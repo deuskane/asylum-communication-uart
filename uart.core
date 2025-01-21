@@ -43,4 +43,4 @@ targets:
   #---------------------------------------
     description     : Default Target
     filesets        :
-      - files_hdl
+      - rtl
