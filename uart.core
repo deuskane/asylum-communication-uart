@@ -30,6 +30,7 @@ filesets:
       - src/uart_baud_rate_gen.vhd
       - src/uart_rx_axis.vhd
       - src/uart_tx_axis.vhd
+      - src/pbi_uart.vhd
     file_type : vhdlSource
     depend :
       - ">=asylum:package:math_pkg:1.0.0"
