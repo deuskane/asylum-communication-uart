@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-01-21
+-- Last update: 2025-01-29
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -89,14 +89,15 @@ begin  -- architecture rtl
 
   ins_uart_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
     generic map(
-      BAUD_RATE      => 115200,
+      BAUD_RATE      => BAUD_RATE,
       CLOCK_FREQ     => CLOCK_FREQ
       )
     port map(
-      clk_i          => clk_i   ,
-      arst_b_i       => arst_b_i,
-      baud_tick_en_i => '1',
-      baud_tick_o    => uart_baud_tick
+      clk_i            => clk_i   ,
+      arst_b_i         => arst_b_i,
+      baud_tick_en_i   => '1',
+      baud_tick_o      => uart_baud_tick,
+      baud_tick_half_o => open
       );
 
   s_axis_tvalid <= ip_cs and ip_we;
