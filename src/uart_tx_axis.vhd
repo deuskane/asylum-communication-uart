@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-01-21
+-- Last update: 2025-03-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -63,18 +63,21 @@ begin
 
   -- Calcul du bit de parité
   process(s_axis_tdata_i, parity_enable_i, parity_odd_i)
+    variable parity_bit_tmp : std_logic;
   begin
     if parity_enable_i = '1' then
-      parity_bit <= '0';
+      parity_bit_tmp := '0';
       for i in 0 to WIDTH-1 loop
-        parity_bit <= parity_bit xor s_axis_tdata_i(i);
+        parity_bit_tmp := parity_bit_tmp xor s_axis_tdata_i(i);
       end loop;
       if parity_odd_i = '1' then
-        parity_bit <= not parity_bit;
+        parity_bit_tmp := not parity_bit_tmp;
       end if;
     else
-      parity_bit <= '1'; -- Pas de parité, bit de stop
+      parity_bit_tmp := '1'; -- Pas de parité, bit de stop
     end if;
+
+    parity_bit <= parity_bit_tmp;
   end process;
 
   -- Logique de transmission UART
