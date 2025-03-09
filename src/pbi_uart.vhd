@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-02-05
+-- Last update: 2025-03-09
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -17,6 +17,7 @@
 -- Revisions  :
 -- Date        Version  Author  Description
 -- 2025-01-21  0.1      rosiere	Created
+-- 2025-03-09  0.2      rosiere	use unconstrained pbi
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -52,13 +53,9 @@ end entity pbi_UART;
 architecture rtl of pbi_UART is
   constant SIZE_ADDR_IP : natural := 2;
   
-  signal ip_cs                  : std_logic;
-  signal ip_re                  : std_logic;
-  signal ip_we                  : std_logic;
-  signal ip_addr                : std_logic_vector (SIZE_ADDR_IP-1   downto 0);
-  signal ip_wdata               : std_logic_vector (PBI_DATA_WIDTH-1 downto 0);
-  signal ip_rdata               : std_logic_vector (PBI_DATA_WIDTH-1 downto 0);
-  signal ip_busy                : std_logic;
+  signal pbi_ini                : pbi_ini_t(addr (SIZE_ADDR_IP  -1 downto 0),
+                                            wdata(PBI_DATA_WIDTH-1 downto 0));
+  signal pbi_tgt                : pbi_tgt_t(rdata(PBI_DATA_WIDTH-1 downto 0));
                             
   signal uart_tx                : std_logic;
   signal uart_rx                : std_logic;
@@ -100,19 +97,14 @@ begin  -- architecture rtl
     clk_i          => clk_i         ,
     cke_i          => '1'           ,
     arstn_i        => arst_b_i      ,
-    ip_cs_o        => ip_cs         ,
-    ip_re_o        => ip_re         ,
-    ip_we_o        => ip_we         ,
-    ip_addr_o      => ip_addr       ,
-    ip_wdata_o     => ip_wdata      ,
-    ip_rdata_i     => ip_rdata      ,
-    ip_busy_i      => ip_busy       ,
     pbi_ini_i      => pbi_ini_i     ,
-    pbi_tgt_o      => pbi_tgt_o     
+    pbi_tgt_o      => pbi_tgt_o     ,
+    pbi_ini_o      => pbi_ini       ,
+    pbi_tgt_i      => pbi_tgt       
     );
 
-  ip_rdata             <= m_axis_tdata;
-  ip_busy              <= not s_axis_tready;
+  pbi_tgt.rdata        <= m_axis_tdata;
+  pbi_tgt.busy         <= not s_axis_tready;
 
   gen_uart_tx: if UART_TX_ENABLE = true
   generate
@@ -131,8 +123,8 @@ begin  -- architecture rtl
         );
 
     uart_tx_baud_tick_en <= '1';
-    s_axis_tvalid        <= ip_cs and ip_we;
-    s_axis_tdata         <= ip_wdata;
+    s_axis_tvalid        <= pbi_ini.cs and pbi_ini.we;
+    s_axis_tdata         <= pbi_ini.wdata;
     
     ins_uart_tx_axis : entity work.uart_tx_axis(rtl)
       generic map
@@ -177,7 +169,7 @@ begin  -- architecture rtl
         baud_tick_half_o => uart_rx_baud_tick_half
         );
 
-    m_axis_tready <= ip_cs and ip_re;
+    m_axis_tready <= pbi_ini.cs and pbi_ini.re;
     uart_rx       <= uart_tx when uart_loopback = '1' else
                      uart_rx_i;
 

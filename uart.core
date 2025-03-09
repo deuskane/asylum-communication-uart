@@ -15,9 +15,10 @@ CAPI=2:
 # Date        Version  Author   Description
 # 2025/01/21  1.0.0    mrosiere Created
 # 2025/02/05  1.1.0    mrosiere UART RX + check with loopback
+# 2025/03/09  1.2.0    mrosiere use unconstrained pbi
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:1.1.0
+name        : asylum:communication:uart:1.2.0
 description : UART TX and RX
 
 #=========================================
@@ -34,7 +35,8 @@ filesets:
       - src/pbi_uart.vhd
     file_type : vhdlSource
     depend :
-      - ">=asylum:package:math_pkg:1.0.0"
+      - asylum:package:math_pkg
+      - asylum:component:pbi_wrapper_target
 
 #=========================================
 targets:
