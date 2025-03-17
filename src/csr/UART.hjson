@@ -1,0 +1,40 @@
+{
+    name      : "UART",
+    width     : 8,
+    desc      : "CSR for UART"
+    registers : [
+        {
+            name         : "data",
+            address      : "x0",
+            desc         : "Write : data to tansmit, Read : data to receive",
+            swaccess     : "rw",
+            hwaccess     : "rw",
+	    hwtype       : "fifo",
+	    
+            fields: [
+                {
+                    name: "value",
+                    bits: "7:0",
+                    desc: "Data with data_oe with mask apply"
+                },
+            ]
+        },
+
+        {
+            name         : "ctrl",
+            address      : "x1",
+            desc         : "Write : data to tansmit, Read : data to receive",
+            swaccess     : "rw",
+            hwaccess     : "none",
+	    
+            fields: [
+                {
+                    name: "value",
+                    bits: "7:0",
+                    desc: "Data with data_oe with mask apply"
+                },
+            ]
+        },
+
+]
+}

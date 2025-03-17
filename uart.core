@@ -16,10 +16,26 @@ CAPI=2:
 # 2025/01/21  1.0.0    mrosiere Created
 # 2025/02/05  1.1.0    mrosiere UART RX + check with loopback
 # 2025/03/09  1.2.0    mrosiere use unconstrained pbi
+# 2025/03/12  1.3.0    mrosiere Add CSR
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:1.2.0
+name        : asylum:communication:uart:1.3.0
 description : UART TX and RX
+
+
+#=========================================
+generate:
+#=========================================
+
+  #---------------------------------------
+  gen_csr:
+  #---------------------------------------
+    generator : regtool
+    parameters:
+      file         : src/csr/UART.hjson
+      name         : UART
+      copy         : src/csr
+      #logical_name : asylum
 
 #=========================================
 filesets:
@@ -48,3 +64,5 @@ targets:
     description     : Default Target
     filesets        :
       - rtl
+    generate        :
+      - gen_csr
