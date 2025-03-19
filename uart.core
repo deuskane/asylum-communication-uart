@@ -51,7 +51,7 @@ filesets:
       - src/pbi_uart.vhd
     file_type : vhdlSource
     depend :
-      - asylum:package:math_pkg
+      - asylum:utils:pkg
       - asylum:component:pbi_wrapper_target
 
 #=========================================

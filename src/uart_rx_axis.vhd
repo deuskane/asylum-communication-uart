@@ -45,16 +45,6 @@ architecture rtl of uart_rx_axis is
   signal   uart_rx_active_r               : std_logic;
   signal   parity_bit_r                   : std_logic;
   
-
-  function reduce_xor(input_vector : STD_LOGIC_VECTOR) return STD_LOGIC is
-    variable temp_result : STD_LOGIC := '0';
-  begin
-    for i in input_vector'range loop
-      temp_result := temp_result xor input_vector(i);
-    end loop;
-    return temp_result;
-  end reduce_xor;
-
 begin
 
   baud_tick_en_o <= '1' when state_r = ACTIVE else
