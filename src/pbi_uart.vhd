@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-03-15
+-- Last update: 2025-03-22
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -102,13 +102,8 @@ begin  -- architecture rtl
   port map(
     clk_i     => clk_i           ,
     arst_b_i  => arst_b_i        ,
-    cs_i      => pbi_ini.cs      ,
-    re_i      => pbi_ini.re      ,
-    we_i      => pbi_ini.we      ,
-    addr_i    => pbi_ini.addr    ,
-    wdata_i   => pbi_ini.wdata   ,
-    rdata_o   => pbi_tgt.rdata   ,
-    busy_o    => pbi_tgt.busy    ,
+    pbi_ini_i => pbi_ini         ,
+    pbi_tgt_o => pbi_tgt         ,
     sw2hw_o   => sw2hw           ,
     hw2sw_i   => hw2sw   
   );

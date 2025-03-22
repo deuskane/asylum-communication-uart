@@ -7,6 +7,8 @@ use     IEEE.NUMERIC_STD.ALL;
 
 library work;
 use     work.UART_csr_pkg.ALL;
+library work;
+use     work.pbi_pkg.all;
 
 --==================================
 -- Module      : UART
@@ -19,13 +21,8 @@ entity UART_registers is
     clk_i      : in  std_logic;
     arst_b_i   : in  std_logic;
     -- Bus
-    cs_i       : in    std_logic;
-    re_i       : in    std_logic;
-    we_i       : in    std_logic;
-    addr_i     : in    std_logic_vector (1-1 downto 0);
-    wdata_i    : in    std_logic_vector (8-1 downto 0);
-    rdata_o    : out   std_logic_vector (8-1 downto 0);
-    busy_o     : out   std_logic;
+    pbi_ini_i  : in  pbi_ini_t;
+    pbi_tgt_o  : out pbi_tgt_t;
     -- CSR
     sw2hw_o    : out UART_sw2hw_t;
     hw2sw_i    : in  UART_hw2sw_t
@@ -70,8 +67,8 @@ begin  -- architecture rtl
   --==================================
 
 
-  data_rcs     <= '1' when     (addr_i = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
-  data_re      <= cs_i and data_rcs and re_i;
+  data_rcs     <= '1' when     (pbi_ini_i.addr = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
+  data_re      <= pbi_ini_i.cs and data_rcs and pbi_ini_i.re;
   data_rdata   <= (
     7 => data_value_rdata(7),
     6 => data_value_rdata(6),
@@ -83,9 +80,9 @@ begin  -- architecture rtl
     0 => data_value_rdata(0),
     others => '0') when data_rcs = '1' else (others => '0');
 
-  data_wcs     <= '1' when     (addr_i = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
-  data_we      <= cs_i and data_wcs and we_i;
-  data_wdata   <= wdata_i;
+  data_wcs     <= '1' when     (pbi_ini_i.addr = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
+  data_we      <= pbi_ini_i.cs and data_wcs and pbi_ini_i.we;
+  data_wdata   <= pbi_ini_i.wdata;
 
   ins_data : entity work.csr_fifo(rtl)
     generic map
@@ -123,8 +120,8 @@ begin  -- architecture rtl
   --==================================
 
 
-  ctrl_rcs     <= '1' when     (addr_i = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
-  ctrl_re      <= cs_i and ctrl_rcs and re_i;
+  ctrl_rcs     <= '1' when     (pbi_ini_i.addr = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
+  ctrl_re      <= pbi_ini_i.cs and ctrl_rcs and pbi_ini_i.re;
   ctrl_rdata   <= (
     7 => ctrl_value_rdata(7),
     6 => ctrl_value_rdata(6),
@@ -136,9 +133,9 @@ begin  -- architecture rtl
     0 => ctrl_value_rdata(0),
     others => '0') when ctrl_rcs = '1' else (others => '0');
 
-  ctrl_wcs     <= '1' when     (addr_i = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
-  ctrl_we      <= cs_i and ctrl_wcs and we_i;
-  ctrl_wdata   <= wdata_i;
+  ctrl_wcs     <= '1' when     (pbi_ini_i.addr = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
+  ctrl_we      <= pbi_ini_i.cs and ctrl_wcs and pbi_ini_i.we;
+  ctrl_wdata   <= pbi_ini_i.wdata;
 
   ins_ctrl : entity work.csr_reg(rtl)
     generic map
@@ -161,10 +158,10 @@ begin  -- architecture rtl
       ,hw_sw_we_o    => sw2hw_o.ctrl.we
       );
 
-  busy_o  <= 
+  pbi_tgt_o.busy  <= 
     data_rbusy or
     ctrl_rbusy;
-  rdata_o <= 
+  pbi_tgt_o.rdata <= 
     data_rdata or
     ctrl_rdata;
 end architecture rtl;

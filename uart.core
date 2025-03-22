@@ -17,11 +17,11 @@ CAPI=2:
 # 2025/02/05  1.1.0    mrosiere UART RX + check with loopback
 # 2025/03/09  1.2.0    mrosiere use unconstrained pbi
 # 2025/03/12  1.3.0    mrosiere Add CSR
+# 2025/03/22  1.4.0    mrosiere Use pbi instead reg interface for csr
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:1.3.0
+name        : asylum:communication:uart:1.4.0
 description : UART TX and RX
-
 
 #=========================================
 generate:

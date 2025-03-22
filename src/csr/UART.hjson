@@ -2,6 +2,7 @@
     name      : "UART",
     width     : 8,
     desc      : "CSR for UART"
+    interface : "pbi"
     registers : [
         {
             name         : "data",
