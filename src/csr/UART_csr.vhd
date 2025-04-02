@@ -67,7 +67,7 @@ begin  -- architecture rtl
   --==================================
 
 
-  data_rcs     <= '1' when     (pbi_ini_i.addr = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
+  data_rcs     <= '1' when     (pbi_ini_i.addr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
   data_re      <= pbi_ini_i.cs and data_rcs and pbi_ini_i.re;
   data_rdata   <= (
     7 => data_value_rdata(7),
@@ -80,7 +80,7 @@ begin  -- architecture rtl
     0 => data_value_rdata(0),
     others => '0') when data_rcs = '1' else (others => '0');
 
-  data_wcs     <= '1' when     (pbi_ini_i.addr = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
+  data_wcs     <= '1' when     (pbi_ini_i.addr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
   data_we      <= pbi_ini_i.cs and data_wcs and pbi_ini_i.we;
   data_wdata   <= pbi_ini_i.wdata;
 
@@ -120,7 +120,7 @@ begin  -- architecture rtl
   --==================================
 
 
-  ctrl_rcs     <= '1' when     (pbi_ini_i.addr = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
+  ctrl_rcs     <= '1' when     (pbi_ini_i.addr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
   ctrl_re      <= pbi_ini_i.cs and ctrl_rcs and pbi_ini_i.re;
   ctrl_rdata   <= (
     7 => ctrl_value_rdata(7),
@@ -133,7 +133,7 @@ begin  -- architecture rtl
     0 => ctrl_value_rdata(0),
     others => '0') when ctrl_rcs = '1' else (others => '0');
 
-  ctrl_wcs     <= '1' when     (pbi_ini_i.addr = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
+  ctrl_wcs     <= '1' when     (pbi_ini_i.addr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
   ctrl_we      <= pbi_ini_i.cs and ctrl_wcs and pbi_ini_i.we;
   ctrl_wdata   <= pbi_ini_i.wdata;
 
@@ -164,4 +164,10 @@ begin  -- architecture rtl
   pbi_tgt_o.rdata <= 
     data_rdata or
     ctrl_rdata;
+
+-- pragma translate_off
+
+
+-- pragma translate_on  
+
 end architecture rtl;

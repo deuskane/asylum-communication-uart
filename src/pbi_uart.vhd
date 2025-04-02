@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-03-22
+-- Last update: 2025-04-02
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -53,9 +53,9 @@ entity pbi_UART is
 end entity pbi_UART;
 
 architecture rtl of pbi_UART is
-  signal pbi_ini                : pbi_ini_t(addr (UART_ADDR_WIDTH-1 downto 0),
-                                            wdata(PBI_DATA_WIDTH-1 downto 0));
-  signal pbi_tgt                : pbi_tgt_t(rdata(PBI_DATA_WIDTH-1 downto 0));
+--signal pbi_ini                : pbi_ini_t(addr (UART_ADDR_WIDTH-1 downto 0),
+--                                          wdata(PBI_DATA_WIDTH-1 downto 0));
+--signal pbi_tgt                : pbi_tgt_t(rdata(PBI_DATA_WIDTH-1 downto 0));
                             
   signal uart_tx                : std_logic;
   signal uart_rx                : std_logic;
@@ -82,28 +82,12 @@ begin  -- architecture rtl
 
   uart_tx_o            <= uart_tx;
   
-  ins_pbi_wrapper_target : entity work.pbi_wrapper_target(rtl)
-  generic map(
-    SIZE_DATA      => PBI_DATA_WIDTH ,
-    SIZE_ADDR_IP   => UART_ADDR_WIDTH,
-    ID             => ID
-     )
-  port map(
-    clk_i          => clk_i         ,
-    cke_i          => '1'           ,
-    arstn_i        => arst_b_i      ,
-    pbi_ini_i      => pbi_ini_i     ,
-    pbi_tgt_o      => pbi_tgt_o     ,
-    pbi_ini_o      => pbi_ini       ,
-    pbi_tgt_i      => pbi_tgt       
-    );
-
   ins_csr : entity work.UART_registers(rtl)
   port map(
     clk_i     => clk_i           ,
     arst_b_i  => arst_b_i        ,
-    pbi_ini_i => pbi_ini         ,
-    pbi_tgt_o => pbi_tgt         ,
+    pbi_ini_i => pbi_ini_i         ,
+    pbi_tgt_o => pbi_tgt_o         ,
     sw2hw_o   => sw2hw           ,
     hw2sw_i   => hw2sw   
   );
