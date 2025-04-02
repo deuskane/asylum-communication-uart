@@ -31,6 +31,17 @@ end entity UART_registers;
 
 architecture rtl of UART_registers is
 
+  signal   sig_wcs   : std_logic;
+  signal   sig_we    : std_logic;
+  signal   sig_waddr : std_logic_vector(pbi_ini_i.addr'length-1 downto 0);
+  signal   sig_wdata : std_logic_vector(pbi_ini_i.wdata'length-1 downto 0);
+
+  signal   sig_rcs   : std_logic;
+  signal   sig_re    : std_logic;
+  signal   sig_raddr : std_logic_vector(pbi_ini_i.addr'length-1 downto 0);
+  signal   sig_rdata : std_logic_vector(pbi_tgt_o.rdata'length-1 downto 0);
+  signal   sig_rbusy : std_logic;
+
   signal   data_wcs   : std_logic;
   signal   data_rcs   : std_logic;
   signal   data_we    : std_logic;
@@ -51,6 +62,18 @@ architecture rtl of UART_registers is
 
 begin  -- architecture rtl
 
+  -- Interface 
+  sig_wcs   <= pbi_ini_i.cs;
+  sig_we    <= pbi_ini_i.we;
+  sig_waddr <= pbi_ini_i.addr;
+  sig_wdata <= pbi_ini_i.wdata;
+
+  sig_rcs   <= pbi_ini_i.cs;
+  sig_re    <= pbi_ini_i.re;
+  sig_raddr <= pbi_ini_i.addr;
+  pbi_tgt_o.rdata <= sig_rdata;
+  pbi_tgt_o.busy <= sig_rbusy;
+
   --==================================
   -- Register    : data
   -- Description : Write : data to tansmit, Read : data to receive
@@ -67,8 +90,8 @@ begin  -- architecture rtl
   --==================================
 
 
-  data_rcs     <= '1' when     (pbi_ini_i.addr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
-  data_re      <= pbi_ini_i.cs and data_rcs and pbi_ini_i.re;
+  data_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
+  data_re      <= sig_rcs and data_rcs and sig_re;
   data_rdata   <= (
     7 => data_value_rdata(7),
     6 => data_value_rdata(6),
@@ -80,9 +103,9 @@ begin  -- architecture rtl
     0 => data_value_rdata(0),
     others => '0') when data_rcs = '1' else (others => '0');
 
-  data_wcs     <= '1' when     (pbi_ini_i.addr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
-  data_we      <= pbi_ini_i.cs and data_wcs and pbi_ini_i.we;
-  data_wdata   <= pbi_ini_i.wdata;
+  data_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
+  data_we      <= sig_wcs and data_wcs and sig_we;
+  data_wdata   <= sig_wdata;
 
   ins_data : entity work.csr_fifo(rtl)
     generic map
@@ -120,8 +143,8 @@ begin  -- architecture rtl
   --==================================
 
 
-  ctrl_rcs     <= '1' when     (pbi_ini_i.addr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
-  ctrl_re      <= pbi_ini_i.cs and ctrl_rcs and pbi_ini_i.re;
+  ctrl_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
+  ctrl_re      <= sig_rcs and ctrl_rcs and sig_re;
   ctrl_rdata   <= (
     7 => ctrl_value_rdata(7),
     6 => ctrl_value_rdata(6),
@@ -133,9 +156,9 @@ begin  -- architecture rtl
     0 => ctrl_value_rdata(0),
     others => '0') when ctrl_rcs = '1' else (others => '0');
 
-  ctrl_wcs     <= '1' when     (pbi_ini_i.addr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
-  ctrl_we      <= pbi_ini_i.cs and ctrl_wcs and pbi_ini_i.we;
-  ctrl_wdata   <= pbi_ini_i.wdata;
+  ctrl_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
+  ctrl_we      <= sig_wcs and ctrl_wcs and sig_we;
+  ctrl_wdata   <= sig_wdata;
 
   ins_ctrl : entity work.csr_reg(rtl)
     generic map
@@ -158,15 +181,23 @@ begin  -- architecture rtl
       ,hw_sw_we_o    => sw2hw_o.ctrl.we
       );
 
-  pbi_tgt_o.busy  <= 
+  sig_rbusy  <= 
     data_rbusy or
     ctrl_rbusy;
-  pbi_tgt_o.rdata <= 
+  sig_rdata <= 
     data_rdata or
     ctrl_rdata;
 
 -- pragma translate_off
 
+  process is
+  begin  -- process
+
+    report "Address Size : "&integer'image(sig_raddr'length) severity note;
+    report "Data    Size : "&integer'image(sig_raddr'length) severity note;
+
+    wait;
+  end process;
 
 -- pragma translate_on  
 
