@@ -34,8 +34,7 @@ entity pbi_UART is
     CLOCK_FREQ          : integer := 50000000;
     BAUD_TICK_CNT_WIDTH : integer := 16;
     UART_TX_ENABLE      : boolean := true;
-    UART_RX_ENABLE      : boolean := true;
-    ID                  : std_logic_vector (PBI_ADDR_WIDTH-1 downto 0) := (others => '0')
+    UART_RX_ENABLE      : boolean := true
     );
   port   (
     clk_i            : in  std_logic;
