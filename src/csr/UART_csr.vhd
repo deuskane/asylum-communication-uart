@@ -42,22 +42,22 @@ architecture rtl of UART_registers is
   signal   sig_rdata : std_logic_vector(pbi_tgt_o.rdata'length-1 downto 0);
   signal   sig_rbusy : std_logic;
 
-  signal   data_wcs   : std_logic;
-  signal   data_rcs   : std_logic;
-  signal   data_we    : std_logic;
-  signal   data_re    : std_logic;
-  signal   data_rdata : std_logic_vector(8-1 downto 0);
-  signal   data_wdata : std_logic_vector(8-1 downto 0);
-  signal   data_rbusy : std_logic;
+  signal   data_wcs       : std_logic;
+  signal   data_we        : std_logic;
+  signal   data_wdata     : std_logic_vector(8-1 downto 0);
+  signal   data_rcs       : std_logic;
+  signal   data_re        : std_logic;
+  signal   data_rdata     : std_logic_vector(8-1 downto 0);
+  signal   data_rbusy     : std_logic;
   signal   data_value_rdata : std_logic_vector(7 downto 0);
 
-  signal   ctrl_wcs   : std_logic;
-  signal   ctrl_rcs   : std_logic;
-  signal   ctrl_we    : std_logic;
-  signal   ctrl_re    : std_logic;
-  signal   ctrl_rdata : std_logic_vector(8-1 downto 0);
-  signal   ctrl_wdata : std_logic_vector(8-1 downto 0);
-  signal   ctrl_rbusy : std_logic;
+  signal   ctrl_wcs       : std_logic;
+  signal   ctrl_we        : std_logic;
+  signal   ctrl_wdata     : std_logic_vector(8-1 downto 0);
+  signal   ctrl_rcs       : std_logic;
+  signal   ctrl_re        : std_logic;
+  signal   ctrl_rdata     : std_logic_vector(8-1 downto 0);
+  signal   ctrl_rbusy     : std_logic;
   signal   ctrl_value_rdata : std_logic_vector(7 downto 0);
 
 begin  -- architecture rtl
@@ -101,7 +101,7 @@ begin  -- architecture rtl
     2 => data_value_rdata(2),
     1 => data_value_rdata(1),
     0 => data_value_rdata(0),
-    others => '0') when data_rcs = '1' else (others => '0');
+    others => '0');
 
   data_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
   data_we      <= sig_wcs and data_wcs and sig_we;
@@ -154,7 +154,7 @@ begin  -- architecture rtl
     2 => ctrl_value_rdata(2),
     1 => ctrl_value_rdata(1),
     0 => ctrl_value_rdata(0),
-    others => '0') when ctrl_rcs = '1' else (others => '0');
+    others => '0');
 
   ctrl_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
   ctrl_we      <= sig_wcs and ctrl_wcs and sig_we;
@@ -181,10 +181,12 @@ begin  -- architecture rtl
       ,hw_sw_we_o    => sw2hw_o.ctrl.we
       );
 
-  sig_rbusy  <= 
-    data_rbusy or
-    ctrl_rbusy;
+  sig_rbusy <= 
+    data_rbusy when data_rcs = '1' else
+    ctrl_rbusy when ctrl_rcs = '1' else
+    '0'; -- Bad Address, no busy
   sig_rdata <= 
-    data_rdata or
-    ctrl_rdata;
+    data_rdata when data_rcs = '1' else
+    ctrl_rdata when ctrl_rcs = '1' else
+    (others => '0'); -- Bad Address, return 0
 end architecture rtl;
