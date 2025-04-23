@@ -119,7 +119,7 @@ begin  -- architecture rtl
   ins_data : entity work.csr_fifo(rtl)
     generic map
       (WIDTH         => 8
-      ,BLOCKING_READ => True,
+      ,BLOCKING_READ => True
       ,BLOCKING_WRITE => True
       )
     port map
