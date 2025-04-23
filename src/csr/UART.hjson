@@ -10,8 +10,13 @@
             desc         : "Write : data to tansmit, Read : data to receive",
             swaccess     : "rw",
             hwaccess     : "rw",
-	    hwtype       : "fifo",
-	    
+            hwtype       : "fifo",
+
+            params: {
+                BLOCKING_READ  : "True", 
+                BLOCKING_WRITE : "True",
+            }
+
             fields: [
                 {
                     name: "value",
@@ -27,7 +32,7 @@
             desc         : "Write : data to tansmit, Read : data to receive",
             swaccess     : "rw",
             hwaccess     : "none",
-	    
+    
             fields: [
                 {
                     name: "value",
