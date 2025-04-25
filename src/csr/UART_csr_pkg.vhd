@@ -26,7 +26,7 @@ package UART_csr_pkg is
     valid : std_logic;
   --==================================
   -- Field       : value
-  -- Description : Data with data_oe with mask apply
+  -- Description : Data TX or Data RX
   -- Width       : 8
   --==================================
     value : std_logic_vector(8-1 downto 0);
@@ -37,7 +37,7 @@ package UART_csr_pkg is
     valid : std_logic;
   --==================================
   -- Field       : value
-  -- Description : Data with data_oe with mask apply
+  -- Description : Data TX or Data RX
   -- Width       : 8
   --==================================
     value : std_logic_vector(8-1 downto 0);
@@ -45,16 +45,46 @@ package UART_csr_pkg is
 
   --==================================
   -- Register    : ctrl
-  -- Description : Write : data to tansmit, Read : data to receive
+  -- Description : Control Register
   -- Address     : 0x1
-  -- Width       : 8
+  -- Width       : 5
   -- Sw Access   : rw
-  -- Hw Access   : none
+  -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
   type UART_ctrl_sw2hw_t is record
     re : std_logic;
     we : std_logic;
+  --==================================
+  -- Field       : enable_tx
+  -- Description : 0 : TX is disable, 1 : TX is enable
+  -- Width       : 1
+  --==================================
+    enable_tx : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : enable_rx
+  -- Description : 0 : RX is disable, 1 : RX is enable
+  -- Width       : 1
+  --==================================
+    enable_rx : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : parity_enable
+  -- Description : 0 : Parity is disable, 1 : Parity is enable
+  -- Width       : 1
+  --==================================
+    parity_enable : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : parity_odd
+  -- Description : 0 : Parity is even, 1 : Parity is odd
+  -- Width       : 1
+  --==================================
+    parity_odd : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : loopback
+  -- Description : 0 : UART RX is connected to input, 1 : UART RX is connected to UART TX
+  -- Width       : 1
+  --==================================
+    loopback : std_logic_vector(1-1 downto 0);
   end record UART_ctrl_sw2hw_t;
 
   ------------------------------------

@@ -21,7 +21,7 @@
                 {
                     name: "value",
                     bits: "7:0",
-                    desc: "Data with data_oe with mask apply"
+                    desc: "Data TX or Data RX"
                 },
             ]
         },
@@ -29,15 +29,35 @@
         {
             name         : "ctrl",
             address      : "x1",
-            desc         : "Write : data to tansmit, Read : data to receive",
+            desc         : "Control Register",
             swaccess     : "rw",
-            hwaccess     : "none",
-    
+            hwaccess     : "ro",
+
             fields: [
                 {
-                    name: "value",
-                    bits: "7:0",
-                    desc: "Data with data_oe with mask apply"
+                    name: "enable_tx",
+                    bits: "0",
+                    desc: "0 : TX is disable, 1 : TX is enable"
+                },
+                {
+                    name: "enable_rx",
+                    bits: "1",
+                    desc: "0 : RX is disable, 1 : RX is enable"
+                },
+                {
+                    name: "parity_enable",
+                    bits: "2",
+                    desc: "0 : Parity is disable, 1 : Parity is enable"
+                },
+                {
+                    name: "parity_odd",
+                    bits: "3",
+                    desc: "0 : Parity is even, 1 : Parity is odd"
+                },
+                {
+                    name: "loopback",
+                    bits: "7",
+                    desc: "0 : UART RX is connected to input, 1 : UART RX is connected to UART TX"
                 },
             ]
         },

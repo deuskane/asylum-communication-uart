@@ -48,22 +48,30 @@ architecture rtl of UART_registers is
   signal   data_wcs       : std_logic;
   signal   data_we        : std_logic;
   signal   data_wdata     : std_logic_vector(8-1 downto 0);
+  signal   data_wdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   data_wdata_hw  : std_logic_vector(8-1 downto 0);
   signal   data_wbusy     : std_logic;
+
   signal   data_rcs       : std_logic;
   signal   data_re        : std_logic;
   signal   data_rdata     : std_logic_vector(8-1 downto 0);
+  signal   data_rdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   data_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   data_rbusy     : std_logic;
-  signal   data_value_rdata : std_logic_vector(7 downto 0);
 
   signal   ctrl_wcs       : std_logic;
   signal   ctrl_we        : std_logic;
   signal   ctrl_wdata     : std_logic_vector(8-1 downto 0);
+  signal   ctrl_wdata_sw  : std_logic_vector(5-1 downto 0);
+  signal   ctrl_wdata_hw  : std_logic_vector(5-1 downto 0);
   signal   ctrl_wbusy     : std_logic;
+
   signal   ctrl_rcs       : std_logic;
   signal   ctrl_re        : std_logic;
   signal   ctrl_rdata     : std_logic_vector(8-1 downto 0);
+  signal   ctrl_rdata_sw  : std_logic_vector(5-1 downto 0);
+  signal   ctrl_rdata_hw  : std_logic_vector(5-1 downto 0);
   signal   ctrl_rbusy     : std_logic;
-  signal   ctrl_value_rdata : std_logic_vector(7 downto 0);
 
 begin  -- architecture rtl
 
@@ -94,7 +102,7 @@ begin  -- architecture rtl
   --==================================
   --==================================
   -- Field       : value
-  -- Description : Data with data_oe with mask apply
+  -- Description : Data TX or Data RX
   -- Width       : 8
   --==================================
 
@@ -102,19 +110,22 @@ begin  -- architecture rtl
   data_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
   data_re      <= sig_rcs and sig_re and data_rcs;
   data_rdata   <= (
-    7 => data_value_rdata(7),
-    6 => data_value_rdata(6),
-    5 => data_value_rdata(5),
-    4 => data_value_rdata(4),
-    3 => data_value_rdata(3),
-    2 => data_value_rdata(2),
-    1 => data_value_rdata(1),
-    0 => data_value_rdata(0),
+    0 => data_rdata_sw(0), -- value(0)
+    1 => data_rdata_sw(1), -- value(1)
+    2 => data_rdata_sw(2), -- value(2)
+    3 => data_rdata_sw(3), -- value(3)
+    4 => data_rdata_sw(4), -- value(4)
+    5 => data_rdata_sw(5), -- value(5)
+    6 => data_rdata_sw(6), -- value(6)
+    7 => data_rdata_sw(7), -- value(7)
     others => '0');
 
   data_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
   data_we      <= sig_wcs and sig_we and data_wcs;
   data_wdata   <= sig_wdata;
+  data_wdata_sw(7 downto 0) <= data_wdata(7 downto 0); -- value
+  data_wdata_hw(7 downto 0) <= hw2sw_i.data.value; -- value
+  sw2hw_o.data.value <= data_rdata_hw(7 downto 0); -- value
 
   ins_data : entity work.csr_fifo(rtl)
     generic map
@@ -125,70 +136,105 @@ begin  -- architecture rtl
     port map
       (clk_i         => clk_i
       ,arst_b_i      => arst_b_i
-      ,sw_wd_i       => data_wdata(7 downto 0)
-      ,sw_rd_o       => data_value_rdata
+      ,sw_wd_i       => data_wdata_sw
+      ,sw_rd_o       => data_rdata_sw
       ,sw_we_i       => data_we
       ,sw_re_i       => data_re
       ,sw_rbusy_o    => data_rbusy
       ,sw_wbusy_o    => data_wbusy
       ,hw_tx_valid_i => hw2sw_i.data.valid
       ,hw_tx_ready_o => sw2hw_o.data.ready
-      ,hw_tx_data_i  => hw2sw_i.data.value
+      ,hw_tx_data_i  => data_wdata_hw
       ,hw_rx_valid_o => sw2hw_o.data.valid
       ,hw_rx_ready_i => hw2sw_i.data.ready
-      ,hw_rx_data_o  => sw2hw_o.data.value
+      ,hw_rx_data_o  => data_rdata_hw
       );
 
   --==================================
   -- Register    : ctrl
-  -- Description : Write : data to tansmit, Read : data to receive
+  -- Description : Control Register
   -- Address     : 0x1
-  -- Width       : 8
+  -- Width       : 5
   -- Sw Access   : rw
-  -- Hw Access   : none
+  -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
   --==================================
-  -- Field       : value
-  -- Description : Data with data_oe with mask apply
-  -- Width       : 8
+  -- Field       : enable_tx
+  -- Description : 0 : TX is disable, 1 : TX is enable
+  -- Width       : 1
+  --==================================
+
+  --==================================
+  -- Field       : enable_rx
+  -- Description : 0 : RX is disable, 1 : RX is enable
+  -- Width       : 1
+  --==================================
+
+  --==================================
+  -- Field       : parity_enable
+  -- Description : 0 : Parity is disable, 1 : Parity is enable
+  -- Width       : 1
+  --==================================
+
+  --==================================
+  -- Field       : parity_odd
+  -- Description : 0 : Parity is even, 1 : Parity is odd
+  -- Width       : 1
+  --==================================
+
+  --==================================
+  -- Field       : loopback
+  -- Description : 0 : UART RX is connected to input, 1 : UART RX is connected to UART TX
+  -- Width       : 1
   --==================================
 
 
   ctrl_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
   ctrl_re      <= sig_rcs and sig_re and ctrl_rcs;
   ctrl_rdata   <= (
-    7 => ctrl_value_rdata(7),
-    6 => ctrl_value_rdata(6),
-    5 => ctrl_value_rdata(5),
-    4 => ctrl_value_rdata(4),
-    3 => ctrl_value_rdata(3),
-    2 => ctrl_value_rdata(2),
-    1 => ctrl_value_rdata(1),
-    0 => ctrl_value_rdata(0),
+    0 => ctrl_rdata_sw(0), -- enable_tx(0)
+    1 => ctrl_rdata_sw(1), -- enable_rx(0)
+    2 => ctrl_rdata_sw(2), -- parity_enable(0)
+    3 => ctrl_rdata_sw(3), -- parity_odd(0)
+    7 => ctrl_rdata_sw(4), -- loopback(0)
     others => '0');
 
   ctrl_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
   ctrl_we      <= sig_wcs and sig_we and ctrl_wcs;
   ctrl_wdata   <= sig_wdata;
+  ctrl_wdata_sw(0 downto 0) <= ctrl_wdata(0 downto 0); -- enable_tx
+  ctrl_wdata_sw(1 downto 1) <= ctrl_wdata(1 downto 1); -- enable_rx
+  ctrl_wdata_sw(2 downto 2) <= ctrl_wdata(2 downto 2); -- parity_enable
+  ctrl_wdata_sw(3 downto 3) <= ctrl_wdata(3 downto 3); -- parity_odd
+  ctrl_wdata_sw(4 downto 4) <= ctrl_wdata(7 downto 7); -- loopback
+  sw2hw_o.ctrl.enable_tx <= ctrl_rdata_hw(0 downto 0); -- enable_tx
+  sw2hw_o.ctrl.enable_rx <= ctrl_rdata_hw(1 downto 1); -- enable_rx
+  sw2hw_o.ctrl.parity_enable <= ctrl_rdata_hw(2 downto 2); -- parity_enable
+  sw2hw_o.ctrl.parity_odd <= ctrl_rdata_hw(3 downto 3); -- parity_odd
+  sw2hw_o.ctrl.loopback <= ctrl_rdata_hw(4 downto 4); -- loopback
 
   ins_ctrl : entity work.csr_reg(rtl)
     generic map
-      (WIDTH         => 8
-      ,INIT          => "00000000"
+      (WIDTH         => 5
+      ,INIT          => "0" -- enable_tx
+                       &"0" -- enable_rx
+                       &"0" -- parity_enable
+                       &"0" -- parity_odd
+                       &"0" -- loopback
       ,MODEL         => "rw"
       )
     port map
       (clk_i         => clk_i
       ,arst_b_i      => arst_b_i
-      ,sw_wd_i       => ctrl_wdata(7 downto 0)
-      ,sw_rd_o       => ctrl_value_rdata
+      ,sw_wd_i       => ctrl_wdata_sw
+      ,sw_rd_o       => ctrl_rdata_sw
       ,sw_we_i       => ctrl_we
       ,sw_re_i       => ctrl_re
       ,sw_rbusy_o    => ctrl_rbusy
       ,sw_wbusy_o    => ctrl_wbusy
       ,hw_wd_i       => (others => '0')
-      ,hw_rd_o       => open
+      ,hw_rd_o       => ctrl_rdata_hw
       ,hw_we_i       => '0'
       ,hw_sw_re_o    => sw2hw_o.ctrl.re
       ,hw_sw_we_o    => sw2hw_o.ctrl.we
