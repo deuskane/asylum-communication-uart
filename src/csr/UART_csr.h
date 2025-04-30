@@ -27,35 +27,47 @@
 //==================================
 #define UART_CTRL 0x1
 
-// Field       : ctrl.enable_tx
+// Field       : ctrl.tx_enable
 // Description : 0 : TX is disable, 1 : TX is enable
 // Range       : [0]
-#define UART_CTRL_ENABLE_TX      0
-#define UART_CTRL_ENABLE_TX_MASK 1
+#define UART_CTRL_TX_ENABLE      0
+#define UART_CTRL_TX_ENABLE_MASK 1
 
-// Field       : ctrl.enable_rx
-// Description : 0 : RX is disable, 1 : RX is enable
-// Range       : [1]
-#define UART_CTRL_ENABLE_RX      1
-#define UART_CTRL_ENABLE_RX_MASK 1
-
-// Field       : ctrl.parity_enable
+// Field       : ctrl.tx_parity_enable
 // Description : 0 : Parity is disable, 1 : Parity is enable
-// Range       : [2]
-#define UART_CTRL_PARITY_ENABLE      2
-#define UART_CTRL_PARITY_ENABLE_MASK 1
+// Range       : [1]
+#define UART_CTRL_TX_PARITY_ENABLE      1
+#define UART_CTRL_TX_PARITY_ENABLE_MASK 1
 
-// Field       : ctrl.parity_odd
+// Field       : ctrl.tx_parity_odd
 // Description : 0 : Parity is even, 1 : Parity is odd
-// Range       : [3]
-#define UART_CTRL_PARITY_ODD      3
-#define UART_CTRL_PARITY_ODD_MASK 1
+// Range       : [2]
+#define UART_CTRL_TX_PARITY_ODD      2
+#define UART_CTRL_TX_PARITY_ODD_MASK 1
 
-// Field       : ctrl.loopback
-// Description : 0 : UART RX is connected to input, 1 : UART RX is connected to UART TX
+// Field       : ctrl.rx_enable
+// Description : 0 : RX is disable, 1 : RX is enable
+// Range       : [4]
+#define UART_CTRL_RX_ENABLE      4
+#define UART_CTRL_RX_ENABLE_MASK 1
+
+// Field       : ctrl.rx_parity_enable
+// Description : 0 : Parity is disable, 1 : Parity is enable
+// Range       : [5]
+#define UART_CTRL_RX_PARITY_ENABLE      5
+#define UART_CTRL_RX_PARITY_ENABLE_MASK 1
+
+// Field       : ctrl.rx_parity_odd
+// Description : 0 : Parity is even, 1 : Parity is odd
+// Range       : [6]
+#define UART_CTRL_RX_PARITY_ODD      6
+#define UART_CTRL_RX_PARITY_ODD_MASK 1
+
+// Field       : ctrl.rx_use_loopback
+// Description : 0 : UART RX is connected to UART RX Input, 1 : UART RX is connected to UART TX
 // Range       : [7]
-#define UART_CTRL_LOOPBACK      7
-#define UART_CTRL_LOOPBACK_MASK 1
+#define UART_CTRL_RX_USE_LOOPBACK      7
+#define UART_CTRL_RX_USE_LOOPBACK_MASK 1
 
 //----------------------------------
 // Structure {module}_t

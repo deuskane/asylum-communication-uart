@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-04-02
+-- Last update: 2025-04-30
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -52,32 +52,40 @@ entity pbi_UART is
 end entity pbi_UART;
 
 architecture rtl of pbi_UART is
---signal pbi_ini                : pbi_ini_t(addr (UART_ADDR_WIDTH-1 downto 0),
---                                          wdata(PBI_DATA_WIDTH-1 downto 0));
---signal pbi_tgt                : pbi_tgt_t(rdata(PBI_DATA_WIDTH-1 downto 0));
-                            
   signal uart_tx                : std_logic;
   signal uart_rx                : std_logic;
 
-  signal uart_tx_baud_tick_en   : std_logic;
-  signal uart_tx_baud_tick      : std_logic;
+  signal tx_baud_tick_en        : std_logic;
+  signal tx_baud_tick           : std_logic;
+                                
+  signal rx_baud_tick_en        : std_logic;
+  signal rx_baud_tick           : std_logic;
+  signal rx_baud_tick_half      : std_logic;
 
-  signal uart_rx_baud_tick_en   : std_logic;
-  signal uart_rx_baud_tick      : std_logic;
-  signal uart_rx_baud_tick_half : std_logic;
+  signal tx_enable              : std_logic;
+  signal tx_parity_enable       : std_logic;
+  signal tx_parity_odd          : std_logic;
+--signal tx_use_loopback        : std_logic;
 
-  signal parity_enable          : std_logic;
-  signal parity_odd             : std_logic;
-  signal uart_loopback          : std_logic;
+  signal rx_enable              : std_logic;
+  signal rx_parity_enable       : std_logic;
+  signal rx_parity_odd          : std_logic;
+  signal rx_use_loopback        : std_logic;
 
   signal sw2hw                  : UART_sw2hw_t;
   signal hw2sw                  : UART_hw2sw_t;
   
 begin  -- architecture rtl
 
-  parity_enable        <= '0';
-  parity_odd           <= '0';
-  uart_loopback        <= '1';
+  rx_enable            <= sw2hw.ctrl.rx_enable       (0);
+  rx_parity_enable     <= sw2hw.ctrl.rx_parity_enable(0);
+  rx_parity_odd        <= sw2hw.ctrl.rx_parity_odd   (0);
+  rx_use_loopback      <= sw2hw.ctrl.rx_use_loopback (0);
+
+  tx_enable            <= sw2hw.ctrl.tx_enable       (0);
+  tx_parity_enable     <= sw2hw.ctrl.tx_parity_enable(0);
+  tx_parity_odd        <= sw2hw.ctrl.tx_parity_odd   (0);
+--tx_use_loopback      <= sw2hw.ctrl.tx_use_loopback (0);
 
   uart_tx_o            <= uart_tx;
   
@@ -85,8 +93,8 @@ begin  -- architecture rtl
   port map(
     clk_i     => clk_i           ,
     arst_b_i  => arst_b_i        ,
-    pbi_ini_i => pbi_ini_i         ,
-    pbi_tgt_o => pbi_tgt_o         ,
+    pbi_ini_i => pbi_ini_i       ,
+    pbi_tgt_o => pbi_tgt_o       ,
     sw2hw_o   => sw2hw           ,
     hw2sw_i   => hw2sw   
   );
@@ -95,19 +103,19 @@ begin  -- architecture rtl
   generate
 
     ins_uart_tx_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
-      generic map(
-        BAUD_RATE      => BAUD_RATE,
-        CLOCK_FREQ     => CLOCK_FREQ
-        )
-      port map(
-        clk_i            => clk_i   ,
-        arst_b_i         => arst_b_i,
-        baud_tick_en_i   => uart_tx_baud_tick_en,
-        baud_tick_o      => uart_tx_baud_tick,
-        baud_tick_half_o => open
-        );
+      generic map
+      (BAUD_RATE      => BAUD_RATE
+      ,CLOCK_FREQ     => CLOCK_FREQ
+       )
+      port map
+      (clk_i            => clk_i
+      ,arst_b_i         => tx_enable
+      ,baud_tick_en_i   => tx_baud_tick_en
+      ,baud_tick_o      => tx_baud_tick
+      ,baud_tick_half_o => open
+      );
 
-    uart_tx_baud_tick_en <= '1';
+    tx_baud_tick_en <= '1';
     
     ins_uart_tx_axis : entity work.uart_tx_axis(rtl)
       generic map
@@ -115,14 +123,14 @@ begin  -- architecture rtl
         )
       port map
       ( clk_i           => clk_i
-       ,arst_b_i        => arst_b_i
+       ,arst_b_i        => tx_enable
        ,s_axis_tdata_i  => sw2hw.data.value
        ,s_axis_tvalid_i => sw2hw.data.valid
        ,s_axis_tready_o => hw2sw.data.ready
        ,uart_tx_o       => uart_tx
-       ,baud_tick_i     => uart_tx_baud_tick
-       ,parity_enable_i => parity_enable
-       ,parity_odd_i    => parity_odd   
+       ,baud_tick_i     => tx_baud_tick
+       ,parity_enable_i => tx_parity_enable
+       ,parity_odd_i    => tx_parity_odd   
        );
     
   end generate gen_uart_tx;
@@ -137,19 +145,19 @@ begin  -- architecture rtl
   generate
 
     ins_uart_rx_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
-      generic map(
-        BAUD_RATE      => BAUD_RATE,
-        CLOCK_FREQ     => CLOCK_FREQ
+      generic map
+      (BAUD_RATE      => BAUD_RATE
+      ,CLOCK_FREQ     => CLOCK_FREQ
         )
-      port map(
-        clk_i            => clk_i   ,
-        arst_b_i         => arst_b_i,
-        baud_tick_en_i   => uart_rx_baud_tick_en,
-        baud_tick_o      => uart_rx_baud_tick,
-        baud_tick_half_o => uart_rx_baud_tick_half
-        );
+      port map
+      (clk_i            => clk_i
+      ,arst_b_i         => rx_enable
+      ,baud_tick_en_i   => rx_baud_tick_en
+      ,baud_tick_o      => rx_baud_tick
+      ,baud_tick_half_o => rx_baud_tick_half
+       );
 
-    uart_rx       <= uart_tx when uart_loopback = '1' else
+    uart_rx       <= uart_tx when rx_use_loopback = '1' else
                      uart_rx_i;
 
     ins_uart_rx_axis : entity work.uart_rx_axis(rtl)
@@ -158,16 +166,16 @@ begin  -- architecture rtl
         )
       port map
       ( clk_i           => clk_i
-       ,arst_b_i        => arst_b_i
+       ,arst_b_i        => rx_enable
        ,m_axis_tdata_o  => hw2sw.data.value
        ,m_axis_tvalid_o => hw2sw.data.valid
        ,m_axis_tready_i => sw2hw.data.ready
        ,uart_rx_i       => uart_rx
-       ,baud_tick_en_o  => uart_rx_baud_tick_en
-       ,baud_tick_i     => uart_rx_baud_tick
-       ,baud_tick_half_i=> uart_rx_baud_tick_half
-       ,parity_enable_i => parity_enable
-       ,parity_odd_i    => parity_odd   
+       ,baud_tick_en_o  => rx_baud_tick_en
+       ,baud_tick_i     => rx_baud_tick
+       ,baud_tick_half_i=> rx_baud_tick_half
+       ,parity_enable_i => rx_parity_enable
+       ,parity_odd_i    => rx_parity_odd   
         );
 
   end generate gen_uart_rx;

@@ -47,7 +47,7 @@ package UART_csr_pkg is
   -- Register    : ctrl
   -- Description : Control Register
   -- Address     : 0x1
-  -- Width       : 5
+  -- Width       : 7
   -- Sw Access   : rw
   -- Hw Access   : ro
   -- Hw Type     : reg
@@ -56,35 +56,47 @@ package UART_csr_pkg is
     re : std_logic;
     we : std_logic;
   --==================================
-  -- Field       : enable_tx
+  -- Field       : tx_enable
   -- Description : 0 : TX is disable, 1 : TX is enable
   -- Width       : 1
   --==================================
-    enable_tx : std_logic_vector(1-1 downto 0);
+    tx_enable : std_logic_vector(1-1 downto 0);
   --==================================
-  -- Field       : enable_rx
-  -- Description : 0 : RX is disable, 1 : RX is enable
-  -- Width       : 1
-  --==================================
-    enable_rx : std_logic_vector(1-1 downto 0);
-  --==================================
-  -- Field       : parity_enable
+  -- Field       : tx_parity_enable
   -- Description : 0 : Parity is disable, 1 : Parity is enable
   -- Width       : 1
   --==================================
-    parity_enable : std_logic_vector(1-1 downto 0);
+    tx_parity_enable : std_logic_vector(1-1 downto 0);
   --==================================
-  -- Field       : parity_odd
+  -- Field       : tx_parity_odd
   -- Description : 0 : Parity is even, 1 : Parity is odd
   -- Width       : 1
   --==================================
-    parity_odd : std_logic_vector(1-1 downto 0);
+    tx_parity_odd : std_logic_vector(1-1 downto 0);
   --==================================
-  -- Field       : loopback
-  -- Description : 0 : UART RX is connected to input, 1 : UART RX is connected to UART TX
+  -- Field       : rx_enable
+  -- Description : 0 : RX is disable, 1 : RX is enable
   -- Width       : 1
   --==================================
-    loopback : std_logic_vector(1-1 downto 0);
+    rx_enable : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_parity_enable
+  -- Description : 0 : Parity is disable, 1 : Parity is enable
+  -- Width       : 1
+  --==================================
+    rx_parity_enable : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_parity_odd
+  -- Description : 0 : Parity is even, 1 : Parity is odd
+  -- Width       : 1
+  --==================================
+    rx_parity_odd : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_use_loopback
+  -- Description : 0 : UART RX is connected to UART RX Input, 1 : UART RX is connected to UART TX
+  -- Width       : 1
+  --==================================
+    rx_use_loopback : std_logic_vector(1-1 downto 0);
   end record UART_ctrl_sw2hw_t;
 
   ------------------------------------

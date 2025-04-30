@@ -35,29 +35,39 @@
 
             fields: [
                 {
-                    name: "enable_tx",
+                    name: "tx_enable",
                     bits: "0",
                     desc: "0 : TX is disable, 1 : TX is enable"
                 },
                 {
-                    name: "enable_rx",
+                    name: "tx_parity_enable",
                     bits: "1",
-                    desc: "0 : RX is disable, 1 : RX is enable"
-                },
-                {
-                    name: "parity_enable",
-                    bits: "2",
                     desc: "0 : Parity is disable, 1 : Parity is enable"
                 },
                 {
-                    name: "parity_odd",
-                    bits: "3",
+                    name: "tx_parity_odd",
+                    bits: "2",
                     desc: "0 : Parity is even, 1 : Parity is odd"
                 },
                 {
-                    name: "loopback",
+                    name: "rx_enable",
+                    bits: "4",
+                    desc: "0 : RX is disable, 1 : RX is enable"
+                },
+                {
+                    name: "rx_parity_enable",
+                    bits: "5",
+                    desc: "0 : Parity is disable, 1 : Parity is enable"
+                },
+                {
+                    name: "rx_parity_odd",
+                    bits: "6",
+                    desc: "0 : Parity is even, 1 : Parity is odd"
+                },
+                {
+                    name: "rx_use_loopback",
                     bits: "7",
-                    desc: "0 : UART RX is connected to input, 1 : UART RX is connected to UART TX"
+                    desc: "0 : UART RX is connected to UART RX Input, 1 : UART RX is connected to UART TX"
                 },
             ]
         },
