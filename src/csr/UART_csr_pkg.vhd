@@ -26,7 +26,7 @@ package UART_csr_pkg is
     valid : std_logic;
   --==================================
   -- Field       : value
-  -- Description : Data with data_oe with mask apply
+  -- Description : Data TX or Data RX
   -- Width       : 8
   --==================================
     value : std_logic_vector(8-1 downto 0);
@@ -37,7 +37,7 @@ package UART_csr_pkg is
     valid : std_logic;
   --==================================
   -- Field       : value
-  -- Description : Data with data_oe with mask apply
+  -- Description : Data TX or Data RX
   -- Width       : 8
   --==================================
     value : std_logic_vector(8-1 downto 0);
@@ -45,16 +45,64 @@ package UART_csr_pkg is
 
   --==================================
   -- Register    : ctrl
-  -- Description : Write : data to tansmit, Read : data to receive
+  -- Description : Control Register
   -- Address     : 0x1
   -- Width       : 8
   -- Sw Access   : rw
-  -- Hw Access   : none
+  -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
   type UART_ctrl_sw2hw_t is record
     re : std_logic;
     we : std_logic;
+  --==================================
+  -- Field       : tx_enable
+  -- Description : 0 : TX is disable, 1 : TX is enable
+  -- Width       : 1
+  --==================================
+    tx_enable : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : tx_parity_enable
+  -- Description : 0 : Parity is disable, 1 : Parity is enable
+  -- Width       : 1
+  --==================================
+    tx_parity_enable : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : tx_parity_odd
+  -- Description : 0 : Parity is even, 1 : Parity is odd
+  -- Width       : 1
+  --==================================
+    tx_parity_odd : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : tx_use_loopback
+  -- Description : 0 : UART TX FIFO is connected to CSR, 1 : UART RX FIFO is connected to UART RX FIFO
+  -- Width       : 1
+  --==================================
+    tx_use_loopback : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_enable
+  -- Description : 0 : RX is disable, 1 : RX is enable
+  -- Width       : 1
+  --==================================
+    rx_enable : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_parity_enable
+  -- Description : 0 : Parity is disable, 1 : Parity is enable
+  -- Width       : 1
+  --==================================
+    rx_parity_enable : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_parity_odd
+  -- Description : 0 : Parity is even, 1 : Parity is odd
+  -- Width       : 1
+  --==================================
+    rx_parity_odd : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_use_loopback
+  -- Description : 0 : UART RX is connected to UART RX Input, 1 : UART RX is connected to UART TX
+  -- Width       : 1
+  --==================================
+    rx_use_loopback : std_logic_vector(1-1 downto 0);
   end record UART_ctrl_sw2hw_t;
 
   ------------------------------------
