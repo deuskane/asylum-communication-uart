@@ -52,6 +52,11 @@ entity pbi_UART is
 end entity pbi_UART;
 
 architecture rtl of pbi_UART is
+  -- Compute Max baud tick counter
+  constant BAUD_TICK_CNT_MAX    : integer := (CLOCK_FREQ / BAUD_RATE) - 1;
+  constant BAUD_TICK_CNT_MAX_SLV: std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) := std_logic_vector(to_unsigned(BAUD_TICK_CNT_MAX, BAUD_TICK_CNT_WIDTH));
+
+  
   signal uart_tx                : std_logic;
   signal uart_rx                : std_logic;
 
@@ -107,15 +112,15 @@ begin  -- architecture rtl
 
     ins_uart_tx_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
       generic map
-      (BAUD_RATE      => BAUD_RATE
-      ,CLOCK_FREQ     => CLOCK_FREQ
+      (BAUD_TICK_CNT_WIDTH     => BAUD_TICK_CNT_WIDTH
        )
       port map
-      (clk_i            => clk_i
-      ,arst_b_i         => tx_enable
-      ,baud_tick_en_i   => tx_baud_tick_en
-      ,baud_tick_o      => tx_baud_tick
-      ,baud_tick_half_o => open
+      (clk_i                   => clk_i
+      ,arst_b_i                => tx_enable
+      ,baud_tick_en_i          => tx_baud_tick_en
+      ,baud_tick_o             => tx_baud_tick
+      ,baud_tick_half_o        => open
+      ,cfg_baud_tick_cnt_max_i => BAUD_TICK_CNT_MAX_SLV
       );
 
     tx_baud_tick_en  <= '1';
@@ -171,16 +176,16 @@ begin  -- architecture rtl
 
     ins_uart_rx_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
       generic map
-      (BAUD_RATE      => BAUD_RATE
-      ,CLOCK_FREQ     => CLOCK_FREQ
-        )
+      (BAUD_TICK_CNT_WIDTH     => BAUD_TICK_CNT_WIDTH
+       )
       port map
-      (clk_i            => clk_i
-      ,arst_b_i         => rx_enable
-      ,baud_tick_en_i   => rx_baud_tick_en
-      ,baud_tick_o      => rx_baud_tick
-      ,baud_tick_half_o => rx_baud_tick_half
-       );
+      (clk_i                   => clk_i
+      ,arst_b_i                => rx_enable
+      ,baud_tick_en_i          => rx_baud_tick_en
+      ,baud_tick_o             => rx_baud_tick
+      ,baud_tick_half_o        => rx_baud_tick_half
+      ,cfg_baud_tick_cnt_max_i => BAUD_TICK_CNT_MAX_SLV
+      );
 
     ins_uart_rx_axis : entity work.uart_rx_axis(rtl)
       generic map
@@ -229,5 +234,17 @@ begin  -- architecture rtl
     hw2sw.data.valid   <= '0';
     
   end generate gen_uart_rx_b;
+
+-- synthesis translate_off
+  process
+  begin
+    report "Clock Frequency       : " & integer'image(CLOCK_FREQ);
+    report "Baud Rate             : " & integer'image(BAUD_RATE);
+    report "Baud Tick Counter Max : " & integer'image(BAUD_TICK_CNT_MAX);
+    report "Baud Tick Counter Div2: " & integer'image(BAUD_TICK_CNT_MAX/2);
+    wait;
+  end process;
+-- synthesis translate_on
+
   
 end architecture rtl;
