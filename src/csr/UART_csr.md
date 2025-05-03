@@ -24,6 +24,9 @@ Control Register
 ### [2:2] tx_parity_odd
 0 : Parity is even, 1 : Parity is odd
 
+### [3:3] tx_use_loopback
+0 : UART TX FIFO is connected to CSR, 1 : UART RX FIFO is connected to UART RX FIFO
+
 ### [4:4] rx_enable
 0 : RX is disable, 1 : RX is enable
 

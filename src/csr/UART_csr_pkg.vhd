@@ -47,7 +47,7 @@ package UART_csr_pkg is
   -- Register    : ctrl
   -- Description : Control Register
   -- Address     : 0x1
-  -- Width       : 7
+  -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
   -- Hw Type     : reg
@@ -73,6 +73,12 @@ package UART_csr_pkg is
   -- Width       : 1
   --==================================
     tx_parity_odd : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : tx_use_loopback
+  -- Description : 0 : UART TX FIFO is connected to CSR, 1 : UART RX FIFO is connected to UART RX FIFO
+  -- Width       : 1
+  --==================================
+    tx_use_loopback : std_logic_vector(1-1 downto 0);
   --==================================
   -- Field       : rx_enable
   -- Description : 0 : RX is disable, 1 : RX is enable

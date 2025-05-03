@@ -45,6 +45,12 @@
 #define UART_CTRL_TX_PARITY_ODD      2
 #define UART_CTRL_TX_PARITY_ODD_MASK 1
 
+// Field       : ctrl.tx_use_loopback
+// Description : 0 : UART TX FIFO is connected to CSR, 1 : UART RX FIFO is connected to UART RX FIFO
+// Range       : [3]
+#define UART_CTRL_TX_USE_LOOPBACK      3
+#define UART_CTRL_TX_USE_LOOPBACK_MASK 1
+
 // Field       : ctrl.rx_enable
 // Description : 0 : RX is disable, 1 : RX is enable
 // Range       : [4]

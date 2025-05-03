@@ -62,15 +62,15 @@ architecture rtl of UART_registers is
   signal   ctrl_wcs       : std_logic;
   signal   ctrl_we        : std_logic;
   signal   ctrl_wdata     : std_logic_vector(8-1 downto 0);
-  signal   ctrl_wdata_sw  : std_logic_vector(7-1 downto 0);
-  signal   ctrl_wdata_hw  : std_logic_vector(7-1 downto 0);
+  signal   ctrl_wdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   ctrl_wdata_hw  : std_logic_vector(8-1 downto 0);
   signal   ctrl_wbusy     : std_logic;
 
   signal   ctrl_rcs       : std_logic;
   signal   ctrl_re        : std_logic;
   signal   ctrl_rdata     : std_logic_vector(8-1 downto 0);
-  signal   ctrl_rdata_sw  : std_logic_vector(7-1 downto 0);
-  signal   ctrl_rdata_hw  : std_logic_vector(7-1 downto 0);
+  signal   ctrl_rdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   ctrl_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   ctrl_rbusy     : std_logic;
 
 begin  -- architecture rtl
@@ -154,7 +154,7 @@ begin  -- architecture rtl
   -- Register    : ctrl
   -- Description : Control Register
   -- Address     : 0x1
-  -- Width       : 7
+  -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
   -- Hw Type     : reg
@@ -174,6 +174,12 @@ begin  -- architecture rtl
   --==================================
   -- Field       : tx_parity_odd
   -- Description : 0 : Parity is even, 1 : Parity is odd
+  -- Width       : 1
+  --==================================
+
+  --==================================
+  -- Field       : tx_use_loopback
+  -- Description : 0 : UART TX FIFO is connected to CSR, 1 : UART RX FIFO is connected to UART RX FIFO
   -- Width       : 1
   --==================================
 
@@ -208,10 +214,11 @@ begin  -- architecture rtl
     0 => ctrl_rdata_sw(0), -- tx_enable(0)
     1 => ctrl_rdata_sw(1), -- tx_parity_enable(0)
     2 => ctrl_rdata_sw(2), -- tx_parity_odd(0)
-    4 => ctrl_rdata_sw(3), -- rx_enable(0)
-    5 => ctrl_rdata_sw(4), -- rx_parity_enable(0)
-    6 => ctrl_rdata_sw(5), -- rx_parity_odd(0)
-    7 => ctrl_rdata_sw(6), -- rx_use_loopback(0)
+    3 => ctrl_rdata_sw(3), -- tx_use_loopback(0)
+    4 => ctrl_rdata_sw(4), -- rx_enable(0)
+    5 => ctrl_rdata_sw(5), -- rx_parity_enable(0)
+    6 => ctrl_rdata_sw(6), -- rx_parity_odd(0)
+    7 => ctrl_rdata_sw(7), -- rx_use_loopback(0)
     others => '0');
 
   ctrl_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
@@ -220,24 +227,27 @@ begin  -- architecture rtl
   ctrl_wdata_sw(0 downto 0) <= ctrl_wdata(0 downto 0); -- tx_enable
   ctrl_wdata_sw(1 downto 1) <= ctrl_wdata(1 downto 1); -- tx_parity_enable
   ctrl_wdata_sw(2 downto 2) <= ctrl_wdata(2 downto 2); -- tx_parity_odd
-  ctrl_wdata_sw(3 downto 3) <= ctrl_wdata(4 downto 4); -- rx_enable
-  ctrl_wdata_sw(4 downto 4) <= ctrl_wdata(5 downto 5); -- rx_parity_enable
-  ctrl_wdata_sw(5 downto 5) <= ctrl_wdata(6 downto 6); -- rx_parity_odd
-  ctrl_wdata_sw(6 downto 6) <= ctrl_wdata(7 downto 7); -- rx_use_loopback
+  ctrl_wdata_sw(3 downto 3) <= ctrl_wdata(3 downto 3); -- tx_use_loopback
+  ctrl_wdata_sw(4 downto 4) <= ctrl_wdata(4 downto 4); -- rx_enable
+  ctrl_wdata_sw(5 downto 5) <= ctrl_wdata(5 downto 5); -- rx_parity_enable
+  ctrl_wdata_sw(6 downto 6) <= ctrl_wdata(6 downto 6); -- rx_parity_odd
+  ctrl_wdata_sw(7 downto 7) <= ctrl_wdata(7 downto 7); -- rx_use_loopback
   sw2hw_o.ctrl.tx_enable <= ctrl_rdata_hw(0 downto 0); -- tx_enable
   sw2hw_o.ctrl.tx_parity_enable <= ctrl_rdata_hw(1 downto 1); -- tx_parity_enable
   sw2hw_o.ctrl.tx_parity_odd <= ctrl_rdata_hw(2 downto 2); -- tx_parity_odd
-  sw2hw_o.ctrl.rx_enable <= ctrl_rdata_hw(3 downto 3); -- rx_enable
-  sw2hw_o.ctrl.rx_parity_enable <= ctrl_rdata_hw(4 downto 4); -- rx_parity_enable
-  sw2hw_o.ctrl.rx_parity_odd <= ctrl_rdata_hw(5 downto 5); -- rx_parity_odd
-  sw2hw_o.ctrl.rx_use_loopback <= ctrl_rdata_hw(6 downto 6); -- rx_use_loopback
+  sw2hw_o.ctrl.tx_use_loopback <= ctrl_rdata_hw(3 downto 3); -- tx_use_loopback
+  sw2hw_o.ctrl.rx_enable <= ctrl_rdata_hw(4 downto 4); -- rx_enable
+  sw2hw_o.ctrl.rx_parity_enable <= ctrl_rdata_hw(5 downto 5); -- rx_parity_enable
+  sw2hw_o.ctrl.rx_parity_odd <= ctrl_rdata_hw(6 downto 6); -- rx_parity_odd
+  sw2hw_o.ctrl.rx_use_loopback <= ctrl_rdata_hw(7 downto 7); -- rx_use_loopback
 
   ins_ctrl : entity work.csr_reg(rtl)
     generic map
-      (WIDTH         => 7
+      (WIDTH         => 8
       ,INIT          => "0" -- tx_enable
                        &"0" -- tx_parity_enable
                        &"0" -- tx_parity_odd
+                       &"0" -- tx_use_loopback
                        &"0" -- rx_enable
                        &"0" -- rx_parity_enable
                        &"0" -- rx_parity_odd
