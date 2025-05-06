@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-05-03
+-- Last update: 2025-05-06
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -53,45 +53,47 @@ end entity pbi_UART;
 
 architecture rtl of pbi_UART is
   -- Compute Max baud tick counter
-  constant BAUD_TICK_CNT_MAX    : integer := (CLOCK_FREQ / BAUD_RATE) - 1;
-  constant BAUD_TICK_CNT_MAX_SLV: std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) := std_logic_vector(to_unsigned(BAUD_TICK_CNT_MAX, BAUD_TICK_CNT_WIDTH));
-
+  constant BAUD_TICK_CNT_MAX_INT  : integer := (CLOCK_FREQ / BAUD_RATE) - 1;
+  constant BAUD_TICK_CNT_MAX_SLV  : std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) := std_logic_vector(to_unsigned(BAUD_TICK_CNT_MAX_INT, BAUD_TICK_CNT_WIDTH));
   
-  signal uart_tx                : std_logic;
-  signal uart_rx                : std_logic;
+  signal   uart_tx                : std_logic;
+  signal   uart_rx                : std_logic;
+           
+  signal   tx_baud_tick_en        : std_logic;
+  signal   tx_baud_tick           : std_logic;
+           
+  signal   tx_tdata               : std_logic_vector(8-1 downto 0);
+  signal   tx_tvalid              : std_logic;
+  signal   tx_tready              : std_logic;
+           
+  signal   rx_tdata               : std_logic_vector(8-1 downto 0);
+  signal   rx_tvalid              : std_logic;
+  signal   rx_tready              : std_logic;
+           
+  signal   rx_baud_tick_en        : std_logic;
+  signal   rx_baud_tick           : std_logic;
+  signal   rx_baud_tick_half      : std_logic;
+           
+  signal   tx_enable              : std_logic;
+  signal   tx_parity_enable       : std_logic;
+  signal   tx_parity_odd          : std_logic;
+  signal   tx_use_loopback        : std_logic;
+           
+  signal   rx_enable              : std_logic;
+  signal   rx_parity_enable       : std_logic;
+  signal   rx_parity_odd          : std_logic;
+  signal   rx_use_loopback        : std_logic;
+           
+  signal   sw2hw                  : UART_sw2hw_t;
+  signal   hw2sw                  : UART_hw2sw_t;
 
-  signal tx_baud_tick_en        : std_logic;
-  signal tx_baud_tick           : std_logic;
-
-  signal tx_tdata               : std_logic_vector(8-1 downto 0);
-  signal tx_tvalid              : std_logic;
-  signal tx_tready              : std_logic;
-
-  signal rx_tdata               : std_logic_vector(8-1 downto 0);
-  signal rx_tvalid              : std_logic;
-  signal rx_tready              : std_logic;
-  
-  signal rx_baud_tick_en        : std_logic;
-  signal rx_baud_tick           : std_logic;
-  signal rx_baud_tick_half      : std_logic;
-
-  signal tx_enable              : std_logic;
-  signal tx_parity_enable       : std_logic;
-  signal tx_parity_odd          : std_logic;
-  signal tx_use_loopback        : std_logic;
-
-  signal rx_enable              : std_logic;
-  signal rx_parity_enable       : std_logic;
-  signal rx_parity_odd          : std_logic;
-  signal rx_use_loopback        : std_logic;
-
-  signal sw2hw                  : UART_sw2hw_t;
-  signal hw2sw                  : UART_hw2sw_t;
+  signal   baud_tick_cnt_max      : std_logic_vector(16-1 downto 0);
   
 begin  -- architecture rtl
 
   uart_tx_o            <= uart_tx;
-  
+
+  -- CSR Instance
   ins_csr : entity work.UART_registers(rtl)
   port map(
     clk_i     => clk_i           ,
@@ -101,14 +103,17 @@ begin  -- architecture rtl
     sw2hw_o   => sw2hw           ,
     hw2sw_i   => hw2sw   
   );
-  
+
+  baud_tick_cnt_max    <= (sw2hw.baud_tick_cnt_max_msb.value &
+                           sw2hw.baud_tick_cnt_max_lsb.value);
+  -- UART TX
   gen_uart_tx: if UART_TX_ENABLE = true
   generate
+    -- UART TX CSR Input
     tx_enable            <= sw2hw.ctrl.tx_enable       (0);
     tx_parity_enable     <= sw2hw.ctrl.tx_parity_enable(0);
     tx_parity_odd        <= sw2hw.ctrl.tx_parity_odd   (0);
     tx_use_loopback      <= sw2hw.ctrl.tx_use_loopback (0);
-
 
     ins_uart_tx_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
       generic map
@@ -120,7 +125,7 @@ begin  -- architecture rtl
       ,baud_tick_en_i          => tx_baud_tick_en
       ,baud_tick_o             => tx_baud_tick
       ,baud_tick_half_o        => open
-      ,cfg_baud_tick_cnt_max_i => BAUD_TICK_CNT_MAX_SLV
+      ,cfg_baud_tick_cnt_max_i => baud_tick_cnt_max
       );
 
     tx_baud_tick_en  <= '1';
@@ -184,7 +189,7 @@ begin  -- architecture rtl
       ,baud_tick_en_i          => rx_baud_tick_en
       ,baud_tick_o             => rx_baud_tick
       ,baud_tick_half_o        => rx_baud_tick_half
-      ,cfg_baud_tick_cnt_max_i => BAUD_TICK_CNT_MAX_SLV
+      ,cfg_baud_tick_cnt_max_i => baud_tick_cnt_max
       );
 
     ins_uart_rx_axis : entity work.uart_rx_axis(rtl)
@@ -240,8 +245,8 @@ begin  -- architecture rtl
   begin
     report "Clock Frequency       : " & integer'image(CLOCK_FREQ);
     report "Baud Rate             : " & integer'image(BAUD_RATE);
-    report "Baud Tick Counter Max : " & integer'image(BAUD_TICK_CNT_MAX);
-    report "Baud Tick Counter Div2: " & integer'image(BAUD_TICK_CNT_MAX/2);
+    report "Baud Tick Counter Max : " & integer'image(BAUD_TICK_CNT_MAX_INT);
+    report "Baud Tick Counter Div2: " & integer'image(BAUD_TICK_CNT_MAX_INT/2);
     wait;
   end process;
 -- synthesis translate_on

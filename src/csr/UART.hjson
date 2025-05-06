@@ -77,5 +77,38 @@
             ]
         },
 
+        {
+            name         : "baud_tick_cnt_max_lsb",
+            address      : "x2",
+            desc         : "Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1",
+            swaccess     : "rw",
+            hwaccess     : "ro",
+            hwtype       : "reg",
+
+            fields: [
+                {
+                    name: "value",
+                    bits: "7:0",
+                    desc: "Baud Tick Counter Max LSB"
+                },
+            ]
+        },
+
+	{
+            name         : "baud_tick_cnt_max_msb",
+            address      : "x3",
+            desc         : "Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1",
+            swaccess     : "rw",
+            hwaccess     : "ro",
+            hwtype       : "reg",
+
+            fields: [
+                {
+                    name: "value",
+                    bits: "7:0",
+                    desc: "Baud Tick Counter Max MSB"
+                },
+            ]
+        },
 ]
 }

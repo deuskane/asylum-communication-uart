@@ -73,6 +73,34 @@ architecture rtl of UART_registers is
   signal   ctrl_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   ctrl_rbusy     : std_logic;
 
+  signal   baud_tick_cnt_max_lsb_wcs       : std_logic;
+  signal   baud_tick_cnt_max_lsb_we        : std_logic;
+  signal   baud_tick_cnt_max_lsb_wdata     : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_lsb_wdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_lsb_wdata_hw  : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_lsb_wbusy     : std_logic;
+
+  signal   baud_tick_cnt_max_lsb_rcs       : std_logic;
+  signal   baud_tick_cnt_max_lsb_re        : std_logic;
+  signal   baud_tick_cnt_max_lsb_rdata     : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_lsb_rdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_lsb_rdata_hw  : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_lsb_rbusy     : std_logic;
+
+  signal   baud_tick_cnt_max_msb_wcs       : std_logic;
+  signal   baud_tick_cnt_max_msb_we        : std_logic;
+  signal   baud_tick_cnt_max_msb_wdata     : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_msb_wdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_msb_wdata_hw  : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_msb_wbusy     : std_logic;
+
+  signal   baud_tick_cnt_max_msb_rcs       : std_logic;
+  signal   baud_tick_cnt_max_msb_re        : std_logic;
+  signal   baud_tick_cnt_max_msb_rdata     : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_msb_rdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_msb_rdata_hw  : std_logic_vector(8-1 downto 0);
+  signal   baud_tick_cnt_max_msb_rbusy     : std_logic;
+
 begin  -- architecture rtl
 
   -- Interface 
@@ -270,16 +298,136 @@ begin  -- architecture rtl
       ,hw_sw_we_o    => sw2hw_o.ctrl.we
       );
 
+  --==================================
+  -- Register    : baud_tick_cnt_max_lsb
+  -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+  -- Address     : 0x2
+  -- Width       : 8
+  -- Sw Access   : rw
+  -- Hw Access   : ro
+  -- Hw Type     : reg
+  --==================================
+  --==================================
+  -- Field       : value
+  -- Description : Baud Tick Counter Max LSB
+  -- Width       : 8
+  --==================================
+
+
+  baud_tick_cnt_max_lsb_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(2,UART_ADDR_WIDTH))) else '0';
+  baud_tick_cnt_max_lsb_re      <= sig_rcs and sig_re and baud_tick_cnt_max_lsb_rcs;
+  baud_tick_cnt_max_lsb_rdata   <= (
+    0 => baud_tick_cnt_max_lsb_rdata_sw(0), -- value(0)
+    1 => baud_tick_cnt_max_lsb_rdata_sw(1), -- value(1)
+    2 => baud_tick_cnt_max_lsb_rdata_sw(2), -- value(2)
+    3 => baud_tick_cnt_max_lsb_rdata_sw(3), -- value(3)
+    4 => baud_tick_cnt_max_lsb_rdata_sw(4), -- value(4)
+    5 => baud_tick_cnt_max_lsb_rdata_sw(5), -- value(5)
+    6 => baud_tick_cnt_max_lsb_rdata_sw(6), -- value(6)
+    7 => baud_tick_cnt_max_lsb_rdata_sw(7), -- value(7)
+    others => '0');
+
+  baud_tick_cnt_max_lsb_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(2,UART_ADDR_WIDTH))) else '0';
+  baud_tick_cnt_max_lsb_we      <= sig_wcs and sig_we and baud_tick_cnt_max_lsb_wcs;
+  baud_tick_cnt_max_lsb_wdata   <= sig_wdata;
+  baud_tick_cnt_max_lsb_wdata_sw(7 downto 0) <= baud_tick_cnt_max_lsb_wdata(7 downto 0); -- value
+  sw2hw_o.baud_tick_cnt_max_lsb.value <= baud_tick_cnt_max_lsb_rdata_hw(7 downto 0); -- value
+
+  ins_baud_tick_cnt_max_lsb : entity work.csr_reg(rtl)
+    generic map
+      (WIDTH         => 8
+      ,INIT          => "00000000" -- value
+      ,MODEL         => "rw"
+      )
+    port map
+      (clk_i         => clk_i
+      ,arst_b_i      => arst_b_i
+      ,sw_wd_i       => baud_tick_cnt_max_lsb_wdata_sw
+      ,sw_rd_o       => baud_tick_cnt_max_lsb_rdata_sw
+      ,sw_we_i       => baud_tick_cnt_max_lsb_we
+      ,sw_re_i       => baud_tick_cnt_max_lsb_re
+      ,sw_rbusy_o    => baud_tick_cnt_max_lsb_rbusy
+      ,sw_wbusy_o    => baud_tick_cnt_max_lsb_wbusy
+      ,hw_wd_i       => (others => '0')
+      ,hw_rd_o       => baud_tick_cnt_max_lsb_rdata_hw
+      ,hw_we_i       => '0'
+      ,hw_sw_re_o    => sw2hw_o.baud_tick_cnt_max_lsb.re
+      ,hw_sw_we_o    => sw2hw_o.baud_tick_cnt_max_lsb.we
+      );
+
+  --==================================
+  -- Register    : baud_tick_cnt_max_msb
+  -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+  -- Address     : 0x3
+  -- Width       : 8
+  -- Sw Access   : rw
+  -- Hw Access   : ro
+  -- Hw Type     : reg
+  --==================================
+  --==================================
+  -- Field       : value
+  -- Description : Baud Tick Counter Max MSB
+  -- Width       : 8
+  --==================================
+
+
+  baud_tick_cnt_max_msb_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(3,UART_ADDR_WIDTH))) else '0';
+  baud_tick_cnt_max_msb_re      <= sig_rcs and sig_re and baud_tick_cnt_max_msb_rcs;
+  baud_tick_cnt_max_msb_rdata   <= (
+    0 => baud_tick_cnt_max_msb_rdata_sw(0), -- value(0)
+    1 => baud_tick_cnt_max_msb_rdata_sw(1), -- value(1)
+    2 => baud_tick_cnt_max_msb_rdata_sw(2), -- value(2)
+    3 => baud_tick_cnt_max_msb_rdata_sw(3), -- value(3)
+    4 => baud_tick_cnt_max_msb_rdata_sw(4), -- value(4)
+    5 => baud_tick_cnt_max_msb_rdata_sw(5), -- value(5)
+    6 => baud_tick_cnt_max_msb_rdata_sw(6), -- value(6)
+    7 => baud_tick_cnt_max_msb_rdata_sw(7), -- value(7)
+    others => '0');
+
+  baud_tick_cnt_max_msb_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(3,UART_ADDR_WIDTH))) else '0';
+  baud_tick_cnt_max_msb_we      <= sig_wcs and sig_we and baud_tick_cnt_max_msb_wcs;
+  baud_tick_cnt_max_msb_wdata   <= sig_wdata;
+  baud_tick_cnt_max_msb_wdata_sw(7 downto 0) <= baud_tick_cnt_max_msb_wdata(7 downto 0); -- value
+  sw2hw_o.baud_tick_cnt_max_msb.value <= baud_tick_cnt_max_msb_rdata_hw(7 downto 0); -- value
+
+  ins_baud_tick_cnt_max_msb : entity work.csr_reg(rtl)
+    generic map
+      (WIDTH         => 8
+      ,INIT          => "00000000" -- value
+      ,MODEL         => "rw"
+      )
+    port map
+      (clk_i         => clk_i
+      ,arst_b_i      => arst_b_i
+      ,sw_wd_i       => baud_tick_cnt_max_msb_wdata_sw
+      ,sw_rd_o       => baud_tick_cnt_max_msb_rdata_sw
+      ,sw_we_i       => baud_tick_cnt_max_msb_we
+      ,sw_re_i       => baud_tick_cnt_max_msb_re
+      ,sw_rbusy_o    => baud_tick_cnt_max_msb_rbusy
+      ,sw_wbusy_o    => baud_tick_cnt_max_msb_wbusy
+      ,hw_wd_i       => (others => '0')
+      ,hw_rd_o       => baud_tick_cnt_max_msb_rdata_hw
+      ,hw_we_i       => '0'
+      ,hw_sw_re_o    => sw2hw_o.baud_tick_cnt_max_msb.re
+      ,hw_sw_we_o    => sw2hw_o.baud_tick_cnt_max_msb.we
+      );
+
   sig_wbusy <= 
     data_wbusy when data_wcs = '1' else
     ctrl_wbusy when ctrl_wcs = '1' else
+    baud_tick_cnt_max_lsb_wbusy when baud_tick_cnt_max_lsb_wcs = '1' else
+    baud_tick_cnt_max_msb_wbusy when baud_tick_cnt_max_msb_wcs = '1' else
     '0'; -- Bad Address, no busy
   sig_rbusy <= 
     data_rbusy when data_rcs = '1' else
     ctrl_rbusy when ctrl_rcs = '1' else
+    baud_tick_cnt_max_lsb_rbusy when baud_tick_cnt_max_lsb_rcs = '1' else
+    baud_tick_cnt_max_msb_rbusy when baud_tick_cnt_max_msb_rcs = '1' else
     '0'; -- Bad Address, no busy
   sig_rdata <= 
     data_rdata when data_rcs = '1' else
     ctrl_rdata when ctrl_rcs = '1' else
+    baud_tick_cnt_max_lsb_rdata when baud_tick_cnt_max_lsb_rcs = '1' else
+    baud_tick_cnt_max_msb_rdata when baud_tick_cnt_max_msb_rcs = '1' else
     (others => '0'); -- Bad Address, return 0
 end architecture rtl;
