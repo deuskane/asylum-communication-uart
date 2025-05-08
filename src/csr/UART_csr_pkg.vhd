@@ -105,19 +105,61 @@ package UART_csr_pkg is
     rx_use_loopback : std_logic_vector(1-1 downto 0);
   end record UART_ctrl_sw2hw_t;
 
+  --==================================
+  -- Register    : baud_tick_cnt_max_lsb
+  -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+  -- Address     : 0x2
+  -- Width       : 8
+  -- Sw Access   : rw
+  -- Hw Access   : ro
+  -- Hw Type     : reg
+  --==================================
+  type UART_baud_tick_cnt_max_lsb_sw2hw_t is record
+    re : std_logic;
+    we : std_logic;
+  --==================================
+  -- Field       : value
+  -- Description : Baud Tick Counter Max LSB
+  -- Width       : 8
+  --==================================
+    value : std_logic_vector(8-1 downto 0);
+  end record UART_baud_tick_cnt_max_lsb_sw2hw_t;
+
+  --==================================
+  -- Register    : baud_tick_cnt_max_msb
+  -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+  -- Address     : 0x3
+  -- Width       : 8
+  -- Sw Access   : rw
+  -- Hw Access   : ro
+  -- Hw Type     : reg
+  --==================================
+  type UART_baud_tick_cnt_max_msb_sw2hw_t is record
+    re : std_logic;
+    we : std_logic;
+  --==================================
+  -- Field       : value
+  -- Description : Baud Tick Counter Max MSB
+  -- Width       : 8
+  --==================================
+    value : std_logic_vector(8-1 downto 0);
+  end record UART_baud_tick_cnt_max_msb_sw2hw_t;
+
   ------------------------------------
   -- Structure UART_t
   ------------------------------------
   type UART_sw2hw_t is record
     data : UART_data_sw2hw_t;
     ctrl : UART_ctrl_sw2hw_t;
+    baud_tick_cnt_max_lsb : UART_baud_tick_cnt_max_lsb_sw2hw_t;
+    baud_tick_cnt_max_msb : UART_baud_tick_cnt_max_msb_sw2hw_t;
   end record UART_sw2hw_t;
 
   type UART_hw2sw_t is record
     data : UART_data_hw2sw_t;
   end record UART_hw2sw_t;
 
-  constant UART_ADDR_WIDTH : natural := 1;
+  constant UART_ADDR_WIDTH : natural := 2;
   constant UART_DATA_WIDTH : natural := 8;
 
 end package UART_csr_pkg;

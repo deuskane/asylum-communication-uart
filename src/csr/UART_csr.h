@@ -75,12 +75,40 @@
 #define UART_CTRL_RX_USE_LOOPBACK      7
 #define UART_CTRL_RX_USE_LOOPBACK_MASK 1
 
+//==================================
+// Register    : baud_tick_cnt_max_lsb
+// Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+// Address     : 0x2
+//==================================
+#define UART_BAUD_TICK_CNT_MAX_LSB 0x2
+
+// Field       : baud_tick_cnt_max_lsb.value
+// Description : Baud Tick Counter Max LSB
+// Range       : [7:0]
+#define UART_BAUD_TICK_CNT_MAX_LSB_VALUE      0
+#define UART_BAUD_TICK_CNT_MAX_LSB_VALUE_MASK 255
+
+//==================================
+// Register    : baud_tick_cnt_max_msb
+// Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+// Address     : 0x3
+//==================================
+#define UART_BAUD_TICK_CNT_MAX_MSB 0x3
+
+// Field       : baud_tick_cnt_max_msb.value
+// Description : Baud Tick Counter Max MSB
+// Range       : [7:0]
+#define UART_BAUD_TICK_CNT_MAX_MSB_VALUE      0
+#define UART_BAUD_TICK_CNT_MAX_MSB_VALUE_MASK 255
+
 //----------------------------------
 // Structure {module}_t
 //----------------------------------
 typedef struct {
   uint8_t data; // 0x0
   uint8_t ctrl; // 0x1
+  uint8_t baud_tick_cnt_max_lsb; // 0x2
+  uint8_t baud_tick_cnt_max_msb; // 0x3
 } UART_t;
 
 #endif // UART_REGISTERS_H

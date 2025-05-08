@@ -5,6 +5,8 @@ CSR for UART
 |---------|-----------|
 |0x0|data|
 |0x1|ctrl|
+|0x2|baud_tick_cnt_max_lsb|
+|0x3|baud_tick_cnt_max_msb|
 
 ## 0x0 data
 Write : data to tansmit, Read : data to receive
@@ -38,4 +40,16 @@ Control Register
 
 ### [7:7] rx_use_loopback
 0 : UART RX is connected to UART RX Input, 1 : UART RX is connected to UART TX
+
+## 0x2 baud_tick_cnt_max_lsb
+Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+
+### [7:0] value
+Baud Tick Counter Max LSB
+
+## 0x3 baud_tick_cnt_max_msb
+Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+
+### [7:0] value
+Baud Tick Counter Max MSB
 
