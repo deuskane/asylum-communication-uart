@@ -19,6 +19,7 @@ CAPI=2:
 # 2025/03/12  1.3.0    mrosiere Add CSR
 # 2025/03/22  1.4.0    mrosiere Use pbi instead reg interface for csr
 # 2025/04/02  1.5.0    mrosiere Remove pbi_target_wrapper
+# 2025/05/14  1.6.0    mrosiere Add parameter USER_DEFINE_BAUD_TICK and default value
 #-----------------------------------------------------------------------------
 
 name        : asylum:communication:uart:1.5.0

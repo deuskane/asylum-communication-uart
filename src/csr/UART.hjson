@@ -3,6 +3,20 @@
     width     : 8,
     desc      : "CSR for UART"
     interface : "pbi"
+
+    parameters : [
+    	{
+	    name         : "USER_DEFINE_BAUD_TICK"
+	    desc         : "Parameters to use the enable the User define Baud Tick"
+	    type         : "boolean"
+	}
+    	{
+	    name         : "BAUD_TICK_CNT_MAX"
+	    desc         : "Default value for Baud Tick Timer"
+	    type         : "std_logic_vector(15 downto 0)"
+	}
+    ]
+
     registers : [
         {
             name         : "data",
@@ -84,12 +98,14 @@
             swaccess     : "rw",
             hwaccess     : "ro",
             hwtype       : "reg",
+	    enable       : "USER_DEFINE_BAUD_TICK",	    
 
-            fields: [
+	    fields: [
                 {
                     name: "value",
                     bits: "7:0",
                     desc: "Baud Tick Counter Max LSB"
+		    expr: "BAUD_TICK_CNT_MAX(7 downto 0)"
                 },
             ]
         },
@@ -101,12 +117,14 @@
             swaccess     : "rw",
             hwaccess     : "ro",
             hwtype       : "reg",
+	    enable       : "USER_DEFINE_BAUD_TICK",
 
             fields: [
                 {
                     name: "value",
                     bits: "7:0",
                     desc: "Baud Tick Counter Max MSB"
+		    expr: "BAUD_TICK_CNT_MAX(15 downto 8)"
                 },
             ]
         },

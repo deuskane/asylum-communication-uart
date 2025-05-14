@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-05-06
+-- Last update: 2025-05-14
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -19,6 +19,7 @@
 -- 2025-01-21  0.1      rosiere	Created
 -- 2025-03-09  0.2      rosiere	use unconstrained pbi
 -- 2025-03-15  0.3      rosiere Add CSR
+-- 2025-05-14  1.0      rosiere Add parameter USER_DEFINE_BAUD_TICK and default value
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -30,11 +31,12 @@ use     work.pbi_pkg.all;
 
 entity pbi_UART is
   generic (
-    BAUD_RATE           : integer := 115200;
-    CLOCK_FREQ          : integer := 50000000;
-    BAUD_TICK_CNT_WIDTH : integer := 16;
-    UART_TX_ENABLE      : boolean := true;
-    UART_RX_ENABLE      : boolean := true
+    BAUD_RATE             : integer := 115200;
+    CLOCK_FREQ            : integer := 50000000;
+    BAUD_TICK_CNT_WIDTH   : integer := 16;
+    UART_TX_ENABLE        : boolean := true;
+    UART_RX_ENABLE        : boolean := true;
+    USER_DEFINE_BAUD_TICK : boolean := true
     );
   port   (
     clk_i            : in  std_logic;
@@ -95,14 +97,18 @@ begin  -- architecture rtl
 
   -- CSR Instance
   ins_csr : entity work.UART_registers(rtl)
-  port map(
-    clk_i     => clk_i           ,
-    arst_b_i  => arst_b_i        ,
-    pbi_ini_i => pbi_ini_i       ,
-    pbi_tgt_o => pbi_tgt_o       ,
-    sw2hw_o   => sw2hw           ,
-    hw2sw_i   => hw2sw   
-  );
+    generic map(
+      USER_DEFINE_BAUD_TICK => USER_DEFINE_BAUD_TICK,
+      BAUD_TICK_CNT_MAX     => BAUD_TICK_CNT_MAX_SLV
+      )
+    port map(
+      clk_i                 => clk_i           ,
+      arst_b_i              => arst_b_i        ,
+      pbi_ini_i             => pbi_ini_i       ,
+      pbi_tgt_o             => pbi_tgt_o       ,
+      sw2hw_o               => sw2hw           ,
+      hw2sw_i               => hw2sw   
+      );
 
   baud_tick_cnt_max    <= (sw2hw.baud_tick_cnt_max_msb.value &
                            sw2hw.baud_tick_cnt_max_lsb.value);

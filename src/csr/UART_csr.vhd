@@ -16,6 +16,10 @@ use     work.pbi_pkg.all;
 -- Width       : 8
 --==================================
 entity UART_registers is
+  generic (
+    USER_DEFINE_BAUD_TICK : boolean -- Parameters to use the enable the User define Baud Tick
+   ;BAUD_TICK_CNT_MAX : std_logic_vector(15 downto 0) -- Default value for Baud Tick Timer
+  );
   port (
     -- Clock and Reset
     clk_i      : in  std_logic;
@@ -45,6 +49,9 @@ architecture rtl of UART_registers is
 
   signal   sig_busy  : std_logic;
 
+  constant INIT_data : std_logic_vector(8-1 downto 0) :=
+             "00000000" -- value
+           ;
   signal   data_wcs       : std_logic;
   signal   data_we        : std_logic;
   signal   data_wdata     : std_logic_vector(8-1 downto 0);
@@ -59,6 +66,16 @@ architecture rtl of UART_registers is
   signal   data_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   data_rbusy     : std_logic;
 
+  constant INIT_ctrl : std_logic_vector(8-1 downto 0) :=
+             "0" -- tx_enable
+           & "0" -- tx_parity_enable
+           & "0" -- tx_parity_odd
+           & "0" -- tx_use_loopback
+           & "0" -- rx_enable
+           & "0" -- rx_parity_enable
+           & "0" -- rx_parity_odd
+           & "0" -- rx_use_loopback
+           ;
   signal   ctrl_wcs       : std_logic;
   signal   ctrl_we        : std_logic;
   signal   ctrl_wdata     : std_logic_vector(8-1 downto 0);
@@ -73,6 +90,9 @@ architecture rtl of UART_registers is
   signal   ctrl_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   ctrl_rbusy     : std_logic;
 
+  constant INIT_baud_tick_cnt_max_lsb : std_logic_vector(8-1 downto 0) :=
+             BAUD_TICK_CNT_MAX(7 downto 0) -- value
+           ;
   signal   baud_tick_cnt_max_lsb_wcs       : std_logic;
   signal   baud_tick_cnt_max_lsb_we        : std_logic;
   signal   baud_tick_cnt_max_lsb_wdata     : std_logic_vector(8-1 downto 0);
@@ -87,6 +107,9 @@ architecture rtl of UART_registers is
   signal   baud_tick_cnt_max_lsb_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   baud_tick_cnt_max_lsb_rbusy     : std_logic;
 
+  constant INIT_baud_tick_cnt_max_msb : std_logic_vector(8-1 downto 0) :=
+             BAUD_TICK_CNT_MAX(15 downto 8) -- value
+           ;
   signal   baud_tick_cnt_max_msb_wcs       : std_logic;
   signal   baud_tick_cnt_max_msb_we        : std_logic;
   signal   baud_tick_cnt_max_msb_wdata     : std_logic_vector(8-1 downto 0);
@@ -119,6 +142,8 @@ begin  -- architecture rtl
                sig_rbusy when sig_re = '1' else
                '0';
 
+  gen_data: if (True)
+  generate
   --==================================
   -- Register    : data
   -- Description : Write : data to tansmit, Read : data to receive
@@ -135,49 +160,65 @@ begin  -- architecture rtl
   --==================================
 
 
-  data_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
-  data_re      <= sig_rcs and sig_re and data_rcs;
-  data_rdata   <= (
-    0 => data_rdata_sw(0), -- value(0)
-    1 => data_rdata_sw(1), -- value(1)
-    2 => data_rdata_sw(2), -- value(2)
-    3 => data_rdata_sw(3), -- value(3)
-    4 => data_rdata_sw(4), -- value(4)
-    5 => data_rdata_sw(5), -- value(5)
-    6 => data_rdata_sw(6), -- value(6)
-    7 => data_rdata_sw(7), -- value(7)
-    others => '0');
+    data_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
+    data_re      <= sig_rcs and sig_re and data_rcs;
+    data_rdata   <= (
+      0 => data_rdata_sw(0), -- value(0)
+      1 => data_rdata_sw(1), -- value(1)
+      2 => data_rdata_sw(2), -- value(2)
+      3 => data_rdata_sw(3), -- value(3)
+      4 => data_rdata_sw(4), -- value(4)
+      5 => data_rdata_sw(5), -- value(5)
+      6 => data_rdata_sw(6), -- value(6)
+      7 => data_rdata_sw(7), -- value(7)
+      others => '0');
 
-  data_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH))) else '0';
-  data_we      <= sig_wcs and sig_we and data_wcs;
-  data_wdata   <= sig_wdata;
-  data_wdata_sw(7 downto 0) <= data_wdata(7 downto 0); -- value
-  data_wdata_hw(7 downto 0) <= hw2sw_i.data.value; -- value
-  sw2hw_o.data.value <= data_rdata_hw(7 downto 0); -- value
+    data_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(0,UART_ADDR_WIDTH)))   else '0';
+    data_we      <= sig_wcs and sig_we and data_wcs;
+    data_wdata   <= sig_wdata;
+    data_wdata_sw(7 downto 0) <= data_wdata(7 downto 0); -- value
+    data_wdata_hw(7 downto 0) <= hw2sw_i.data.value; -- value
+    sw2hw_o.data.value <= data_rdata_hw(7 downto 0); -- value
 
-  ins_data : entity work.csr_fifo(rtl)
-    generic map
-      (WIDTH         => 8
-      ,BLOCKING_READ => True
-      ,BLOCKING_WRITE => True
-      )
-    port map
-      (clk_i         => clk_i
-      ,arst_b_i      => arst_b_i
-      ,sw_wd_i       => data_wdata_sw
-      ,sw_rd_o       => data_rdata_sw
-      ,sw_we_i       => data_we
-      ,sw_re_i       => data_re
-      ,sw_rbusy_o    => data_rbusy
-      ,sw_wbusy_o    => data_wbusy
-      ,hw_tx_valid_i => hw2sw_i.data.valid
-      ,hw_tx_ready_o => sw2hw_o.data.ready
-      ,hw_tx_data_i  => data_wdata_hw
-      ,hw_rx_valid_o => sw2hw_o.data.valid
-      ,hw_rx_ready_i => hw2sw_i.data.ready
-      ,hw_rx_data_o  => data_rdata_hw
-      );
+    ins_data : entity work.csr_fifo(rtl)
+      generic map
+        (WIDTH         => 8
+        ,BLOCKING_READ => True
+        ,BLOCKING_WRITE => True
+        )
+      port map
+        (clk_i         => clk_i
+        ,arst_b_i      => arst_b_i
+        ,sw_wd_i       => data_wdata_sw
+        ,sw_rd_o       => data_rdata_sw
+        ,sw_we_i       => data_we
+        ,sw_re_i       => data_re
+        ,sw_rbusy_o    => data_rbusy
+        ,sw_wbusy_o    => data_wbusy
+        ,hw_tx_valid_i => hw2sw_i.data.valid
+        ,hw_tx_ready_o => sw2hw_o.data.ready
+        ,hw_tx_data_i  => data_wdata_hw
+        ,hw_rx_valid_o => sw2hw_o.data.valid
+        ,hw_rx_ready_i => hw2sw_i.data.ready
+        ,hw_rx_data_o  => data_rdata_hw
+        );
 
+  end generate gen_data;
+
+  gen_data_b: if not (True)
+  generate
+    data_rcs     <= '0';
+    data_rbusy   <= '0';
+    data_rdata   <= (others => '0');
+    data_wcs      <= '0';
+    data_wbusy    <= '0';
+    sw2hw_o.data.value <= "00000000";
+    sw2hw_o.data.ready <= '0';
+    sw2hw_o.data.valid <= '0';
+  end generate gen_data_b;
+
+  gen_ctrl: if (True)
+  generate
   --==================================
   -- Register    : ctrl
   -- Description : Control Register
@@ -236,68 +277,84 @@ begin  -- architecture rtl
   --==================================
 
 
-  ctrl_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
-  ctrl_re      <= sig_rcs and sig_re and ctrl_rcs;
-  ctrl_rdata   <= (
-    0 => ctrl_rdata_sw(0), -- tx_enable(0)
-    1 => ctrl_rdata_sw(1), -- tx_parity_enable(0)
-    2 => ctrl_rdata_sw(2), -- tx_parity_odd(0)
-    3 => ctrl_rdata_sw(3), -- tx_use_loopback(0)
-    4 => ctrl_rdata_sw(4), -- rx_enable(0)
-    5 => ctrl_rdata_sw(5), -- rx_parity_enable(0)
-    6 => ctrl_rdata_sw(6), -- rx_parity_odd(0)
-    7 => ctrl_rdata_sw(7), -- rx_use_loopback(0)
-    others => '0');
+    ctrl_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
+    ctrl_re      <= sig_rcs and sig_re and ctrl_rcs;
+    ctrl_rdata   <= (
+      0 => ctrl_rdata_sw(0), -- tx_enable(0)
+      1 => ctrl_rdata_sw(1), -- tx_parity_enable(0)
+      2 => ctrl_rdata_sw(2), -- tx_parity_odd(0)
+      3 => ctrl_rdata_sw(3), -- tx_use_loopback(0)
+      4 => ctrl_rdata_sw(4), -- rx_enable(0)
+      5 => ctrl_rdata_sw(5), -- rx_parity_enable(0)
+      6 => ctrl_rdata_sw(6), -- rx_parity_odd(0)
+      7 => ctrl_rdata_sw(7), -- rx_use_loopback(0)
+      others => '0');
 
-  ctrl_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH))) else '0';
-  ctrl_we      <= sig_wcs and sig_we and ctrl_wcs;
-  ctrl_wdata   <= sig_wdata;
-  ctrl_wdata_sw(0 downto 0) <= ctrl_wdata(0 downto 0); -- tx_enable
-  ctrl_wdata_sw(1 downto 1) <= ctrl_wdata(1 downto 1); -- tx_parity_enable
-  ctrl_wdata_sw(2 downto 2) <= ctrl_wdata(2 downto 2); -- tx_parity_odd
-  ctrl_wdata_sw(3 downto 3) <= ctrl_wdata(3 downto 3); -- tx_use_loopback
-  ctrl_wdata_sw(4 downto 4) <= ctrl_wdata(4 downto 4); -- rx_enable
-  ctrl_wdata_sw(5 downto 5) <= ctrl_wdata(5 downto 5); -- rx_parity_enable
-  ctrl_wdata_sw(6 downto 6) <= ctrl_wdata(6 downto 6); -- rx_parity_odd
-  ctrl_wdata_sw(7 downto 7) <= ctrl_wdata(7 downto 7); -- rx_use_loopback
-  sw2hw_o.ctrl.tx_enable <= ctrl_rdata_hw(0 downto 0); -- tx_enable
-  sw2hw_o.ctrl.tx_parity_enable <= ctrl_rdata_hw(1 downto 1); -- tx_parity_enable
-  sw2hw_o.ctrl.tx_parity_odd <= ctrl_rdata_hw(2 downto 2); -- tx_parity_odd
-  sw2hw_o.ctrl.tx_use_loopback <= ctrl_rdata_hw(3 downto 3); -- tx_use_loopback
-  sw2hw_o.ctrl.rx_enable <= ctrl_rdata_hw(4 downto 4); -- rx_enable
-  sw2hw_o.ctrl.rx_parity_enable <= ctrl_rdata_hw(5 downto 5); -- rx_parity_enable
-  sw2hw_o.ctrl.rx_parity_odd <= ctrl_rdata_hw(6 downto 6); -- rx_parity_odd
-  sw2hw_o.ctrl.rx_use_loopback <= ctrl_rdata_hw(7 downto 7); -- rx_use_loopback
+    ctrl_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(1,UART_ADDR_WIDTH)))   else '0';
+    ctrl_we      <= sig_wcs and sig_we and ctrl_wcs;
+    ctrl_wdata   <= sig_wdata;
+    ctrl_wdata_sw(0 downto 0) <= ctrl_wdata(0 downto 0); -- tx_enable
+    ctrl_wdata_sw(1 downto 1) <= ctrl_wdata(1 downto 1); -- tx_parity_enable
+    ctrl_wdata_sw(2 downto 2) <= ctrl_wdata(2 downto 2); -- tx_parity_odd
+    ctrl_wdata_sw(3 downto 3) <= ctrl_wdata(3 downto 3); -- tx_use_loopback
+    ctrl_wdata_sw(4 downto 4) <= ctrl_wdata(4 downto 4); -- rx_enable
+    ctrl_wdata_sw(5 downto 5) <= ctrl_wdata(5 downto 5); -- rx_parity_enable
+    ctrl_wdata_sw(6 downto 6) <= ctrl_wdata(6 downto 6); -- rx_parity_odd
+    ctrl_wdata_sw(7 downto 7) <= ctrl_wdata(7 downto 7); -- rx_use_loopback
+    sw2hw_o.ctrl.tx_enable <= ctrl_rdata_hw(0 downto 0); -- tx_enable
+    sw2hw_o.ctrl.tx_parity_enable <= ctrl_rdata_hw(1 downto 1); -- tx_parity_enable
+    sw2hw_o.ctrl.tx_parity_odd <= ctrl_rdata_hw(2 downto 2); -- tx_parity_odd
+    sw2hw_o.ctrl.tx_use_loopback <= ctrl_rdata_hw(3 downto 3); -- tx_use_loopback
+    sw2hw_o.ctrl.rx_enable <= ctrl_rdata_hw(4 downto 4); -- rx_enable
+    sw2hw_o.ctrl.rx_parity_enable <= ctrl_rdata_hw(5 downto 5); -- rx_parity_enable
+    sw2hw_o.ctrl.rx_parity_odd <= ctrl_rdata_hw(6 downto 6); -- rx_parity_odd
+    sw2hw_o.ctrl.rx_use_loopback <= ctrl_rdata_hw(7 downto 7); -- rx_use_loopback
 
-  ins_ctrl : entity work.csr_reg(rtl)
-    generic map
-      (WIDTH         => 8
-      ,INIT          => "0" -- tx_enable
-                       &"0" -- tx_parity_enable
-                       &"0" -- tx_parity_odd
-                       &"0" -- tx_use_loopback
-                       &"0" -- rx_enable
-                       &"0" -- rx_parity_enable
-                       &"0" -- rx_parity_odd
-                       &"0" -- rx_use_loopback
-      ,MODEL         => "rw"
-      )
-    port map
-      (clk_i         => clk_i
-      ,arst_b_i      => arst_b_i
-      ,sw_wd_i       => ctrl_wdata_sw
-      ,sw_rd_o       => ctrl_rdata_sw
-      ,sw_we_i       => ctrl_we
-      ,sw_re_i       => ctrl_re
-      ,sw_rbusy_o    => ctrl_rbusy
-      ,sw_wbusy_o    => ctrl_wbusy
-      ,hw_wd_i       => (others => '0')
-      ,hw_rd_o       => ctrl_rdata_hw
-      ,hw_we_i       => '0'
-      ,hw_sw_re_o    => sw2hw_o.ctrl.re
-      ,hw_sw_we_o    => sw2hw_o.ctrl.we
-      );
+    ins_ctrl : entity work.csr_reg(rtl)
+      generic map
+        (WIDTH         => 8
+        ,INIT          => INIT_ctrl
+        ,MODEL         => "rw"
+        )
+      port map
+        (clk_i         => clk_i
+        ,arst_b_i      => arst_b_i
+        ,sw_wd_i       => ctrl_wdata_sw
+        ,sw_rd_o       => ctrl_rdata_sw
+        ,sw_we_i       => ctrl_we
+        ,sw_re_i       => ctrl_re
+        ,sw_rbusy_o    => ctrl_rbusy
+        ,sw_wbusy_o    => ctrl_wbusy
+        ,hw_wd_i       => (others => '0')
+        ,hw_rd_o       => ctrl_rdata_hw
+        ,hw_we_i       => '0'
+        ,hw_sw_re_o    => sw2hw_o.ctrl.re
+        ,hw_sw_we_o    => sw2hw_o.ctrl.we
+        );
 
+  end generate gen_ctrl;
+
+  gen_ctrl_b: if not (True)
+  generate
+    ctrl_rcs     <= '0';
+    ctrl_rbusy   <= '0';
+    ctrl_rdata   <= (others => '0');
+    ctrl_wcs      <= '0';
+    ctrl_wbusy    <= '0';
+    sw2hw_o.ctrl.tx_enable <= "0";
+    sw2hw_o.ctrl.tx_parity_enable <= "0";
+    sw2hw_o.ctrl.tx_parity_odd <= "0";
+    sw2hw_o.ctrl.tx_use_loopback <= "0";
+    sw2hw_o.ctrl.rx_enable <= "0";
+    sw2hw_o.ctrl.rx_parity_enable <= "0";
+    sw2hw_o.ctrl.rx_parity_odd <= "0";
+    sw2hw_o.ctrl.rx_use_loopback <= "0";
+    sw2hw_o.ctrl.re <= '0';
+    sw2hw_o.ctrl.we <= '0';
+  end generate gen_ctrl_b;
+
+  gen_baud_tick_cnt_max_lsb: if (USER_DEFINE_BAUD_TICK)
+  generate
   --==================================
   -- Register    : baud_tick_cnt_max_lsb
   -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
@@ -314,47 +371,63 @@ begin  -- architecture rtl
   --==================================
 
 
-  baud_tick_cnt_max_lsb_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(2,UART_ADDR_WIDTH))) else '0';
-  baud_tick_cnt_max_lsb_re      <= sig_rcs and sig_re and baud_tick_cnt_max_lsb_rcs;
-  baud_tick_cnt_max_lsb_rdata   <= (
-    0 => baud_tick_cnt_max_lsb_rdata_sw(0), -- value(0)
-    1 => baud_tick_cnt_max_lsb_rdata_sw(1), -- value(1)
-    2 => baud_tick_cnt_max_lsb_rdata_sw(2), -- value(2)
-    3 => baud_tick_cnt_max_lsb_rdata_sw(3), -- value(3)
-    4 => baud_tick_cnt_max_lsb_rdata_sw(4), -- value(4)
-    5 => baud_tick_cnt_max_lsb_rdata_sw(5), -- value(5)
-    6 => baud_tick_cnt_max_lsb_rdata_sw(6), -- value(6)
-    7 => baud_tick_cnt_max_lsb_rdata_sw(7), -- value(7)
-    others => '0');
+    baud_tick_cnt_max_lsb_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(2,UART_ADDR_WIDTH))) else '0';
+    baud_tick_cnt_max_lsb_re      <= sig_rcs and sig_re and baud_tick_cnt_max_lsb_rcs;
+    baud_tick_cnt_max_lsb_rdata   <= (
+      0 => baud_tick_cnt_max_lsb_rdata_sw(0), -- value(0)
+      1 => baud_tick_cnt_max_lsb_rdata_sw(1), -- value(1)
+      2 => baud_tick_cnt_max_lsb_rdata_sw(2), -- value(2)
+      3 => baud_tick_cnt_max_lsb_rdata_sw(3), -- value(3)
+      4 => baud_tick_cnt_max_lsb_rdata_sw(4), -- value(4)
+      5 => baud_tick_cnt_max_lsb_rdata_sw(5), -- value(5)
+      6 => baud_tick_cnt_max_lsb_rdata_sw(6), -- value(6)
+      7 => baud_tick_cnt_max_lsb_rdata_sw(7), -- value(7)
+      others => '0');
 
-  baud_tick_cnt_max_lsb_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(2,UART_ADDR_WIDTH))) else '0';
-  baud_tick_cnt_max_lsb_we      <= sig_wcs and sig_we and baud_tick_cnt_max_lsb_wcs;
-  baud_tick_cnt_max_lsb_wdata   <= sig_wdata;
-  baud_tick_cnt_max_lsb_wdata_sw(7 downto 0) <= baud_tick_cnt_max_lsb_wdata(7 downto 0); -- value
-  sw2hw_o.baud_tick_cnt_max_lsb.value <= baud_tick_cnt_max_lsb_rdata_hw(7 downto 0); -- value
+    baud_tick_cnt_max_lsb_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(2,UART_ADDR_WIDTH)))   else '0';
+    baud_tick_cnt_max_lsb_we      <= sig_wcs and sig_we and baud_tick_cnt_max_lsb_wcs;
+    baud_tick_cnt_max_lsb_wdata   <= sig_wdata;
+    baud_tick_cnt_max_lsb_wdata_sw(7 downto 0) <= baud_tick_cnt_max_lsb_wdata(7 downto 0); -- value
+    sw2hw_o.baud_tick_cnt_max_lsb.value <= baud_tick_cnt_max_lsb_rdata_hw(7 downto 0); -- value
 
-  ins_baud_tick_cnt_max_lsb : entity work.csr_reg(rtl)
-    generic map
-      (WIDTH         => 8
-      ,INIT          => "00000000" -- value
-      ,MODEL         => "rw"
-      )
-    port map
-      (clk_i         => clk_i
-      ,arst_b_i      => arst_b_i
-      ,sw_wd_i       => baud_tick_cnt_max_lsb_wdata_sw
-      ,sw_rd_o       => baud_tick_cnt_max_lsb_rdata_sw
-      ,sw_we_i       => baud_tick_cnt_max_lsb_we
-      ,sw_re_i       => baud_tick_cnt_max_lsb_re
-      ,sw_rbusy_o    => baud_tick_cnt_max_lsb_rbusy
-      ,sw_wbusy_o    => baud_tick_cnt_max_lsb_wbusy
-      ,hw_wd_i       => (others => '0')
-      ,hw_rd_o       => baud_tick_cnt_max_lsb_rdata_hw
-      ,hw_we_i       => '0'
-      ,hw_sw_re_o    => sw2hw_o.baud_tick_cnt_max_lsb.re
-      ,hw_sw_we_o    => sw2hw_o.baud_tick_cnt_max_lsb.we
-      );
+    ins_baud_tick_cnt_max_lsb : entity work.csr_reg(rtl)
+      generic map
+        (WIDTH         => 8
+        ,INIT          => INIT_baud_tick_cnt_max_lsb
+        ,MODEL         => "rw"
+        )
+      port map
+        (clk_i         => clk_i
+        ,arst_b_i      => arst_b_i
+        ,sw_wd_i       => baud_tick_cnt_max_lsb_wdata_sw
+        ,sw_rd_o       => baud_tick_cnt_max_lsb_rdata_sw
+        ,sw_we_i       => baud_tick_cnt_max_lsb_we
+        ,sw_re_i       => baud_tick_cnt_max_lsb_re
+        ,sw_rbusy_o    => baud_tick_cnt_max_lsb_rbusy
+        ,sw_wbusy_o    => baud_tick_cnt_max_lsb_wbusy
+        ,hw_wd_i       => (others => '0')
+        ,hw_rd_o       => baud_tick_cnt_max_lsb_rdata_hw
+        ,hw_we_i       => '0'
+        ,hw_sw_re_o    => sw2hw_o.baud_tick_cnt_max_lsb.re
+        ,hw_sw_we_o    => sw2hw_o.baud_tick_cnt_max_lsb.we
+        );
 
+  end generate gen_baud_tick_cnt_max_lsb;
+
+  gen_baud_tick_cnt_max_lsb_b: if not (USER_DEFINE_BAUD_TICK)
+  generate
+    baud_tick_cnt_max_lsb_rcs     <= '0';
+    baud_tick_cnt_max_lsb_rbusy   <= '0';
+    baud_tick_cnt_max_lsb_rdata   <= (others => '0');
+    baud_tick_cnt_max_lsb_wcs      <= '0';
+    baud_tick_cnt_max_lsb_wbusy    <= '0';
+    sw2hw_o.baud_tick_cnt_max_lsb.value <= BAUD_TICK_CNT_MAX(7 downto 0);
+    sw2hw_o.baud_tick_cnt_max_lsb.re <= '0';
+    sw2hw_o.baud_tick_cnt_max_lsb.we <= '0';
+  end generate gen_baud_tick_cnt_max_lsb_b;
+
+  gen_baud_tick_cnt_max_msb: if (USER_DEFINE_BAUD_TICK)
+  generate
   --==================================
   -- Register    : baud_tick_cnt_max_msb
   -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
@@ -371,46 +444,60 @@ begin  -- architecture rtl
   --==================================
 
 
-  baud_tick_cnt_max_msb_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(3,UART_ADDR_WIDTH))) else '0';
-  baud_tick_cnt_max_msb_re      <= sig_rcs and sig_re and baud_tick_cnt_max_msb_rcs;
-  baud_tick_cnt_max_msb_rdata   <= (
-    0 => baud_tick_cnt_max_msb_rdata_sw(0), -- value(0)
-    1 => baud_tick_cnt_max_msb_rdata_sw(1), -- value(1)
-    2 => baud_tick_cnt_max_msb_rdata_sw(2), -- value(2)
-    3 => baud_tick_cnt_max_msb_rdata_sw(3), -- value(3)
-    4 => baud_tick_cnt_max_msb_rdata_sw(4), -- value(4)
-    5 => baud_tick_cnt_max_msb_rdata_sw(5), -- value(5)
-    6 => baud_tick_cnt_max_msb_rdata_sw(6), -- value(6)
-    7 => baud_tick_cnt_max_msb_rdata_sw(7), -- value(7)
-    others => '0');
+    baud_tick_cnt_max_msb_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(3,UART_ADDR_WIDTH))) else '0';
+    baud_tick_cnt_max_msb_re      <= sig_rcs and sig_re and baud_tick_cnt_max_msb_rcs;
+    baud_tick_cnt_max_msb_rdata   <= (
+      0 => baud_tick_cnt_max_msb_rdata_sw(0), -- value(0)
+      1 => baud_tick_cnt_max_msb_rdata_sw(1), -- value(1)
+      2 => baud_tick_cnt_max_msb_rdata_sw(2), -- value(2)
+      3 => baud_tick_cnt_max_msb_rdata_sw(3), -- value(3)
+      4 => baud_tick_cnt_max_msb_rdata_sw(4), -- value(4)
+      5 => baud_tick_cnt_max_msb_rdata_sw(5), -- value(5)
+      6 => baud_tick_cnt_max_msb_rdata_sw(6), -- value(6)
+      7 => baud_tick_cnt_max_msb_rdata_sw(7), -- value(7)
+      others => '0');
 
-  baud_tick_cnt_max_msb_wcs     <= '1' when     (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(3,UART_ADDR_WIDTH))) else '0';
-  baud_tick_cnt_max_msb_we      <= sig_wcs and sig_we and baud_tick_cnt_max_msb_wcs;
-  baud_tick_cnt_max_msb_wdata   <= sig_wdata;
-  baud_tick_cnt_max_msb_wdata_sw(7 downto 0) <= baud_tick_cnt_max_msb_wdata(7 downto 0); -- value
-  sw2hw_o.baud_tick_cnt_max_msb.value <= baud_tick_cnt_max_msb_rdata_hw(7 downto 0); -- value
+    baud_tick_cnt_max_msb_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(3,UART_ADDR_WIDTH)))   else '0';
+    baud_tick_cnt_max_msb_we      <= sig_wcs and sig_we and baud_tick_cnt_max_msb_wcs;
+    baud_tick_cnt_max_msb_wdata   <= sig_wdata;
+    baud_tick_cnt_max_msb_wdata_sw(7 downto 0) <= baud_tick_cnt_max_msb_wdata(7 downto 0); -- value
+    sw2hw_o.baud_tick_cnt_max_msb.value <= baud_tick_cnt_max_msb_rdata_hw(7 downto 0); -- value
 
-  ins_baud_tick_cnt_max_msb : entity work.csr_reg(rtl)
-    generic map
-      (WIDTH         => 8
-      ,INIT          => "00000000" -- value
-      ,MODEL         => "rw"
-      )
-    port map
-      (clk_i         => clk_i
-      ,arst_b_i      => arst_b_i
-      ,sw_wd_i       => baud_tick_cnt_max_msb_wdata_sw
-      ,sw_rd_o       => baud_tick_cnt_max_msb_rdata_sw
-      ,sw_we_i       => baud_tick_cnt_max_msb_we
-      ,sw_re_i       => baud_tick_cnt_max_msb_re
-      ,sw_rbusy_o    => baud_tick_cnt_max_msb_rbusy
-      ,sw_wbusy_o    => baud_tick_cnt_max_msb_wbusy
-      ,hw_wd_i       => (others => '0')
-      ,hw_rd_o       => baud_tick_cnt_max_msb_rdata_hw
-      ,hw_we_i       => '0'
-      ,hw_sw_re_o    => sw2hw_o.baud_tick_cnt_max_msb.re
-      ,hw_sw_we_o    => sw2hw_o.baud_tick_cnt_max_msb.we
-      );
+    ins_baud_tick_cnt_max_msb : entity work.csr_reg(rtl)
+      generic map
+        (WIDTH         => 8
+        ,INIT          => INIT_baud_tick_cnt_max_msb
+        ,MODEL         => "rw"
+        )
+      port map
+        (clk_i         => clk_i
+        ,arst_b_i      => arst_b_i
+        ,sw_wd_i       => baud_tick_cnt_max_msb_wdata_sw
+        ,sw_rd_o       => baud_tick_cnt_max_msb_rdata_sw
+        ,sw_we_i       => baud_tick_cnt_max_msb_we
+        ,sw_re_i       => baud_tick_cnt_max_msb_re
+        ,sw_rbusy_o    => baud_tick_cnt_max_msb_rbusy
+        ,sw_wbusy_o    => baud_tick_cnt_max_msb_wbusy
+        ,hw_wd_i       => (others => '0')
+        ,hw_rd_o       => baud_tick_cnt_max_msb_rdata_hw
+        ,hw_we_i       => '0'
+        ,hw_sw_re_o    => sw2hw_o.baud_tick_cnt_max_msb.re
+        ,hw_sw_we_o    => sw2hw_o.baud_tick_cnt_max_msb.we
+        );
+
+  end generate gen_baud_tick_cnt_max_msb;
+
+  gen_baud_tick_cnt_max_msb_b: if not (USER_DEFINE_BAUD_TICK)
+  generate
+    baud_tick_cnt_max_msb_rcs     <= '0';
+    baud_tick_cnt_max_msb_rbusy   <= '0';
+    baud_tick_cnt_max_msb_rdata   <= (others => '0');
+    baud_tick_cnt_max_msb_wcs      <= '0';
+    baud_tick_cnt_max_msb_wbusy    <= '0';
+    sw2hw_o.baud_tick_cnt_max_msb.value <= BAUD_TICK_CNT_MAX(15 downto 8);
+    sw2hw_o.baud_tick_cnt_max_msb.re <= '0';
+    sw2hw_o.baud_tick_cnt_max_msb.we <= '0';
+  end generate gen_baud_tick_cnt_max_msb_b;
 
   sig_wbusy <= 
     data_wbusy when data_wcs = '1' else
