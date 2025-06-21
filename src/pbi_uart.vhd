@@ -42,7 +42,7 @@ entity pbi_UART is
     USER_DEFINE_BAUD_TICK : boolean := true;
     
     FILENAME_TX           : string  := "dump_uart_tx.txt";
-    FILENAME_RX           : string  := "dump_uart_tx.txt"
+    FILENAME_RX           : string  := "dump_uart_rx.txt"
     );
   port   (
     clk_i            : in  std_logic;
