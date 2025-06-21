@@ -60,6 +60,12 @@ entity pbi_UART is
 end entity pbi_UART;
 
 architecture rtl of pbi_UART is
+
+-- synthesis translate_off
+  file     file_tx                : text open write_mode is FILENAME_TX;
+  file     file_rx                : text open write_mode is FILENAME_RX;
+-- synthesis translate_on
+
   -- Compute Max baud tick counter
   constant BAUD_TICK_CNT_MAX_INT  : integer := (CLOCK_FREQ / BAUD_RATE) - 1;
   constant BAUD_TICK_CNT_MAX_SLV  : std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) := std_logic_vector(to_unsigned(BAUD_TICK_CNT_MAX_INT, BAUD_TICK_CNT_WIDTH));
@@ -96,11 +102,6 @@ architecture rtl of pbi_UART is
   signal   hw2sw                  : UART_hw2sw_t;
 
   signal   baud_tick_cnt_max      : std_logic_vector(16-1 downto 0);
-
--- synthesis translate_off
-  file     file_tx                : text open write_mode is FILENAME_TX;
-  file     file_rx                : text open write_mode is FILENAME_RX;
--- synthesis translate_on
   
 begin  -- architecture rtl
 
