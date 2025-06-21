@@ -278,7 +278,7 @@ begin  -- architecture rtl
       if (tx_tvalid and tx_tready)
       then
         write    (line_buffer, tx_tdata);
-        write    (line_buffer, string'(" - "));
+        write    (line_buffer, string'(" - 0x"));
         write    (line_buffer, to_hstring(tx_tdata));
         write    (line_buffer, string'(" - "));
         write    (line_buffer, character'val(to_integer(unsigned(tx_tdata))));
@@ -288,7 +288,7 @@ begin  -- architecture rtl
       if (rx_tvalid and rx_tready)
       then
         write    (line_buffer, rx_tdata);
-        write    (line_buffer, string'(" - "));
+        write    (line_buffer, string'(" - 0x"));
         write    (line_buffer, to_hstring(rx_tdata));
         write    (line_buffer, string'(" - "));
         write    (line_buffer, character'val(to_integer(unsigned(rx_tdata))));
@@ -298,6 +298,5 @@ begin  -- architecture rtl
     end if;
   end process;
 -- synthesis translate_on
-
   
 end architecture rtl;
