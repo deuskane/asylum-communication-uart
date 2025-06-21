@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-05-14
+-- Last update: 2025-06-21
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -25,6 +25,9 @@
 library IEEE;
 use     IEEE.STD_LOGIC_1164.ALL;
 use     IEEE.numeric_std.ALL;
+use     ieee.std_logic_textio.all;
+use     std.textio.all;
+
 library work;
 use     work.UART_csr_pkg.ALL;
 use     work.pbi_pkg.all;
@@ -36,7 +39,10 @@ entity pbi_UART is
     BAUD_TICK_CNT_WIDTH   : integer := 16;
     UART_TX_ENABLE        : boolean := true;
     UART_RX_ENABLE        : boolean := true;
-    USER_DEFINE_BAUD_TICK : boolean := true
+    USER_DEFINE_BAUD_TICK : boolean := true;
+    
+    FILENAME_TX           : string  := "dump_uart_tx.txt";
+    FILENAME_RX           : string  := "dump_uart_tx.txt"
     );
   port   (
     clk_i            : in  std_logic;
@@ -90,6 +96,11 @@ architecture rtl of pbi_UART is
   signal   hw2sw                  : UART_hw2sw_t;
 
   signal   baud_tick_cnt_max      : std_logic_vector(16-1 downto 0);
+
+-- synthesis translate_off
+  file     file_tx                : text open write_mode is FILENAME_TX;
+  file     file_rx                : text open write_mode is FILENAME_RX;
+-- synthesis translate_on
   
 begin  -- architecture rtl
 
@@ -254,6 +265,36 @@ begin  -- architecture rtl
     report "Baud Tick Counter Max : " & integer'image(BAUD_TICK_CNT_MAX_INT);
     report "Baud Tick Counter Div2: " & integer'image(BAUD_TICK_CNT_MAX_INT/2);
     wait;
+  end process;
+
+  process (clk_i) is
+    variable line_buffer : line;
+  begin  -- process
+
+    if rising_edge(clk_i)
+    then
+
+      if (tx_tvalid and tx_tready)
+      then
+        write    (line_buffer, tx_tdata);
+        write    (line_buffer, string'(" - "));
+        write    (line_buffer, to_hstring(tx_tdata));
+        write    (line_buffer, string'(" - "));
+        write    (line_buffer, character'val(to_integer(unsigned(tx_tdata))));
+        writeline(file_tx, line_buffer);
+      end if;
+
+      if (rx_tvalid and rx_tready)
+      then
+        write    (line_buffer, rx_tdata);
+        write    (line_buffer, string'(" - "));
+        write    (line_buffer, to_hstring(rx_tdata));
+        write    (line_buffer, string'(" - "));
+        write    (line_buffer, character'val(to_integer(unsigned(rx_tdata))));
+        writeline(file_rx, line_buffer);
+      end if;
+      
+    end if;
   end process;
 -- synthesis translate_on
 
