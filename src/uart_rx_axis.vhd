@@ -42,7 +42,6 @@ architecture rtl of uart_rx_axis is
   -- Déclaration des registres internes
   signal   uart_rx_data_r                 : std_logic_vector(BIT_MSB     downto 0); 
   signal   uart_rx_bit_cnt_r              : unsigned        (WIDTH_CNT-1 downto 0);
-  signal   uart_rx_active_r               : std_logic;
   signal   parity_bit_r                   : std_logic;
   
 begin
