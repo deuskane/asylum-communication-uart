@@ -201,6 +201,10 @@ begin  -- architecture rtl
         ,hw_rx_valid_o => sw2hw_o.data.valid
         ,hw_rx_ready_i => hw2sw_i.data.ready
         ,hw_rx_data_o  => data_rdata_hw
+        ,hw_tx_empty_o        => open
+        ,hw_tx_full_o         => open
+        ,hw_rx_empty_o        => open
+        ,hw_rx_full_o         => open
         );
 
   end generate gen_data;
