@@ -15,11 +15,12 @@
 -- Copyright (c) 2017
 -------------------------------------------------------------------------------
 -- Revisions  :
--- Date        Version  Author  Description
--- 2025-01-21  0.1      rosiere	Created
--- 2025-03-09  0.2      rosiere	use unconstrained pbi
--- 2025-03-15  0.3      rosiere Add CSR
--- 2025-05-14  1.0      rosiere Add parameter USER_DEFINE_BAUD_TICK and default value
+-- Date        Version Author  Description
+-- 2025-01-21  0.1     mrosiere	Created
+-- 2025-03-09  0.2     mrosiere	use unconstrained pbi
+-- 2025-03-15  0.3     mrosiere Add CSR
+-- 2025-05-14  1.0     mrosiere Add parameter USER_DEFINE_BAUD_TICK and default value
+-- 2025-07-09  1.1     mrosiere Add FIFO Depth
 -------------------------------------------------------------------------------
 
 library IEEE;
