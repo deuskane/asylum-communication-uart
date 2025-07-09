@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-06-21
+-- Last update: 2025-07-09
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -40,6 +40,8 @@ entity pbi_UART is
     UART_TX_ENABLE        : boolean := true;
     UART_RX_ENABLE        : boolean := true;
     USER_DEFINE_BAUD_TICK : boolean := true;
+    DEPTH_TX              : natural := 0;
+    DEPTH_RX              : natural := 0;
     
     FILENAME_TX           : string  := "dump_uart_tx.txt";
     FILENAME_RX           : string  := "dump_uart_rx.txt"
@@ -111,7 +113,9 @@ begin  -- architecture rtl
   ins_csr : entity work.UART_registers(rtl)
     generic map(
       USER_DEFINE_BAUD_TICK => USER_DEFINE_BAUD_TICK,
-      BAUD_TICK_CNT_MAX     => BAUD_TICK_CNT_MAX_SLV
+      BAUD_TICK_CNT_MAX     => BAUD_TICK_CNT_MAX_SLV,
+      DEPTH_TX              => DEPTH_TX,
+      DEPTH_RX              => DEPTH_RX
       )
     port map(
       clk_i                 => clk_i           ,

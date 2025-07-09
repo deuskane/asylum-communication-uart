@@ -15,6 +15,16 @@
 	    desc         : "Default value for Baud Tick Timer"
 	    type         : "std_logic_vector(15 downto 0)"
 	}
+	{
+	    name         : "DEPTH_TX"
+	    desc         : "Depth of FIFO TX (SW2HW)"
+	    type         : "natural"
+	}
+	{
+	    name         : "DEPTH_RX"
+	    desc         : "Depth of FIFO RX (HW2SW)"
+	    type         : "natural"
+	}
     ]
 
     registers : [
@@ -29,6 +39,8 @@
             params: {
                 BLOCKING_READ  : "True", 
                 BLOCKING_WRITE : "True",
+		DEPTH_SW2HW    : "DEPTH_TX"
+		DEPTH_HW2SW    : "DEPTH_RX"
             }
 
             fields: [
