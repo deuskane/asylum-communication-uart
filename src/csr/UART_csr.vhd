@@ -199,16 +199,16 @@ begin  -- architecture rtl
         ,sw_re_i       => data_re
         ,sw_rbusy_o    => data_rbusy
         ,sw_wbusy_o    => data_wbusy
-        ,hw_tx_valid_i => hw2sw_i.data.valid
-        ,hw_tx_ready_o => sw2hw_o.data.ready
-        ,hw_tx_data_i  => data_wdata_hw
-        ,hw_rx_valid_o => sw2hw_o.data.valid
-        ,hw_rx_ready_i => hw2sw_i.data.ready
-        ,hw_rx_data_o  => data_rdata_hw
-        ,hw_tx_empty_o        => open
-        ,hw_tx_full_o         => open
-        ,hw_rx_empty_o        => open
-        ,hw_rx_full_o         => open
+        ,hw_tx_valid_i        => hw2sw_i.data.valid
+        ,hw_tx_ready_o        => sw2hw_o.data.ready
+        ,hw_tx_data_i         => data_wdata_hw
+        ,hw_tx_empty_o        => sw2hw_o.data.tx_empty
+        ,hw_tx_full_o         => sw2hw_o.data.tx_full
+        ,hw_rx_valid_o        => sw2hw_o.data.valid
+        ,hw_rx_ready_i        => hw2sw_i.data.ready
+        ,hw_rx_data_o         => data_rdata_hw
+        ,hw_rx_empty_o        => sw2hw_o.data.rx_empty
+        ,hw_rx_full_o         => sw2hw_o.data.rx_full
         );
 
   end generate gen_data;

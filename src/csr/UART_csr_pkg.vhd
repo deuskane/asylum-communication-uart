@@ -30,6 +30,10 @@ package UART_csr_pkg is
   -- Width       : 8
   --==================================
     value : std_logic_vector(8-1 downto 0);
+    rx_empty : std_logic;
+    rx_full  : std_logic;
+    tx_empty : std_logic;
+    tx_full  : std_logic;
   end record UART_data_sw2hw_t;
 
   type UART_data_hw2sw_t is record
