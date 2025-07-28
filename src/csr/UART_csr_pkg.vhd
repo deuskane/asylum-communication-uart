@@ -13,9 +13,59 @@ use     IEEE.NUMERIC_STD.ALL;
 package UART_csr_pkg is
 
   --==================================
+  -- Register    : isr
+  -- Description : Interruption Status Register
+  -- Address     : 0x0
+  -- Width       : 4
+  -- Sw Access   : rw1c
+  -- Hw Access   : rw
+  -- Hw Type     : reg
+  --==================================
+  type UART_isr_sw2hw_t is record
+    re : std_logic;
+    we : std_logic;
+  --==================================
+  -- Field       : value
+  -- Description : 0: interrupt is inactive, 1: interrupt is active
+  -- Width       : 4
+  --==================================
+    value : std_logic_vector(4-1 downto 0);
+  end record UART_isr_sw2hw_t;
+
+  type UART_isr_hw2sw_t is record
+    we : std_logic;
+  --==================================
+  -- Field       : value
+  -- Description : 0: interrupt is inactive, 1: interrupt is active
+  -- Width       : 4
+  --==================================
+    value : std_logic_vector(4-1 downto 0);
+  end record UART_isr_hw2sw_t;
+
+  --==================================
+  -- Register    : imr
+  -- Description : Interruption Mask Register
+  -- Address     : 0x1
+  -- Width       : 4
+  -- Sw Access   : rw
+  -- Hw Access   : ro
+  -- Hw Type     : reg
+  --==================================
+  type UART_imr_sw2hw_t is record
+    re : std_logic;
+    we : std_logic;
+  --==================================
+  -- Field       : enable
+  -- Description : 0: interrupt is disable, 1: interrupt is enable
+  -- Width       : 4
+  --==================================
+    enable : std_logic_vector(4-1 downto 0);
+  end record UART_imr_sw2hw_t;
+
+  --==================================
   -- Register    : data
   -- Description : Write : data to tansmit, Read : data to receive
-  -- Address     : 0x0
+  -- Address     : 0x3
   -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : rw
@@ -50,7 +100,7 @@ package UART_csr_pkg is
   --==================================
   -- Register    : ctrl
   -- Description : Control Register
-  -- Address     : 0x1
+  -- Address     : 0x2
   -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
@@ -112,7 +162,7 @@ package UART_csr_pkg is
   --==================================
   -- Register    : baud_tick_cnt_max_lsb
   -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
-  -- Address     : 0x2
+  -- Address     : 0x4
   -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
@@ -132,7 +182,7 @@ package UART_csr_pkg is
   --==================================
   -- Register    : baud_tick_cnt_max_msb
   -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
-  -- Address     : 0x3
+  -- Address     : 0x5
   -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
@@ -153,6 +203,8 @@ package UART_csr_pkg is
   -- Structure UART_t
   ------------------------------------
   type UART_sw2hw_t is record
+    isr : UART_isr_sw2hw_t;
+    imr : UART_imr_sw2hw_t;
     data : UART_data_sw2hw_t;
     ctrl : UART_ctrl_sw2hw_t;
     baud_tick_cnt_max_lsb : UART_baud_tick_cnt_max_lsb_sw2hw_t;
@@ -160,10 +212,11 @@ package UART_csr_pkg is
   end record UART_sw2hw_t;
 
   type UART_hw2sw_t is record
+    isr : UART_isr_hw2sw_t;
     data : UART_data_hw2sw_t;
   end record UART_hw2sw_t;
 
-  constant UART_ADDR_WIDTH : natural := 2;
+  constant UART_ADDR_WIDTH : natural := 3;
   constant UART_DATA_WIDTH : natural := 8;
 
 end package UART_csr_pkg;

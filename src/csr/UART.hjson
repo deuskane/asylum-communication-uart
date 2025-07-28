@@ -28,9 +28,109 @@
     ]
 
     registers : [
+
+#        {
+#            name         : "isr",
+#            address      : "x0",
+#            desc         : "Interruption Status Register",
+#            swaccess     : "rw1c",
+#            hwaccess     : "rw",
+#            hwtype       : "reg",
+#
+#            fields: [
+#                {
+#                    name: "tx_empty_b",
+#                    bits: "0",
+#                    desc: "0: tx fifo is empty, 1: tx fifo is not empty"
+#                },
+#                {
+#                    name: "tx_full",
+#                    bits: "1",
+#                    desc: "0: tx fifo is not full, 1: tx fifo is full"
+#                },
+#                {
+#                    name: "rx_empty_b",
+#                    bits: "4",
+#                    desc: "0: rx fifo is empty, 1: rx fifo is not empty"
+#                },
+#                {
+#                    name: "rx_full",
+#                    bits: "5",
+#                    desc: "0: rx fifo is not full, 1: rx fifo is full"
+#                },
+#            ]
+#        },
+#
+#        {
+#            name         : "imr",
+#            address      : "x1",
+#            desc         : "Interruption Mask Register",
+#            swaccess     : "rw",
+#            hwaccess     : "ro",
+#            hwtype       : "reg",
+#
+#            fields: [
+#                {
+#                    name: "tx_empty_b",
+#                    bits: "0",
+#                    desc: "0: tx_empty_b is disable, 1: tx_empty_b is enable"
+#                },
+#                {
+#                    name: "tx_full",
+#                    bits: "1",
+#                    desc: "0: tx_full is disable, 1: tx_full is enable"
+#                },
+#                {
+#                    name: "rx_empty_b",
+#                    bits: "4",
+#                    desc: "0: rx_empty_b is disable, 1: rx_empty_b is enable"
+#                },
+#                {
+#                    name: "rx_full",
+#                    bits: "5",
+#                    desc: "0: rx_full is disable, 1: rx_full is enable"
+#                },
+#            ]
+#        },
+
         {
-            name         : "data",
+            name         : "isr",
             address      : "x0",
+            desc         : "Interruption Status Register",
+            swaccess     : "rw1c",
+            hwaccess     : "rw",
+            hwtype       : "reg",
+
+            fields: [
+                {
+                    name: "value",
+                    bits: "3:0",
+                    desc: "0: interrupt is inactive, 1: interrupt is active"
+                },
+            ]
+        },
+
+        {
+            name         : "imr",
+            address      : "x1",
+            desc         : "Interruption Mask Register",
+            swaccess     : "rw",
+            hwaccess     : "ro",
+            hwtype       : "reg",
+
+            fields: [
+                {
+                    name: "enable",
+                    bits: "3:0",
+		    init: "x0",
+                    desc: "0: interrupt is disable, 1: interrupt is enable"
+                },
+            ]
+        },
+
+	{
+            name         : "data",
+            address      : "x3",
             desc         : "Write : data to tansmit, Read : data to receive",
             swaccess     : "rw",
             hwaccess     : "rw",
@@ -54,7 +154,7 @@
 
         {
             name         : "ctrl",
-            address      : "x1",
+            address      : "x2",
             desc         : "Control Register",
             swaccess     : "rw",
             hwaccess     : "ro",
@@ -105,7 +205,7 @@
 
         {
             name         : "baud_tick_cnt_max_lsb",
-            address      : "x2",
+            address      : "x4",
             desc         : "Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1",
             swaccess     : "rw",
             hwaccess     : "ro",
@@ -124,7 +224,7 @@
 
 	{
             name         : "baud_tick_cnt_max_msb",
-            address      : "x3",
+            address      : "x5",
             desc         : "Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1",
             swaccess     : "rw",
             hwaccess     : "ro",

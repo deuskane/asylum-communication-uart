@@ -22,9 +22,10 @@ CAPI=2:
 # 2025/05/14  1.6.0    mrosiere Add parameter USER_DEFINE_BAUD_TICK and default value
 # 2025/06/21  1.6.1    mrosiere Dump FIFO activity in file
 # 2025/07/09  1.7.0    mrosiere Configure FIFO Depth
+# 2025/07/27  1.8.0    mrosiere Add Interruption
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:1.7.0
+name        : asylum:communication:uart:1.8.0
 description : UART TX and RX
 
 #=========================================
@@ -57,6 +58,7 @@ filesets:
     depend :
       - asylum:utils:pkg
       - asylum:component:pbi_wrapper_target
+      - asylum:system:GIC
 
 #=========================================
 targets:

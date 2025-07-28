@@ -8,11 +8,37 @@
 // Width       : 8
 
 //==================================
-// Register    : data
-// Description : Write : data to tansmit, Read : data to receive
+// Register    : isr
+// Description : Interruption Status Register
 // Address     : 0x0
 //==================================
-#define UART_DATA 0x0
+#define UART_ISR 0x0
+
+// Field       : isr.value
+// Description : 0: interrupt is inactive, 1: interrupt is active
+// Range       : [3:0]
+#define UART_ISR_VALUE      0
+#define UART_ISR_VALUE_MASK 15
+
+//==================================
+// Register    : imr
+// Description : Interruption Mask Register
+// Address     : 0x1
+//==================================
+#define UART_IMR 0x1
+
+// Field       : imr.enable
+// Description : 0: interrupt is disable, 1: interrupt is enable
+// Range       : [3:0]
+#define UART_IMR_ENABLE      0
+#define UART_IMR_ENABLE_MASK 15
+
+//==================================
+// Register    : data
+// Description : Write : data to tansmit, Read : data to receive
+// Address     : 0x3
+//==================================
+#define UART_DATA 0x3
 
 // Field       : data.value
 // Description : Data TX or Data RX
@@ -23,9 +49,9 @@
 //==================================
 // Register    : ctrl
 // Description : Control Register
-// Address     : 0x1
+// Address     : 0x2
 //==================================
-#define UART_CTRL 0x1
+#define UART_CTRL 0x2
 
 // Field       : ctrl.tx_enable
 // Description : 0 : TX is disable, 1 : TX is enable
@@ -78,9 +104,9 @@
 //==================================
 // Register    : baud_tick_cnt_max_lsb
 // Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
-// Address     : 0x2
+// Address     : 0x4
 //==================================
-#define UART_BAUD_TICK_CNT_MAX_LSB 0x2
+#define UART_BAUD_TICK_CNT_MAX_LSB 0x4
 
 // Field       : baud_tick_cnt_max_lsb.value
 // Description : Baud Tick Counter Max LSB
@@ -91,9 +117,9 @@
 //==================================
 // Register    : baud_tick_cnt_max_msb
 // Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
-// Address     : 0x3
+// Address     : 0x5
 //==================================
-#define UART_BAUD_TICK_CNT_MAX_MSB 0x3
+#define UART_BAUD_TICK_CNT_MAX_MSB 0x5
 
 // Field       : baud_tick_cnt_max_msb.value
 // Description : Baud Tick Counter Max MSB
@@ -105,10 +131,12 @@
 // Structure {module}_t
 //----------------------------------
 typedef struct {
-  uint8_t data; // 0x0
-  uint8_t ctrl; // 0x1
-  uint8_t baud_tick_cnt_max_lsb; // 0x2
-  uint8_t baud_tick_cnt_max_msb; // 0x3
+  uint8_t isr; // 0x0
+  uint8_t imr; // 0x1
+  uint8_t ctrl; // 0x2
+  uint8_t data; // 0x3
+  uint8_t baud_tick_cnt_max_lsb; // 0x4
+  uint8_t baud_tick_cnt_max_msb; // 0x5
 } UART_t;
 
 #endif // UART_REGISTERS_H

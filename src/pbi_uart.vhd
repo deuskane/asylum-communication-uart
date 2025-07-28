@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-07-09
+-- Last update: 2025-07-28
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -57,7 +57,11 @@ entity pbi_UART is
     
     -- To/From IO
     uart_tx_o        : out std_logic;
-    uart_rx_i        : in  std_logic
+    uart_rx_i        : in  std_logic;
+
+    -- Interruption
+    it_o             : out std_logic
+
     );
 
 end entity pbi_UART;
@@ -105,6 +109,12 @@ architecture rtl of pbi_UART is
   signal   hw2sw                  : UART_hw2sw_t;
 
   signal   baud_tick_cnt_max      : std_logic_vector(16-1 downto 0);
+
+  signal   it                     : std_logic_vector(4-1 downto 0);
+  signal   rx_full                : std_logic;
+  signal   rx_empty_b             : std_logic;
+  signal   tx_full                : std_logic;
+  signal   tx_empty_b             : std_logic;
   
 begin  -- architecture rtl
 
@@ -263,6 +273,26 @@ begin  -- architecture rtl
     
   end generate gen_uart_rx_b;
 
+  rx_full    <=     sw2hw.data.rx_full ;
+  rx_empty_b <= not sw2hw.data.rx_empty;
+  tx_full    <=     sw2hw.data.tx_full ;
+  tx_empty_b <= not sw2hw.data.tx_empty;
+  it         <= (rx_full    &  
+                 rx_empty_b & 
+                 tx_full    & 
+                 tx_empty_b 
+                 );
+  
+  ins_GIC_core : entity work.GIC_core(rtl)
+  port map(
+    itm_o     => it_o            ,
+    its_i     => it,
+    isr_i     => sw2hw.isr.value ,
+    isr_o     => hw2sw.isr.value ,
+    imr_i     => sw2hw.imr.enable
+    );
+
+  
 -- synthesis translate_off
   process
   begin

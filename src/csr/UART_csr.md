@@ -3,18 +3,32 @@ CSR for UART
 
 | Address | Registers |
 |---------|-----------|
-|0x0|data|
-|0x1|ctrl|
-|0x2|baud_tick_cnt_max_lsb|
-|0x3|baud_tick_cnt_max_msb|
+|0x0|isr|
+|0x1|imr|
+|0x2|ctrl|
+|0x3|data|
+|0x4|baud_tick_cnt_max_lsb|
+|0x5|baud_tick_cnt_max_msb|
 
-## 0x0 data
+## 0x0 isr
+Interruption Status Register
+
+### [3:0] value
+0: interrupt is inactive, 1: interrupt is active
+
+## 0x1 imr
+Interruption Mask Register
+
+### [3:0] enable
+0: interrupt is disable, 1: interrupt is enable
+
+## 0x3 data
 Write : data to tansmit, Read : data to receive
 
 ### [7:0] value
 Data TX or Data RX
 
-## 0x1 ctrl
+## 0x2 ctrl
 Control Register
 
 ### [0:0] tx_enable
@@ -41,13 +55,13 @@ Control Register
 ### [7:7] rx_use_loopback
 0 : UART RX is connected to UART RX Input, 1 : UART RX is connected to UART TX
 
-## 0x2 baud_tick_cnt_max_lsb
+## 0x4 baud_tick_cnt_max_lsb
 Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
 
 ### [7:0] value
 Baud Tick Counter Max LSB
 
-## 0x3 baud_tick_cnt_max_msb
+## 0x5 baud_tick_cnt_max_msb
 Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
 
 ### [7:0] value
