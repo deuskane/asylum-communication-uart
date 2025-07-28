@@ -111,10 +111,10 @@ architecture rtl of pbi_UART is
   signal   baud_tick_cnt_max      : std_logic_vector(16-1 downto 0);
 
   signal   it                     : std_logic_vector(4-1 downto 0);
-  signal   rx_full                : std_logic;
-  signal   rx_empty_b             : std_logic;
-  signal   tx_full                : std_logic;
-  signal   tx_empty_b             : std_logic;
+  signal   it_rx_full             : std_logic;
+  signal   it_rx_empty_b          : std_logic;
+  signal   it_tx_full             : std_logic;
+  signal   it_tx_empty_b          : std_logic;
   
 begin  -- architecture rtl
 
@@ -273,15 +273,15 @@ begin  -- architecture rtl
     
   end generate gen_uart_rx_b;
 
-  rx_full    <=     sw2hw.data.rx_full ;
-  rx_empty_b <= not sw2hw.data.rx_empty;
-  tx_full    <=     sw2hw.data.tx_full ;
-  tx_empty_b <= not sw2hw.data.tx_empty;
-  it         <= (rx_full    &  
-                 rx_empty_b & 
-                 tx_full    & 
-                 tx_empty_b 
-                 );
+  it_rx_full    <=     sw2hw.data.rx_full ;
+  it_rx_empty_b <= not sw2hw.data.rx_empty;
+  it_tx_full    <=     sw2hw.data.tx_full ;
+  it_tx_empty_b <= not sw2hw.data.tx_empty;
+  it            <= (it_rx_full    &  
+                    it_rx_empty_b & 
+                    it_tx_full    & 
+                    it_tx_empty_b 
+                    );
   
   ins_GIC_core : entity work.GIC_core(rtl)
   port map(
