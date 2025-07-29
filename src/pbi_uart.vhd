@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-07-28
+-- Last update: 2025-07-29
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -282,6 +282,7 @@ begin  -- architecture rtl
                     it_tx_full    & 
                     it_tx_empty_b 
                     );
+  hw2sw.isr.we  <= '1';
   
   ins_GIC_core : entity work.GIC_core(rtl)
   port map(
@@ -291,7 +292,7 @@ begin  -- architecture rtl
     isr_o     => hw2sw.isr.value ,
     imr_i     => sw2hw.imr.enable
     );
-
+  
   
 -- synthesis translate_off
   process
