@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-07-29
+-- Last update: 2025-07-30
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -273,10 +273,10 @@ begin  -- architecture rtl
     
   end generate gen_uart_rx_b;
 
-  it_rx_full    <=     sw2hw.data.rx_full ;
-  it_rx_empty_b <= not sw2hw.data.rx_empty;
-  it_tx_full    <=     sw2hw.data.tx_full ;
-  it_tx_empty_b <= not sw2hw.data.tx_empty;
+  it_rx_full    <=     sw2hw.data.hw2sw_full ;
+  it_rx_empty_b <= not sw2hw.data.hw2sw_empty;
+  it_tx_full    <=     sw2hw.data.sw2hw_full ;
+  it_tx_empty_b <= not sw2hw.data.sw2hw_empty;
   it            <= (it_rx_full    &  
                     it_rx_empty_b & 
                     it_tx_full    & 

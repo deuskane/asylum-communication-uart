@@ -375,13 +375,13 @@ begin  -- architecture rtl
         ,hw_tx_valid_i        => hw2sw_i.data.valid
         ,hw_tx_ready_o        => sw2hw_o.data.ready
         ,hw_tx_data_i         => data_wdata_hw
-        ,hw_tx_empty_o        => sw2hw_o.data.tx_empty
-        ,hw_tx_full_o         => sw2hw_o.data.tx_full
+        ,hw_tx_empty_o        => sw2hw_o.data.hw2sw_empty
+        ,hw_tx_full_o         => sw2hw_o.data.hw2sw_full
         ,hw_rx_valid_o        => sw2hw_o.data.valid
         ,hw_rx_ready_i        => hw2sw_i.data.ready
         ,hw_rx_data_o         => data_rdata_hw
-        ,hw_rx_empty_o        => sw2hw_o.data.rx_empty
-        ,hw_rx_full_o         => sw2hw_o.data.rx_full
+        ,hw_rx_empty_o        => sw2hw_o.data.sw2hw_empty
+        ,hw_rx_full_o         => sw2hw_o.data.sw2hw_full
         );
 
   end generate gen_data;
