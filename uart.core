@@ -37,9 +37,9 @@ generate:
   #---------------------------------------
     generator : regtool
     parameters:
-      file         : src/csr/UART.hjson
+      file         : hdl/csr/UART.hjson
       name         : UART
-      copy         : src/csr
+      copy         : hdl/csr
       #logical_name : asylum
 
 #=========================================
@@ -50,10 +50,10 @@ filesets:
   rtl:
   #---------------------------------------
     files:
-      - src/uart_baud_rate_gen.vhd
-      - src/uart_rx_axis.vhd
-      - src/uart_tx_axis.vhd
-      - src/pbi_uart.vhd
+      - hdl/uart_baud_rate_gen.vhd
+      - hdl/uart_rx_axis.vhd
+      - hdl/uart_tx_axis.vhd
+      - hdl/pbi_uart.vhd
     file_type : vhdlSource
     depend :
       - asylum:utils:pkg
