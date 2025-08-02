@@ -102,29 +102,47 @@ architecture rtl of UART_registers is
   signal   data_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   data_rbusy     : std_logic;
 
-  constant INIT_ctrl : std_logic_vector(8-1 downto 0) :=
+  constant INIT_ctrl_tx : std_logic_vector(5-1 downto 0) :=
              "0" -- tx_enable
            & "0" -- tx_parity_enable
            & "0" -- tx_parity_odd
            & "0" -- tx_use_loopback
-           & "0" -- rx_enable
+           & "0" -- cts_enable
+           ;
+  signal   ctrl_tx_wcs       : std_logic;
+  signal   ctrl_tx_we        : std_logic;
+  signal   ctrl_tx_wdata     : std_logic_vector(8-1 downto 0);
+  signal   ctrl_tx_wdata_sw  : std_logic_vector(5-1 downto 0);
+  signal   ctrl_tx_wdata_hw  : std_logic_vector(5-1 downto 0);
+  signal   ctrl_tx_wbusy     : std_logic;
+
+  signal   ctrl_tx_rcs       : std_logic;
+  signal   ctrl_tx_re        : std_logic;
+  signal   ctrl_tx_rdata     : std_logic_vector(8-1 downto 0);
+  signal   ctrl_tx_rdata_sw  : std_logic_vector(5-1 downto 0);
+  signal   ctrl_tx_rdata_hw  : std_logic_vector(5-1 downto 0);
+  signal   ctrl_tx_rbusy     : std_logic;
+
+  constant INIT_ctrl_rx : std_logic_vector(5-1 downto 0) :=
+             "0" -- rx_enable
            & "0" -- rx_parity_enable
            & "0" -- rx_parity_odd
            & "0" -- rx_use_loopback
+           & "0" -- rts_enable
            ;
-  signal   ctrl_wcs       : std_logic;
-  signal   ctrl_we        : std_logic;
-  signal   ctrl_wdata     : std_logic_vector(8-1 downto 0);
-  signal   ctrl_wdata_sw  : std_logic_vector(8-1 downto 0);
-  signal   ctrl_wdata_hw  : std_logic_vector(8-1 downto 0);
-  signal   ctrl_wbusy     : std_logic;
+  signal   ctrl_rx_wcs       : std_logic;
+  signal   ctrl_rx_we        : std_logic;
+  signal   ctrl_rx_wdata     : std_logic_vector(8-1 downto 0);
+  signal   ctrl_rx_wdata_sw  : std_logic_vector(5-1 downto 0);
+  signal   ctrl_rx_wdata_hw  : std_logic_vector(5-1 downto 0);
+  signal   ctrl_rx_wbusy     : std_logic;
 
-  signal   ctrl_rcs       : std_logic;
-  signal   ctrl_re        : std_logic;
-  signal   ctrl_rdata     : std_logic_vector(8-1 downto 0);
-  signal   ctrl_rdata_sw  : std_logic_vector(8-1 downto 0);
-  signal   ctrl_rdata_hw  : std_logic_vector(8-1 downto 0);
-  signal   ctrl_rbusy     : std_logic;
+  signal   ctrl_rx_rcs       : std_logic;
+  signal   ctrl_rx_re        : std_logic;
+  signal   ctrl_rx_rdata     : std_logic_vector(8-1 downto 0);
+  signal   ctrl_rx_rdata_sw  : std_logic_vector(5-1 downto 0);
+  signal   ctrl_rx_rdata_hw  : std_logic_vector(5-1 downto 0);
+  signal   ctrl_rx_rbusy     : std_logic;
 
   constant INIT_baud_tick_cnt_max_lsb : std_logic_vector(8-1 downto 0) :=
              BAUD_TICK_CNT_MAX(7 downto 0) -- value
@@ -322,7 +340,7 @@ begin  -- architecture rtl
   --==================================
   -- Register    : data
   -- Description : Write : data to tansmit, Read : data to receive
-  -- Address     : 0x3
+  -- Address     : 0x2
   -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : rw
@@ -335,7 +353,7 @@ begin  -- architecture rtl
   --==================================
 
 
-    data_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(3,UART_ADDR_WIDTH))) else '0';
+    data_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(2,UART_ADDR_WIDTH))) else '0';
     data_re      <= sig_rcs and sig_re and data_rcs;
     data_rdata   <= (
       0 => data_rdata_sw(0), -- value(0)
@@ -348,7 +366,7 @@ begin  -- architecture rtl
       7 => data_rdata_sw(7), -- value(7)
       others => '0');
 
-    data_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(3,UART_ADDR_WIDTH)))   else '0';
+    data_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(2,UART_ADDR_WIDTH)))   else '0';
     data_we      <= sig_wcs and sig_we and data_wcs;
     data_wdata   <= sig_wdata;
     data_wdata_sw(7 downto 0) <= data_wdata(7 downto 0); -- value
@@ -398,13 +416,13 @@ begin  -- architecture rtl
     sw2hw_o.data.valid <= '0';
   end generate gen_data_b;
 
-  gen_ctrl: if (True)
+  gen_ctrl_tx: if (True)
   generate
   --==================================
-  -- Register    : ctrl
+  -- Register    : ctrl_tx
   -- Description : Control Register
-  -- Address     : 0x2
-  -- Width       : 8
+  -- Address     : 0x4
+  -- Width       : 5
   -- Sw Access   : rw
   -- Hw Access   : ro
   -- Hw Type     : reg
@@ -434,6 +452,88 @@ begin  -- architecture rtl
   --==================================
 
   --==================================
+  -- Field       : cts_enable
+  -- Description : 0 : Clear To Send Disable, 1 : Clear To Send Enable
+  -- Width       : 1
+  --==================================
+
+
+    ctrl_tx_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(4,UART_ADDR_WIDTH))) else '0';
+    ctrl_tx_re      <= sig_rcs and sig_re and ctrl_tx_rcs;
+    ctrl_tx_rdata   <= (
+      0 => ctrl_tx_rdata_sw(0), -- tx_enable(0)
+      1 => ctrl_tx_rdata_sw(1), -- tx_parity_enable(0)
+      2 => ctrl_tx_rdata_sw(2), -- tx_parity_odd(0)
+      3 => ctrl_tx_rdata_sw(3), -- tx_use_loopback(0)
+      4 => ctrl_tx_rdata_sw(4), -- cts_enable(0)
+      others => '0');
+
+    ctrl_tx_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(4,UART_ADDR_WIDTH)))   else '0';
+    ctrl_tx_we      <= sig_wcs and sig_we and ctrl_tx_wcs;
+    ctrl_tx_wdata   <= sig_wdata;
+    ctrl_tx_wdata_sw(0 downto 0) <= ctrl_tx_wdata(0 downto 0); -- tx_enable
+    ctrl_tx_wdata_sw(1 downto 1) <= ctrl_tx_wdata(1 downto 1); -- tx_parity_enable
+    ctrl_tx_wdata_sw(2 downto 2) <= ctrl_tx_wdata(2 downto 2); -- tx_parity_odd
+    ctrl_tx_wdata_sw(3 downto 3) <= ctrl_tx_wdata(3 downto 3); -- tx_use_loopback
+    ctrl_tx_wdata_sw(4 downto 4) <= ctrl_tx_wdata(4 downto 4); -- cts_enable
+    sw2hw_o.ctrl_tx.tx_enable <= ctrl_tx_rdata_hw(0 downto 0); -- tx_enable
+    sw2hw_o.ctrl_tx.tx_parity_enable <= ctrl_tx_rdata_hw(1 downto 1); -- tx_parity_enable
+    sw2hw_o.ctrl_tx.tx_parity_odd <= ctrl_tx_rdata_hw(2 downto 2); -- tx_parity_odd
+    sw2hw_o.ctrl_tx.tx_use_loopback <= ctrl_tx_rdata_hw(3 downto 3); -- tx_use_loopback
+    sw2hw_o.ctrl_tx.cts_enable <= ctrl_tx_rdata_hw(4 downto 4); -- cts_enable
+
+    ins_ctrl_tx : entity work.csr_reg(rtl)
+      generic map
+        (WIDTH         => 5
+        ,INIT          => INIT_ctrl_tx
+        ,MODEL         => "rw"
+        )
+      port map
+        (clk_i         => clk_i
+        ,arst_b_i      => arst_b_i
+        ,sw_wd_i       => ctrl_tx_wdata_sw
+        ,sw_rd_o       => ctrl_tx_rdata_sw
+        ,sw_we_i       => ctrl_tx_we
+        ,sw_re_i       => ctrl_tx_re
+        ,sw_rbusy_o    => ctrl_tx_rbusy
+        ,sw_wbusy_o    => ctrl_tx_wbusy
+        ,hw_wd_i       => (others => '0')
+        ,hw_rd_o       => ctrl_tx_rdata_hw
+        ,hw_we_i       => '0'
+        ,hw_sw_re_o    => sw2hw_o.ctrl_tx.re
+        ,hw_sw_we_o    => sw2hw_o.ctrl_tx.we
+        );
+
+  end generate gen_ctrl_tx;
+
+  gen_ctrl_tx_b: if not (True)
+  generate
+    ctrl_tx_rcs     <= '0';
+    ctrl_tx_rbusy   <= '0';
+    ctrl_tx_rdata   <= (others => '0');
+    ctrl_tx_wcs      <= '0';
+    ctrl_tx_wbusy    <= '0';
+    sw2hw_o.ctrl_tx.tx_enable <= "0";
+    sw2hw_o.ctrl_tx.tx_parity_enable <= "0";
+    sw2hw_o.ctrl_tx.tx_parity_odd <= "0";
+    sw2hw_o.ctrl_tx.tx_use_loopback <= "0";
+    sw2hw_o.ctrl_tx.cts_enable <= "0";
+    sw2hw_o.ctrl_tx.re <= '0';
+    sw2hw_o.ctrl_tx.we <= '0';
+  end generate gen_ctrl_tx_b;
+
+  gen_ctrl_rx: if (True)
+  generate
+  --==================================
+  -- Register    : ctrl_rx
+  -- Description : Control Register
+  -- Address     : 0x5
+  -- Width       : 5
+  -- Sw Access   : rw
+  -- Hw Access   : ro
+  -- Hw Type     : reg
+  --==================================
+  --==================================
   -- Field       : rx_enable
   -- Description : 0 : RX is disable, 1 : RX is enable
   -- Width       : 1
@@ -457,89 +557,83 @@ begin  -- architecture rtl
   -- Width       : 1
   --==================================
 
+  --==================================
+  -- Field       : rts_enable
+  -- Description : 0 : Request To Send Disable, 1 : Request To Send Enable
+  -- Width       : 1
+  --==================================
 
-    ctrl_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(2,UART_ADDR_WIDTH))) else '0';
-    ctrl_re      <= sig_rcs and sig_re and ctrl_rcs;
-    ctrl_rdata   <= (
-      0 => ctrl_rdata_sw(0), -- tx_enable(0)
-      1 => ctrl_rdata_sw(1), -- tx_parity_enable(0)
-      2 => ctrl_rdata_sw(2), -- tx_parity_odd(0)
-      3 => ctrl_rdata_sw(3), -- tx_use_loopback(0)
-      4 => ctrl_rdata_sw(4), -- rx_enable(0)
-      5 => ctrl_rdata_sw(5), -- rx_parity_enable(0)
-      6 => ctrl_rdata_sw(6), -- rx_parity_odd(0)
-      7 => ctrl_rdata_sw(7), -- rx_use_loopback(0)
+
+    ctrl_rx_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(5,UART_ADDR_WIDTH))) else '0';
+    ctrl_rx_re      <= sig_rcs and sig_re and ctrl_rx_rcs;
+    ctrl_rx_rdata   <= (
+      0 => ctrl_rx_rdata_sw(0), -- rx_enable(0)
+      1 => ctrl_rx_rdata_sw(1), -- rx_parity_enable(0)
+      2 => ctrl_rx_rdata_sw(2), -- rx_parity_odd(0)
+      3 => ctrl_rx_rdata_sw(3), -- rx_use_loopback(0)
+      4 => ctrl_rx_rdata_sw(4), -- rts_enable(0)
       others => '0');
 
-    ctrl_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(2,UART_ADDR_WIDTH)))   else '0';
-    ctrl_we      <= sig_wcs and sig_we and ctrl_wcs;
-    ctrl_wdata   <= sig_wdata;
-    ctrl_wdata_sw(0 downto 0) <= ctrl_wdata(0 downto 0); -- tx_enable
-    ctrl_wdata_sw(1 downto 1) <= ctrl_wdata(1 downto 1); -- tx_parity_enable
-    ctrl_wdata_sw(2 downto 2) <= ctrl_wdata(2 downto 2); -- tx_parity_odd
-    ctrl_wdata_sw(3 downto 3) <= ctrl_wdata(3 downto 3); -- tx_use_loopback
-    ctrl_wdata_sw(4 downto 4) <= ctrl_wdata(4 downto 4); -- rx_enable
-    ctrl_wdata_sw(5 downto 5) <= ctrl_wdata(5 downto 5); -- rx_parity_enable
-    ctrl_wdata_sw(6 downto 6) <= ctrl_wdata(6 downto 6); -- rx_parity_odd
-    ctrl_wdata_sw(7 downto 7) <= ctrl_wdata(7 downto 7); -- rx_use_loopback
-    sw2hw_o.ctrl.tx_enable <= ctrl_rdata_hw(0 downto 0); -- tx_enable
-    sw2hw_o.ctrl.tx_parity_enable <= ctrl_rdata_hw(1 downto 1); -- tx_parity_enable
-    sw2hw_o.ctrl.tx_parity_odd <= ctrl_rdata_hw(2 downto 2); -- tx_parity_odd
-    sw2hw_o.ctrl.tx_use_loopback <= ctrl_rdata_hw(3 downto 3); -- tx_use_loopback
-    sw2hw_o.ctrl.rx_enable <= ctrl_rdata_hw(4 downto 4); -- rx_enable
-    sw2hw_o.ctrl.rx_parity_enable <= ctrl_rdata_hw(5 downto 5); -- rx_parity_enable
-    sw2hw_o.ctrl.rx_parity_odd <= ctrl_rdata_hw(6 downto 6); -- rx_parity_odd
-    sw2hw_o.ctrl.rx_use_loopback <= ctrl_rdata_hw(7 downto 7); -- rx_use_loopback
+    ctrl_rx_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(5,UART_ADDR_WIDTH)))   else '0';
+    ctrl_rx_we      <= sig_wcs and sig_we and ctrl_rx_wcs;
+    ctrl_rx_wdata   <= sig_wdata;
+    ctrl_rx_wdata_sw(0 downto 0) <= ctrl_rx_wdata(0 downto 0); -- rx_enable
+    ctrl_rx_wdata_sw(1 downto 1) <= ctrl_rx_wdata(1 downto 1); -- rx_parity_enable
+    ctrl_rx_wdata_sw(2 downto 2) <= ctrl_rx_wdata(2 downto 2); -- rx_parity_odd
+    ctrl_rx_wdata_sw(3 downto 3) <= ctrl_rx_wdata(3 downto 3); -- rx_use_loopback
+    ctrl_rx_wdata_sw(4 downto 4) <= ctrl_rx_wdata(4 downto 4); -- rts_enable
+    sw2hw_o.ctrl_rx.rx_enable <= ctrl_rx_rdata_hw(0 downto 0); -- rx_enable
+    sw2hw_o.ctrl_rx.rx_parity_enable <= ctrl_rx_rdata_hw(1 downto 1); -- rx_parity_enable
+    sw2hw_o.ctrl_rx.rx_parity_odd <= ctrl_rx_rdata_hw(2 downto 2); -- rx_parity_odd
+    sw2hw_o.ctrl_rx.rx_use_loopback <= ctrl_rx_rdata_hw(3 downto 3); -- rx_use_loopback
+    sw2hw_o.ctrl_rx.rts_enable <= ctrl_rx_rdata_hw(4 downto 4); -- rts_enable
 
-    ins_ctrl : entity work.csr_reg(rtl)
+    ins_ctrl_rx : entity work.csr_reg(rtl)
       generic map
-        (WIDTH         => 8
-        ,INIT          => INIT_ctrl
+        (WIDTH         => 5
+        ,INIT          => INIT_ctrl_rx
         ,MODEL         => "rw"
         )
       port map
         (clk_i         => clk_i
         ,arst_b_i      => arst_b_i
-        ,sw_wd_i       => ctrl_wdata_sw
-        ,sw_rd_o       => ctrl_rdata_sw
-        ,sw_we_i       => ctrl_we
-        ,sw_re_i       => ctrl_re
-        ,sw_rbusy_o    => ctrl_rbusy
-        ,sw_wbusy_o    => ctrl_wbusy
+        ,sw_wd_i       => ctrl_rx_wdata_sw
+        ,sw_rd_o       => ctrl_rx_rdata_sw
+        ,sw_we_i       => ctrl_rx_we
+        ,sw_re_i       => ctrl_rx_re
+        ,sw_rbusy_o    => ctrl_rx_rbusy
+        ,sw_wbusy_o    => ctrl_rx_wbusy
         ,hw_wd_i       => (others => '0')
-        ,hw_rd_o       => ctrl_rdata_hw
+        ,hw_rd_o       => ctrl_rx_rdata_hw
         ,hw_we_i       => '0'
-        ,hw_sw_re_o    => sw2hw_o.ctrl.re
-        ,hw_sw_we_o    => sw2hw_o.ctrl.we
+        ,hw_sw_re_o    => sw2hw_o.ctrl_rx.re
+        ,hw_sw_we_o    => sw2hw_o.ctrl_rx.we
         );
 
-  end generate gen_ctrl;
+  end generate gen_ctrl_rx;
 
-  gen_ctrl_b: if not (True)
+  gen_ctrl_rx_b: if not (True)
   generate
-    ctrl_rcs     <= '0';
-    ctrl_rbusy   <= '0';
-    ctrl_rdata   <= (others => '0');
-    ctrl_wcs      <= '0';
-    ctrl_wbusy    <= '0';
-    sw2hw_o.ctrl.tx_enable <= "0";
-    sw2hw_o.ctrl.tx_parity_enable <= "0";
-    sw2hw_o.ctrl.tx_parity_odd <= "0";
-    sw2hw_o.ctrl.tx_use_loopback <= "0";
-    sw2hw_o.ctrl.rx_enable <= "0";
-    sw2hw_o.ctrl.rx_parity_enable <= "0";
-    sw2hw_o.ctrl.rx_parity_odd <= "0";
-    sw2hw_o.ctrl.rx_use_loopback <= "0";
-    sw2hw_o.ctrl.re <= '0';
-    sw2hw_o.ctrl.we <= '0';
-  end generate gen_ctrl_b;
+    ctrl_rx_rcs     <= '0';
+    ctrl_rx_rbusy   <= '0';
+    ctrl_rx_rdata   <= (others => '0');
+    ctrl_rx_wcs      <= '0';
+    ctrl_rx_wbusy    <= '0';
+    sw2hw_o.ctrl_rx.rx_enable <= "0";
+    sw2hw_o.ctrl_rx.rx_parity_enable <= "0";
+    sw2hw_o.ctrl_rx.rx_parity_odd <= "0";
+    sw2hw_o.ctrl_rx.rx_use_loopback <= "0";
+    sw2hw_o.ctrl_rx.rts_enable <= "0";
+    sw2hw_o.ctrl_rx.re <= '0';
+    sw2hw_o.ctrl_rx.we <= '0';
+  end generate gen_ctrl_rx_b;
 
   gen_baud_tick_cnt_max_lsb: if (USER_DEFINE_BAUD_TICK)
   generate
   --==================================
   -- Register    : baud_tick_cnt_max_lsb
   -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
-  -- Address     : 0x4
+  -- Address     : 0x6
   -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
@@ -552,7 +646,7 @@ begin  -- architecture rtl
   --==================================
 
 
-    baud_tick_cnt_max_lsb_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(4,UART_ADDR_WIDTH))) else '0';
+    baud_tick_cnt_max_lsb_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(6,UART_ADDR_WIDTH))) else '0';
     baud_tick_cnt_max_lsb_re      <= sig_rcs and sig_re and baud_tick_cnt_max_lsb_rcs;
     baud_tick_cnt_max_lsb_rdata   <= (
       0 => baud_tick_cnt_max_lsb_rdata_sw(0), -- value(0)
@@ -565,7 +659,7 @@ begin  -- architecture rtl
       7 => baud_tick_cnt_max_lsb_rdata_sw(7), -- value(7)
       others => '0');
 
-    baud_tick_cnt_max_lsb_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(4,UART_ADDR_WIDTH)))   else '0';
+    baud_tick_cnt_max_lsb_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(6,UART_ADDR_WIDTH)))   else '0';
     baud_tick_cnt_max_lsb_we      <= sig_wcs and sig_we and baud_tick_cnt_max_lsb_wcs;
     baud_tick_cnt_max_lsb_wdata   <= sig_wdata;
     baud_tick_cnt_max_lsb_wdata_sw(7 downto 0) <= baud_tick_cnt_max_lsb_wdata(7 downto 0); -- value
@@ -612,7 +706,7 @@ begin  -- architecture rtl
   --==================================
   -- Register    : baud_tick_cnt_max_msb
   -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
-  -- Address     : 0x5
+  -- Address     : 0x7
   -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
@@ -625,7 +719,7 @@ begin  -- architecture rtl
   --==================================
 
 
-    baud_tick_cnt_max_msb_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(5,UART_ADDR_WIDTH))) else '0';
+    baud_tick_cnt_max_msb_rcs     <= '1' when     (sig_raddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(7,UART_ADDR_WIDTH))) else '0';
     baud_tick_cnt_max_msb_re      <= sig_rcs and sig_re and baud_tick_cnt_max_msb_rcs;
     baud_tick_cnt_max_msb_rdata   <= (
       0 => baud_tick_cnt_max_msb_rdata_sw(0), -- value(0)
@@ -638,7 +732,7 @@ begin  -- architecture rtl
       7 => baud_tick_cnt_max_msb_rdata_sw(7), -- value(7)
       others => '0');
 
-    baud_tick_cnt_max_msb_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(5,UART_ADDR_WIDTH)))   else '0';
+    baud_tick_cnt_max_msb_wcs     <= '1' when       (sig_waddr(UART_ADDR_WIDTH-1 downto 0) = std_logic_vector(to_unsigned(7,UART_ADDR_WIDTH)))   else '0';
     baud_tick_cnt_max_msb_we      <= sig_wcs and sig_we and baud_tick_cnt_max_msb_wcs;
     baud_tick_cnt_max_msb_wdata   <= sig_wdata;
     baud_tick_cnt_max_msb_wdata_sw(7 downto 0) <= baud_tick_cnt_max_msb_wdata(7 downto 0); -- value
@@ -684,7 +778,8 @@ begin  -- architecture rtl
     isr_wbusy when isr_wcs = '1' else
     imr_wbusy when imr_wcs = '1' else
     data_wbusy when data_wcs = '1' else
-    ctrl_wbusy when ctrl_wcs = '1' else
+    ctrl_tx_wbusy when ctrl_tx_wcs = '1' else
+    ctrl_rx_wbusy when ctrl_rx_wcs = '1' else
     baud_tick_cnt_max_lsb_wbusy when baud_tick_cnt_max_lsb_wcs = '1' else
     baud_tick_cnt_max_msb_wbusy when baud_tick_cnt_max_msb_wcs = '1' else
     '0'; -- Bad Address, no busy
@@ -692,7 +787,8 @@ begin  -- architecture rtl
     isr_rbusy when isr_rcs = '1' else
     imr_rbusy when imr_rcs = '1' else
     data_rbusy when data_rcs = '1' else
-    ctrl_rbusy when ctrl_rcs = '1' else
+    ctrl_tx_rbusy when ctrl_tx_rcs = '1' else
+    ctrl_rx_rbusy when ctrl_rx_rcs = '1' else
     baud_tick_cnt_max_lsb_rbusy when baud_tick_cnt_max_lsb_rcs = '1' else
     baud_tick_cnt_max_msb_rbusy when baud_tick_cnt_max_msb_rcs = '1' else
     '0'; -- Bad Address, no busy
@@ -700,7 +796,8 @@ begin  -- architecture rtl
     isr_rdata when isr_rcs = '1' else
     imr_rdata when imr_rcs = '1' else
     data_rdata when data_rcs = '1' else
-    ctrl_rdata when ctrl_rcs = '1' else
+    ctrl_tx_rdata when ctrl_tx_rcs = '1' else
+    ctrl_rx_rdata when ctrl_rx_rcs = '1' else
     baud_tick_cnt_max_lsb_rdata when baud_tick_cnt_max_lsb_rcs = '1' else
     baud_tick_cnt_max_msb_rdata when baud_tick_cnt_max_msb_rcs = '1' else
     (others => '0'); -- Bad Address, return 0

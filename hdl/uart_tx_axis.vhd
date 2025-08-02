@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-03-02
+-- Last update: 2025-08-02
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -37,6 +37,7 @@ entity uart_tx_axis is
     s_axis_tvalid_i : in  std_logic;
     s_axis_tready_o : out std_logic;
     uart_tx_o       : out std_logic;
+    uart_cts_b_i    : in  std_logic;
     baud_tick_i     : in  std_logic;
     parity_enable_i : in  std_logic;
     parity_odd_i    : in  std_logic
@@ -96,7 +97,8 @@ begin
       if (uart_tx_active_r = '0')
       then
         -- New Data to transmit ?
-        if (s_axis_tvalid_i = '1')
+        if ((s_axis_tvalid_i = '1') and
+            (uart_cts_b_i    = '0'))
         then
           -- Add start, data and parity bit
           uart_tx_data_r      <= parity_bit & s_axis_tdata_i & '0'; 

@@ -66,7 +66,7 @@
 
 	{
             name         : "data",
-            address      : "x3",
+            address      : "x2",
             desc         : "Write : data to tansmit, Read : data to receive",
             swaccess     : "rw",
             hwaccess     : "rw",
@@ -89,8 +89,8 @@
         },
 
         {
-            name         : "ctrl",
-            address      : "x2",
+            name         : "ctrl_tx",
+            address      : "x4",
             desc         : "Control Register",
             swaccess     : "rw",
             hwaccess     : "ro",
@@ -117,31 +117,53 @@
                     desc: "0 : UART TX FIFO is connected to CSR, 1 : UART RX FIFO is connected to UART RX FIFO"
                 },
                 {
-                    name: "rx_enable",
+                    name: "cts_enable",
                     bits: "4",
-                    desc: "0 : RX is disable, 1 : RX is enable"
-                },
-                {
-                    name: "rx_parity_enable",
-                    bits: "5",
-                    desc: "0 : Parity is disable, 1 : Parity is enable"
-                },
-                {
-                    name: "rx_parity_odd",
-                    bits: "6",
-                    desc: "0 : Parity is even, 1 : Parity is odd"
-                },
-                {
-                    name: "rx_use_loopback",
-                    bits: "7",
-                    desc: "0 : UART RX is connected to UART RX Input, 1 : UART RX is connected to UART TX"
+                    desc: "0 : Clear To Send Disable, 1 : Clear To Send Enable"
                 },
             ]
         },
 
         {
+            name         : "ctrl_rx",
+            address      : "x5",
+            desc         : "Control Register",
+            swaccess     : "rw",
+            hwaccess     : "ro",
+
+            fields: [
+                {
+                    name: "rx_enable",
+                    bits: "0",
+                    desc: "0 : RX is disable, 1 : RX is enable"
+                },
+                {
+                    name: "rx_parity_enable",
+                    bits: "1",
+                    desc: "0 : Parity is disable, 1 : Parity is enable"
+                },
+                {
+                    name: "rx_parity_odd",
+                    bits: "2",
+                    desc: "0 : Parity is even, 1 : Parity is odd"
+                },
+                {
+                    name: "rx_use_loopback",
+                    bits: "3",
+                    desc: "0 : UART RX is connected to UART RX Input, 1 : UART RX is connected to UART TX"
+                },
+                {
+                    name: "rts_enable",
+                    bits: "4",
+                    desc: "0 : Request To Send Disable, 1 : Request To Send Enable"
+                },
+            ]
+        },
+
+
+        {
             name         : "baud_tick_cnt_max_lsb",
-            address      : "x4",
+            address      : "x6",
             desc         : "Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1",
             swaccess     : "rw",
             hwaccess     : "ro",
@@ -160,7 +182,7 @@
 
 	{
             name         : "baud_tick_cnt_max_msb",
-            address      : "x5",
+            address      : "x7",
             desc         : "Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1",
             swaccess     : "rw",
             hwaccess     : "ro",

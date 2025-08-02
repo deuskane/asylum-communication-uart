@@ -21,6 +21,7 @@
 -- 2025-03-15  0.3     mrosiere Add CSR
 -- 2025-05-14  1.0     mrosiere Add parameter USER_DEFINE_BAUD_TICK and default value
 -- 2025-07-09  1.1     mrosiere Add FIFO Depth
+-- 2025-08-02  1.2     mrosiere Add RTS / CTS
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -82,7 +83,11 @@ architecture rtl of pbi_UART is
   
   signal   uart_tx                : std_logic;
   signal   uart_rx                : std_logic;
-           
+
+  signal   uart_cts_b             : std_logic;
+  signal   uart_rts_b             : std_logic;
+
+  
   signal   tx_baud_tick_en        : std_logic;
   signal   tx_baud_tick           : std_logic;
            
@@ -102,11 +107,13 @@ architecture rtl of pbi_UART is
   signal   tx_parity_enable       : std_logic;
   signal   tx_parity_odd          : std_logic;
   signal   tx_use_loopback        : std_logic;
-           
+  signal   cts_enable             : std_logic;
+  
   signal   rx_enable              : std_logic;
   signal   rx_parity_enable       : std_logic;
   signal   rx_parity_odd          : std_logic;
   signal   rx_use_loopback        : std_logic;
+  signal   rts_enable             : std_logic;
            
   signal   sw2hw                  : UART_sw2hw_t;
   signal   hw2sw                  : UART_hw2sw_t;
@@ -123,6 +130,8 @@ begin  -- architecture rtl
 
   uart_tx_o            <= uart_tx;
 
+  uart_rts_b_o         <= uart_rts_b;
+  
   -- CSR Instance
   ins_csr : entity work.UART_registers(rtl)
     generic map(
@@ -146,10 +155,11 @@ begin  -- architecture rtl
   gen_uart_tx: if UART_TX_ENABLE = true
   generate
     -- UART TX CSR Input
-    tx_enable            <= sw2hw.ctrl.tx_enable       (0);
-    tx_parity_enable     <= sw2hw.ctrl.tx_parity_enable(0);
-    tx_parity_odd        <= sw2hw.ctrl.tx_parity_odd   (0);
-    tx_use_loopback      <= sw2hw.ctrl.tx_use_loopback (0);
+    tx_enable            <= sw2hw.ctrl_tx.tx_enable       (0);
+    tx_parity_enable     <= sw2hw.ctrl_tx.tx_parity_enable(0);
+    tx_parity_odd        <= sw2hw.ctrl_tx.tx_parity_odd   (0);
+    tx_use_loopback      <= sw2hw.ctrl_tx.tx_use_loopback (0);
+    cts_enable           <= sw2hw.ctrl_tx.cts_enable      (0);
 
     ins_uart_tx_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
       generic map
@@ -177,17 +187,20 @@ begin  -- architecture rtl
        ,s_axis_tvalid_i => tx_tvalid
        ,s_axis_tready_o => tx_tready
        ,uart_tx_o       => uart_tx
+       ,uart_cts_b_i    => uart_cts_b
        ,baud_tick_i     => tx_baud_tick
        ,parity_enable_i => tx_parity_enable
        ,parity_odd_i    => tx_parity_odd   
         );
-
+    
     gen_uart_rx: if UART_RX_ENABLE = true
     generate
       -- Have RX, can implement loopback
       tx_tdata         <= sw2hw.data.value when tx_use_loopback = '0' else rx_tdata ;
       tx_tvalid        <= sw2hw.data.valid when tx_use_loopback = '0' else rx_tvalid;
       hw2sw.data.ready <= tx_tready        when tx_use_loopback = '0' else '1';-- Always accept 
+      uart_cts_b       <= '0'              when cts_enable      = '0' else
+                          uart_cts_b_i     when tx_use_loopback = '0' else uart_rts_b;
     end generate gen_uart_rx;
 
     gen_uart_rx_b: if UART_RX_ENABLE = false
@@ -196,6 +209,8 @@ begin  -- architecture rtl
       tx_tdata         <= sw2hw.data.value;
       tx_tvalid        <= sw2hw.data.valid;
       hw2sw.data.ready <= tx_tready;
+      uart_cts_b       <= '0'              when cts_enable      = '0' else
+                          uart_cts_b_i;
     end generate gen_uart_rx_b;
     
   end generate gen_uart_tx;
@@ -210,11 +225,16 @@ begin  -- architecture rtl
 
   gen_uart_rx: if UART_RX_ENABLE = true
   generate
-    rx_enable            <= sw2hw.ctrl.rx_enable       (0);
-    rx_parity_enable     <= sw2hw.ctrl.rx_parity_enable(0);
-    rx_parity_odd        <= sw2hw.ctrl.rx_parity_odd   (0);
-    rx_use_loopback      <= sw2hw.ctrl.rx_use_loopback (0);
+    rx_enable            <= sw2hw.ctrl_rx.rx_enable       (0);
+    rx_parity_enable     <= sw2hw.ctrl_rx.rx_parity_enable(0);
+    rx_parity_odd        <= sw2hw.ctrl_rx.rx_parity_odd   (0);
+    rx_use_loopback      <= sw2hw.ctrl_rx.rx_use_loopback (0);
+    rts_enable           <= sw2hw.ctrl_rx.rts_enable      (0);
 
+    uart_rts_b           <= '0' when rts_enable = '0' else
+                            it_rx_full
+                            ;
+    
     ins_uart_rx_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
       generic map
       (BAUD_TICK_CNT_WIDTH     => BAUD_TICK_CNT_WIDTH
@@ -273,7 +293,8 @@ begin  -- architecture rtl
 
     hw2sw.data.value   <= (others => '0');
     hw2sw.data.valid   <= '0';
-    
+
+    uart_rts_b         <= '0';
   end generate gen_uart_rx_b;
 
   it_rx_full    <=     sw2hw.data.hw2sw_full ;

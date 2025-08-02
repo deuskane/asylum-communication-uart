@@ -65,7 +65,7 @@ package UART_csr_pkg is
   --==================================
   -- Register    : data
   -- Description : Write : data to tansmit, Read : data to receive
-  -- Address     : 0x3
+  -- Address     : 0x2
   -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : rw
@@ -98,15 +98,15 @@ package UART_csr_pkg is
   end record UART_data_hw2sw_t;
 
   --==================================
-  -- Register    : ctrl
+  -- Register    : ctrl_tx
   -- Description : Control Register
-  -- Address     : 0x2
-  -- Width       : 8
+  -- Address     : 0x4
+  -- Width       : 5
   -- Sw Access   : rw
   -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
-  type UART_ctrl_sw2hw_t is record
+  type UART_ctrl_tx_sw2hw_t is record
     re : std_logic;
     we : std_logic;
   --==================================
@@ -134,6 +134,26 @@ package UART_csr_pkg is
   --==================================
     tx_use_loopback : std_logic_vector(1-1 downto 0);
   --==================================
+  -- Field       : cts_enable
+  -- Description : 0 : Clear To Send Disable, 1 : Clear To Send Enable
+  -- Width       : 1
+  --==================================
+    cts_enable : std_logic_vector(1-1 downto 0);
+  end record UART_ctrl_tx_sw2hw_t;
+
+  --==================================
+  -- Register    : ctrl_rx
+  -- Description : Control Register
+  -- Address     : 0x5
+  -- Width       : 5
+  -- Sw Access   : rw
+  -- Hw Access   : ro
+  -- Hw Type     : reg
+  --==================================
+  type UART_ctrl_rx_sw2hw_t is record
+    re : std_logic;
+    we : std_logic;
+  --==================================
   -- Field       : rx_enable
   -- Description : 0 : RX is disable, 1 : RX is enable
   -- Width       : 1
@@ -157,12 +177,18 @@ package UART_csr_pkg is
   -- Width       : 1
   --==================================
     rx_use_loopback : std_logic_vector(1-1 downto 0);
-  end record UART_ctrl_sw2hw_t;
+  --==================================
+  -- Field       : rts_enable
+  -- Description : 0 : Request To Send Disable, 1 : Request To Send Enable
+  -- Width       : 1
+  --==================================
+    rts_enable : std_logic_vector(1-1 downto 0);
+  end record UART_ctrl_rx_sw2hw_t;
 
   --==================================
   -- Register    : baud_tick_cnt_max_lsb
   -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
-  -- Address     : 0x4
+  -- Address     : 0x6
   -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
@@ -182,7 +208,7 @@ package UART_csr_pkg is
   --==================================
   -- Register    : baud_tick_cnt_max_msb
   -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
-  -- Address     : 0x5
+  -- Address     : 0x7
   -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
@@ -206,7 +232,8 @@ package UART_csr_pkg is
     isr : UART_isr_sw2hw_t;
     imr : UART_imr_sw2hw_t;
     data : UART_data_sw2hw_t;
-    ctrl : UART_ctrl_sw2hw_t;
+    ctrl_tx : UART_ctrl_tx_sw2hw_t;
+    ctrl_rx : UART_ctrl_rx_sw2hw_t;
     baud_tick_cnt_max_lsb : UART_baud_tick_cnt_max_lsb_sw2hw_t;
     baud_tick_cnt_max_msb : UART_baud_tick_cnt_max_msb_sw2hw_t;
   end record UART_sw2hw_t;
