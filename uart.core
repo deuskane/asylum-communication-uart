@@ -23,9 +23,10 @@ CAPI=2:
 # 2025/06/21  1.6.1    mrosiere Dump FIFO activity in file
 # 2025/07/09  1.7.0    mrosiere Configure FIFO Depth
 # 2025/07/27  1.8.0    mrosiere Add Interruption
+# 2025/08/02  1.9.0    mrosiere Add CTS/RTS ports
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:1.8.0
+name        : asylum:communication:uart:1.9.0
 description : UART TX and RX
 
 #=========================================

@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-07-30
+-- Last update: 2025-08-02
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -56,8 +56,11 @@ entity pbi_UART is
     pbi_tgt_o        : out pbi_tgt_t;
     
     -- To/From IO
-    uart_tx_o        : out std_logic;
+    uart_tx_o        : out std_logic; -- Data 
     uart_rx_i        : in  std_logic;
+
+    uart_cts_b_i     : in  std_logic; -- Clear   To Send (Active low)
+    uart_rts_b_o     : out std_logic; -- Request To Send (Active low)
 
     -- Interruption
     it_o             : out std_logic
