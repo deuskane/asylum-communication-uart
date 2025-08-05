@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-08-02
+-- Last update: 2025-08-05
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -128,11 +128,15 @@ architecture rtl of pbi_UART is
   
 begin  -- architecture rtl
 
+  -----------------------------------------------------------------------------
+  -- Output of UART
+  -----------------------------------------------------------------------------
   uart_tx_o            <= uart_tx;
-
   uart_rts_b_o         <= uart_rts_b;
   
+  -----------------------------------------------------------------------------
   -- CSR Instance
+  -----------------------------------------------------------------------------
   ins_csr : entity work.UART_registers(rtl)
     generic map(
       USER_DEFINE_BAUD_TICK => USER_DEFINE_BAUD_TICK,
@@ -149,9 +153,13 @@ begin  -- architecture rtl
       hw2sw_i               => hw2sw   
       );
 
+  -- Baud Tick on 16b
   baud_tick_cnt_max    <= (sw2hw.baud_tick_cnt_max_msb.value &
                            sw2hw.baud_tick_cnt_max_lsb.value);
+
+  -----------------------------------------------------------------------------
   -- UART TX
+  -----------------------------------------------------------------------------
   gen_uart_tx: if UART_TX_ENABLE = true
   generate
     -- UART TX CSR Input
@@ -161,6 +169,7 @@ begin  -- architecture rtl
     tx_use_loopback      <= sw2hw.ctrl_tx.tx_use_loopback (0);
     cts_enable           <= sw2hw.ctrl_tx.cts_enable      (0);
 
+    -- Instanciate UART TX Baud Rate Generator
     ins_uart_tx_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
       generic map
       (BAUD_TICK_CNT_WIDTH     => BAUD_TICK_CNT_WIDTH
@@ -196,11 +205,15 @@ begin  -- architecture rtl
     gen_uart_rx: if UART_RX_ENABLE = true
     generate
       -- Have RX, can implement loopback
-      tx_tdata         <= sw2hw.data.value when tx_use_loopback = '0' else rx_tdata ;
-      tx_tvalid        <= sw2hw.data.valid when tx_use_loopback = '0' else rx_tvalid;
-      hw2sw.data.ready <= tx_tready        when tx_use_loopback = '0' else '1';-- Always accept 
-      uart_cts_b       <= '0'              when cts_enable      = '0' else
-                          uart_cts_b_i     when tx_use_loopback = '0' else uart_rts_b;
+      tx_tdata         <= sw2hw.data.value when tx_use_loopback = '0' else
+                          rx_tdata ;
+      tx_tvalid        <= sw2hw.data.valid when tx_use_loopback = '0' else
+                          rx_tvalid;
+      hw2sw.data.ready <= tx_tready        when tx_use_loopback = '0' else
+                          '1';-- Always accept 
+      uart_cts_b       <= '0'              when cts_enable      = '0' else -- Always Active
+                          uart_cts_b_i     when tx_use_loopback = '0' else
+                          uart_rts_b;                                      -- Loop With RTS from RX
     end generate gen_uart_rx;
 
     gen_uart_rx_b: if UART_RX_ENABLE = false
@@ -215,7 +228,9 @@ begin  -- architecture rtl
     
   end generate gen_uart_tx;
 
+  -----------------------------------------------------------------------------
   -- No UART TX
+  -----------------------------------------------------------------------------
   gen_uart_tx_b: if UART_TX_ENABLE = false
   generate
     hw2sw.data.ready     <= '1';
@@ -223,6 +238,9 @@ begin  -- architecture rtl
     tx_use_loopback      <= '0';
   end generate gen_uart_tx_b;
 
+  -----------------------------------------------------------------------------
+  -- UART RX
+  -----------------------------------------------------------------------------
   gen_uart_rx: if UART_RX_ENABLE = true
   generate
     rx_enable            <= sw2hw.ctrl_rx.rx_enable       (0);
@@ -288,6 +306,9 @@ begin  -- architecture rtl
 
   end generate gen_uart_rx;
 
+  -----------------------------------------------------------------------------
+  -- No UART RX
+  -----------------------------------------------------------------------------
   gen_uart_rx_b: if UART_RX_ENABLE = false
   generate
 
@@ -297,6 +318,9 @@ begin  -- architecture rtl
     uart_rts_b         <= '0';
   end generate gen_uart_rx_b;
 
+  -----------------------------------------------------------------------------
+  -- Interruptions
+  -----------------------------------------------------------------------------
   it_rx_full    <=     sw2hw.data.hw2sw_full ;
   it_rx_empty_b <= not sw2hw.data.hw2sw_empty;
   it_tx_full    <=     sw2hw.data.sw2hw_full ;
@@ -316,7 +340,10 @@ begin  -- architecture rtl
     isr_o     => hw2sw.isr.value ,
     imr_i     => sw2hw.imr.enable
     );
-  
+
+  -----------------------------------------------------------------------------
+  -- Debug
+  -----------------------------------------------------------------------------
   
 -- synthesis translate_off
   process
