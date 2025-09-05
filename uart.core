@@ -24,6 +24,7 @@ CAPI=2:
 # 2025/07/09  1.7.0    mrosiere Configure FIFO Depth
 # 2025/07/27  1.8.0    mrosiere Add Interruption
 # 2025/08/02  1.9.0    mrosiere Add CTS/RTS ports
+# 2025/09/05  1.9.1    mrosiere Add Package
 #-----------------------------------------------------------------------------
 
 name        : asylum:communication:uart:1.9.0
@@ -51,6 +52,7 @@ filesets:
   rtl:
   #---------------------------------------
     files:
+      - hdl/uart_pkg.vhd
       - hdl/uart_baud_rate_gen.vhd
       - hdl/uart_rx_axis.vhd
       - hdl/uart_tx_axis.vhd
