@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-08-05
+-- Last update: 2025-09-06
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -31,6 +31,8 @@ use     ieee.std_logic_textio.all;
 use     std.textio.all;
 
 library work;
+use     work.uart_pkg.ALL;
+use     work.GIC_pkg.ALL;
 use     work.UART_csr_pkg.ALL;
 use     work.pbi_pkg.all;
 
@@ -137,7 +139,7 @@ begin  -- architecture rtl
   -----------------------------------------------------------------------------
   -- CSR Instance
   -----------------------------------------------------------------------------
-  ins_csr : entity work.UART_registers(rtl)
+  ins_csr : UART_registers
     generic map(
       USER_DEFINE_BAUD_TICK => USER_DEFINE_BAUD_TICK,
       BAUD_TICK_CNT_MAX     => BAUD_TICK_CNT_MAX_SLV,
@@ -170,7 +172,7 @@ begin  -- architecture rtl
     cts_enable           <= sw2hw.ctrl_tx.cts_enable      (0);
 
     -- Instanciate UART TX Baud Rate Generator
-    ins_uart_tx_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
+    ins_uart_tx_baud_rate_gen : uart_baud_rate_gen
       generic map
       (BAUD_TICK_CNT_WIDTH     => BAUD_TICK_CNT_WIDTH
        )
@@ -185,7 +187,7 @@ begin  -- architecture rtl
 
     tx_baud_tick_en  <= '1';
 
-    ins_uart_tx_axis : entity work.uart_tx_axis(rtl)
+    ins_uart_tx_axis : uart_tx_axis
       generic map
       ( WIDTH           => 8
         )
@@ -253,7 +255,7 @@ begin  -- architecture rtl
                             it_rx_full
                             ;
     
-    ins_uart_rx_baud_rate_gen : entity work.uart_baud_rate_gen(rtl)
+    ins_uart_rx_baud_rate_gen : uart_baud_rate_gen
       generic map
       (BAUD_TICK_CNT_WIDTH     => BAUD_TICK_CNT_WIDTH
        )
@@ -266,7 +268,7 @@ begin  -- architecture rtl
       ,cfg_baud_tick_cnt_max_i => baud_tick_cnt_max
       );
 
-    ins_uart_rx_axis : entity work.uart_rx_axis(rtl)
+    ins_uart_rx_axis : uart_rx_axis
       generic map
       ( WIDTH           => 8
         )
@@ -332,7 +334,7 @@ begin  -- architecture rtl
                     );
   hw2sw.isr.we  <= '1';
   
-  ins_GIC_core : entity work.GIC_core(rtl)
+  ins_GIC_core : GIC_core
   port map(
     itm_o     => it_o            ,
     its_i     => it,

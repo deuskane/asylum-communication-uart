@@ -4,6 +4,8 @@ library IEEE;
 use     IEEE.STD_LOGIC_1164.ALL;
 use     IEEE.NUMERIC_STD.ALL;
 
+library work;
+use     work.pbi_pkg.all;
 --==================================
 -- Module      : UART
 -- Description : CSR for UART
@@ -245,5 +247,29 @@ package UART_csr_pkg is
 
   constant UART_ADDR_WIDTH : natural := 3;
   constant UART_DATA_WIDTH : natural := 8;
+
+  ------------------------------------
+  -- Component
+  ------------------------------------
+component UART_registers is
+  generic (
+    USER_DEFINE_BAUD_TICK : boolean -- Parameters to use the enable the User define Baud Tick
+   ;BAUD_TICK_CNT_MAX : std_logic_vector(15 downto 0) -- Default value for Baud Tick Timer
+   ;DEPTH_TX : natural -- Depth of FIFO TX (SW2HW)
+   ;DEPTH_RX : natural -- Depth of FIFO RX (HW2SW)
+  );
+  port (
+    -- Clock and Reset
+    clk_i      : in  std_logic;
+    arst_b_i   : in  std_logic;
+    -- Bus
+    pbi_ini_i  : in  pbi_ini_t;
+    pbi_tgt_o  : out pbi_tgt_t;
+    -- CSR
+    sw2hw_o    : out UART_sw2hw_t;
+    hw2sw_i    : in  UART_hw2sw_t
+  );
+end component UART_registers;
+
 
 end package UART_csr_pkg;

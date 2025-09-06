@@ -8,6 +8,8 @@ use     IEEE.NUMERIC_STD.ALL;
 library work;
 use     work.UART_csr_pkg.ALL;
 library work;
+use     work.csr_pkg.ALL;
+library work;
 use     work.pbi_pkg.all;
 
 --==================================
@@ -230,7 +232,7 @@ begin  -- architecture rtl
     isr_wdata_hw(3 downto 0) <= hw2sw_i.isr.value; -- value
     sw2hw_o.isr.value <= isr_rdata_hw(3 downto 0); -- value
 
-    ins_isr : entity work.csr_reg(rtl)
+    ins_isr : csr_reg
       generic map
         (WIDTH         => 4
         ,INIT          => INIT_isr
@@ -299,7 +301,7 @@ begin  -- architecture rtl
     imr_wdata_sw(3 downto 0) <= imr_wdata(3 downto 0); -- enable
     sw2hw_o.imr.enable <= imr_rdata_hw(3 downto 0); -- enable
 
-    ins_imr : entity work.csr_reg(rtl)
+    ins_imr : csr_reg
       generic map
         (WIDTH         => 4
         ,INIT          => INIT_imr
@@ -373,7 +375,7 @@ begin  -- architecture rtl
     data_wdata_hw(7 downto 0) <= hw2sw_i.data.value; -- value
     sw2hw_o.data.value <= data_rdata_hw(7 downto 0); -- value
 
-    ins_data : entity work.csr_fifo(rtl)
+    ins_data : csr_fifo
       generic map
         (WIDTH         => 8
         ,BLOCKING_READ => True
@@ -482,7 +484,7 @@ begin  -- architecture rtl
     sw2hw_o.ctrl_tx.tx_use_loopback <= ctrl_tx_rdata_hw(3 downto 3); -- tx_use_loopback
     sw2hw_o.ctrl_tx.cts_enable <= ctrl_tx_rdata_hw(4 downto 4); -- cts_enable
 
-    ins_ctrl_tx : entity work.csr_reg(rtl)
+    ins_ctrl_tx : csr_reg
       generic map
         (WIDTH         => 5
         ,INIT          => INIT_ctrl_tx
@@ -588,7 +590,7 @@ begin  -- architecture rtl
     sw2hw_o.ctrl_rx.rx_use_loopback <= ctrl_rx_rdata_hw(3 downto 3); -- rx_use_loopback
     sw2hw_o.ctrl_rx.rts_enable <= ctrl_rx_rdata_hw(4 downto 4); -- rts_enable
 
-    ins_ctrl_rx : entity work.csr_reg(rtl)
+    ins_ctrl_rx : csr_reg
       generic map
         (WIDTH         => 5
         ,INIT          => INIT_ctrl_rx
@@ -665,7 +667,7 @@ begin  -- architecture rtl
     baud_tick_cnt_max_lsb_wdata_sw(7 downto 0) <= baud_tick_cnt_max_lsb_wdata(7 downto 0); -- value
     sw2hw_o.baud_tick_cnt_max_lsb.value <= baud_tick_cnt_max_lsb_rdata_hw(7 downto 0); -- value
 
-    ins_baud_tick_cnt_max_lsb : entity work.csr_reg(rtl)
+    ins_baud_tick_cnt_max_lsb : csr_reg
       generic map
         (WIDTH         => 8
         ,INIT          => INIT_baud_tick_cnt_max_lsb
@@ -738,7 +740,7 @@ begin  -- architecture rtl
     baud_tick_cnt_max_msb_wdata_sw(7 downto 0) <= baud_tick_cnt_max_msb_wdata(7 downto 0); -- value
     sw2hw_o.baud_tick_cnt_max_msb.value <= baud_tick_cnt_max_msb_rdata_hw(7 downto 0); -- value
 
-    ins_baud_tick_cnt_max_msb : entity work.csr_reg(rtl)
+    ins_baud_tick_cnt_max_msb : csr_reg
       generic map
         (WIDTH         => 8
         ,INIT          => INIT_baud_tick_cnt_max_msb
