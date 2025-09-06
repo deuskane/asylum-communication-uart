@@ -27,7 +27,7 @@ CAPI=2:
 # 2025/09/05  1.9.1    mrosiere Add Package
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:1.9.0
+name        : asylum:communication:uart:1.9.1
 description : UART TX and RX
 
 #=========================================
