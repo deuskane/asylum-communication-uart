@@ -2,8 +2,8 @@ library IEEE;
 use     IEEE.STD_LOGIC_1164.ALL;
 use     IEEE.NUMERIC_STD.ALL;
 
-library work;
-use     work.math_pkg.ALL;
+library asylum;
+use     asylum.math_pkg.ALL;
 
 entity uart_rx_axis is
   generic (

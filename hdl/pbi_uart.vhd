@@ -30,11 +30,11 @@ use     IEEE.numeric_std.ALL;
 use     ieee.std_logic_textio.all;
 use     std.textio.all;
 
-library work;
-use     work.uart_pkg.ALL;
-use     work.GIC_pkg.ALL;
-use     work.UART_csr_pkg.ALL;
-use     work.pbi_pkg.all;
+library asylum;
+use     asylum.uart_pkg.ALL;
+use     asylum.GIC_pkg.ALL;
+use     asylum.UART_csr_pkg.ALL;
+use     asylum.pbi_pkg.all;
 
 entity pbi_UART is
   generic (
