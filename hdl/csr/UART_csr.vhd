@@ -53,9 +53,14 @@ architecture rtl of UART_registers is
 
   signal   sig_busy  : std_logic;
 
-  constant INIT_isr : std_logic_vector(4-1 downto 0) :=
-             "0000" -- value
-           ;
+  function INIT_isr
+    return std_logic_vector is
+    variable tmp : std_logic_vector(4-1 downto 0);
+  begin  -- function INIT_isr
+    tmp(3 downto 0) := "0000"; -- value
+    return tmp;
+  end function INIT_isr;
+
   signal   isr_wcs       : std_logic;
   signal   isr_we        : std_logic;
   signal   isr_wdata     : std_logic_vector(8-1 downto 0);
@@ -70,9 +75,14 @@ architecture rtl of UART_registers is
   signal   isr_rdata_hw  : std_logic_vector(4-1 downto 0);
   signal   isr_rbusy     : std_logic;
 
-  constant INIT_imr : std_logic_vector(4-1 downto 0) :=
-             "0000" -- enable
-           ;
+  function INIT_imr
+    return std_logic_vector is
+    variable tmp : std_logic_vector(4-1 downto 0);
+  begin  -- function INIT_imr
+    tmp(3 downto 0) := "0000"; -- enable
+    return tmp;
+  end function INIT_imr;
+
   signal   imr_wcs       : std_logic;
   signal   imr_we        : std_logic;
   signal   imr_wdata     : std_logic_vector(8-1 downto 0);
@@ -87,9 +97,14 @@ architecture rtl of UART_registers is
   signal   imr_rdata_hw  : std_logic_vector(4-1 downto 0);
   signal   imr_rbusy     : std_logic;
 
-  constant INIT_data : std_logic_vector(8-1 downto 0) :=
-             "00000000" -- value
-           ;
+  function INIT_data
+    return std_logic_vector is
+    variable tmp : std_logic_vector(8-1 downto 0);
+  begin  -- function INIT_data
+    tmp(7 downto 0) := "00000000"; -- value
+    return tmp;
+  end function INIT_data;
+
   signal   data_wcs       : std_logic;
   signal   data_we        : std_logic;
   signal   data_wdata     : std_logic_vector(8-1 downto 0);
@@ -104,13 +119,18 @@ architecture rtl of UART_registers is
   signal   data_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   data_rbusy     : std_logic;
 
-  constant INIT_ctrl_tx : std_logic_vector(5-1 downto 0) :=
-             "0" -- tx_enable
-           & "0" -- tx_parity_enable
-           & "0" -- tx_parity_odd
-           & "0" -- tx_use_loopback
-           & "0" -- cts_enable
-           ;
+  function INIT_ctrl_tx
+    return std_logic_vector is
+    variable tmp : std_logic_vector(5-1 downto 0);
+  begin  -- function INIT_ctrl_tx
+    tmp(0 downto 0) := "0"; -- tx_enable
+    tmp(1 downto 1) := "0"; -- tx_parity_enable
+    tmp(2 downto 2) := "0"; -- tx_parity_odd
+    tmp(3 downto 3) := "0"; -- tx_use_loopback
+    tmp(4 downto 4) := "0"; -- cts_enable
+    return tmp;
+  end function INIT_ctrl_tx;
+
   signal   ctrl_tx_wcs       : std_logic;
   signal   ctrl_tx_we        : std_logic;
   signal   ctrl_tx_wdata     : std_logic_vector(8-1 downto 0);
@@ -125,13 +145,18 @@ architecture rtl of UART_registers is
   signal   ctrl_tx_rdata_hw  : std_logic_vector(5-1 downto 0);
   signal   ctrl_tx_rbusy     : std_logic;
 
-  constant INIT_ctrl_rx : std_logic_vector(5-1 downto 0) :=
-             "0" -- rx_enable
-           & "0" -- rx_parity_enable
-           & "0" -- rx_parity_odd
-           & "0" -- rx_use_loopback
-           & "0" -- rts_enable
-           ;
+  function INIT_ctrl_rx
+    return std_logic_vector is
+    variable tmp : std_logic_vector(5-1 downto 0);
+  begin  -- function INIT_ctrl_rx
+    tmp(0 downto 0) := "0"; -- rx_enable
+    tmp(1 downto 1) := "0"; -- rx_parity_enable
+    tmp(2 downto 2) := "0"; -- rx_parity_odd
+    tmp(3 downto 3) := "0"; -- rx_use_loopback
+    tmp(4 downto 4) := "0"; -- rts_enable
+    return tmp;
+  end function INIT_ctrl_rx;
+
   signal   ctrl_rx_wcs       : std_logic;
   signal   ctrl_rx_we        : std_logic;
   signal   ctrl_rx_wdata     : std_logic_vector(8-1 downto 0);
@@ -146,9 +171,14 @@ architecture rtl of UART_registers is
   signal   ctrl_rx_rdata_hw  : std_logic_vector(5-1 downto 0);
   signal   ctrl_rx_rbusy     : std_logic;
 
-  constant INIT_baud_tick_cnt_max_lsb : std_logic_vector(8-1 downto 0) :=
-             BAUD_TICK_CNT_MAX(7 downto 0) -- value
-           ;
+  function INIT_baud_tick_cnt_max_lsb
+    return std_logic_vector is
+    variable tmp : std_logic_vector(8-1 downto 0);
+  begin  -- function INIT_baud_tick_cnt_max_lsb
+    tmp(7 downto 0) := BAUD_TICK_CNT_MAX(7 downto 0); -- value
+    return tmp;
+  end function INIT_baud_tick_cnt_max_lsb;
+
   signal   baud_tick_cnt_max_lsb_wcs       : std_logic;
   signal   baud_tick_cnt_max_lsb_we        : std_logic;
   signal   baud_tick_cnt_max_lsb_wdata     : std_logic_vector(8-1 downto 0);
@@ -163,9 +193,14 @@ architecture rtl of UART_registers is
   signal   baud_tick_cnt_max_lsb_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   baud_tick_cnt_max_lsb_rbusy     : std_logic;
 
-  constant INIT_baud_tick_cnt_max_msb : std_logic_vector(8-1 downto 0) :=
-             BAUD_TICK_CNT_MAX(15 downto 8) -- value
-           ;
+  function INIT_baud_tick_cnt_max_msb
+    return std_logic_vector is
+    variable tmp : std_logic_vector(8-1 downto 0);
+  begin  -- function INIT_baud_tick_cnt_max_msb
+    tmp(7 downto 0) := BAUD_TICK_CNT_MAX(15 downto 8); -- value
+    return tmp;
+  end function INIT_baud_tick_cnt_max_msb;
+
   signal   baud_tick_cnt_max_msb_wcs       : std_logic;
   signal   baud_tick_cnt_max_msb_we        : std_logic;
   signal   baud_tick_cnt_max_msb_wdata     : std_logic_vector(8-1 downto 0);
