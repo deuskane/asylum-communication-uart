@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-09-06
+-- Last update: 2025-11-10
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -66,8 +66,10 @@ entity pbi_UART is
     uart_rts_b_o     : out std_logic; -- Request To Send (Active low)
 
     -- Interruption
-    it_o             : out std_logic
+    it_o             : out std_logic;
 
+    -- Debug
+    debug_o          : out uart_debug_t
     );
 
 end entity pbi_UART;
@@ -201,7 +203,8 @@ begin  -- architecture rtl
        ,uart_cts_b_i    => uart_cts_b
        ,baud_tick_i     => tx_baud_tick
        ,parity_enable_i => tx_parity_enable
-       ,parity_odd_i    => tx_parity_odd   
+       ,parity_odd_i    => tx_parity_odd
+       ,debug_o         => debug_o.uart_tx 
         );
     
     gen_uart_rx: if UART_RX_ENABLE = true
@@ -238,6 +241,7 @@ begin  -- architecture rtl
     hw2sw.data.ready     <= '1';
     uart_tx              <= '1';
     tx_use_loopback      <= '0';
+    debug_o.uart_tx.state<= '0';
   end generate gen_uart_tx_b;
 
   -----------------------------------------------------------------------------
@@ -283,7 +287,9 @@ begin  -- architecture rtl
        ,baud_tick_i     => rx_baud_tick
        ,baud_tick_half_i=> rx_baud_tick_half
        ,parity_enable_i => rx_parity_enable
-       ,parity_odd_i    => rx_parity_odd   
+       ,parity_odd_i    => rx_parity_odd
+       ,debug_o         => debug_o.uart_rx
+
         );
 
     gen_uart_tx: if UART_TX_ENABLE = true
@@ -314,10 +320,13 @@ begin  -- architecture rtl
   gen_uart_rx_b: if UART_RX_ENABLE = false
   generate
 
-    hw2sw.data.value   <= (others => '0');
-    hw2sw.data.valid   <= '0';
-
-    uart_rts_b         <= '0';
+    hw2sw.data.value               <= (others => '0');
+    hw2sw.data.valid               <= '0';
+    uart_rts_b                     <= '0';
+    debug_o.uart_rx.state          <= (others => '0');
+    debug_o.uart_rx.bit_cnt        <= (others => '0');
+    debug_o.uart_rx.baud_tick_half <= '0';
+    
   end generate gen_uart_rx_b;
 
   -----------------------------------------------------------------------------
@@ -346,7 +355,7 @@ begin  -- architecture rtl
   -----------------------------------------------------------------------------
   -- Debug
   -----------------------------------------------------------------------------
-  
+
 -- synthesis translate_off
   process
   begin

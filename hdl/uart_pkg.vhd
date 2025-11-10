@@ -5,6 +5,35 @@ library asylum;
 use     asylum.pbi_pkg.all;
 
 package uart_pkg is
+
+
+  -----------------------------------------------------------------------------
+  -- uart_tx_debug_t
+  -----------------------------------------------------------------------------
+  type uart_tx_debug_t is record
+    state   : std_logic;
+  end record uart_tx_debug_t;
+
+  -----------------------------------------------------------------------------
+  -- uart_rx_debug_t
+  -----------------------------------------------------------------------------
+  type uart_rx_debug_t is record
+    state          : std_logic_vector(2-1 downto 0);
+    bit_cnt        : std_logic_vector(4-1 downto 0);
+    baud_tick_half : std_logic;
+  end record uart_rx_debug_t;
+
+  -----------------------------------------------------------------------------
+  -- uart_debug_t
+  -----------------------------------------------------------------------------
+  type uart_debug_t is record
+
+    uart_tx : uart_tx_debug_t;
+    uart_rx : uart_rx_debug_t;
+    
+  end record uart_debug_t;
+
+  
 -- [COMPONENT_INSERT][BEGIN]
 component uart_rx_axis is
   generic (
@@ -13,15 +42,21 @@ component uart_rx_axis is
   port (
     clk_i           : in  std_logic;
     arst_b_i        : in  std_logic;
+
     uart_rx_i       : in  std_logic;
+
     m_axis_tdata_o  : out std_logic_vector(WIDTH-1 downto 0);
     m_axis_tvalid_o : out std_logic;
     m_axis_tready_i : in  std_logic;
+
     baud_tick_i     : in  std_logic;
     baud_tick_half_i: in  std_logic;
     baud_tick_en_o  : out std_logic;
+
     parity_enable_i : in  std_logic;
-    parity_odd_i    : in  std_logic
+    parity_odd_i    : in  std_logic;
+
+    debug_o         : out uart_rx_debug_t
   );
 end component uart_rx_axis;
 
@@ -32,15 +67,21 @@ component uart_tx_axis is
   port (
     clk_i           : in  std_logic;
     arst_b_i        : in  std_logic;
+
     s_axis_tdata_i  : in  std_logic_vector(WIDTH-1 downto 0);
     s_axis_tvalid_i : in  std_logic;
     s_axis_tready_o : out std_logic;
+
     uart_tx_o       : out std_logic;
     uart_cts_b_i    : in  std_logic;
+
     baud_tick_i     : in  std_logic;
     parity_enable_i : in  std_logic;
-    parity_odd_i    : in  std_logic
-  );
+    parity_odd_i    : in  std_logic;
+
+    debug_o         : out uart_tx_debug_t
+
+    );
 end component uart_tx_axis;
 
 component pbi_UART is
@@ -73,8 +114,10 @@ component pbi_UART is
     uart_rts_b_o     : out std_logic; -- Request To Send (Active low)
 
     -- Interruption
-    it_o             : out std_logic
+    it_o             : out std_logic;
 
+    -- Debug
+    debug_o          : out uart_debug_t
     );
 
 end component pbi_UART;

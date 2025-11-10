@@ -25,9 +25,10 @@ CAPI=2:
 # 2025/07/27  1.8.0    mrosiere Add Interruption
 # 2025/08/02  1.9.0    mrosiere Add CTS/RTS ports
 # 2025/09/05  1.9.1    mrosiere Add Package
+# 2025/11/10  1.10.0   mrosiere Update counter with shift register
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:1.9.1
+name        : asylum:communication:uart:1.10.0
 description : UART TX and RX
 
 #=========================================

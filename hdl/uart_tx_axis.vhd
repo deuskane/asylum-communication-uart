@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-08-02
+-- Last update: 2025-11-10
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -25,6 +25,7 @@ use     IEEE.NUMERIC_STD.ALL;
 
 library asylum;
 use     asylum.math_pkg.ALL;
+use     asylum.uart_pkg.ALL;
 
 entity uart_tx_axis is
   generic (
@@ -33,25 +34,29 @@ entity uart_tx_axis is
   port (
     clk_i           : in  std_logic;
     arst_b_i        : in  std_logic;
+
     s_axis_tdata_i  : in  std_logic_vector(WIDTH-1 downto 0);
     s_axis_tvalid_i : in  std_logic;
     s_axis_tready_o : out std_logic;
+
     uart_tx_o       : out std_logic;
     uart_cts_b_i    : in  std_logic;
+
     baud_tick_i     : in  std_logic;
     parity_enable_i : in  std_logic;
-    parity_odd_i    : in  std_logic
-  );
+    parity_odd_i    : in  std_logic;
+
+    debug_o         : out uart_tx_debug_t
+
+    );
 end uart_tx_axis;
 
 architecture rtl of uart_tx_axis is
-  constant WIDTH_CNT                      : natural := clog2(WIDTH+3);
-  constant UART_BIT_CNT_WITHOUT_PARITY    : unsigned(WIDTH_CNT-1 downto 0) := to_unsigned(WIDTH+1,WIDTH_CNT);
-  constant UART_BIT_CNT_WITH_PARITY       : unsigned(WIDTH_CNT-1 downto 0) := UART_BIT_CNT_WITHOUT_PARITY+1;
+  constant BIT_MSB                        : natural := WIDTH+2-1;
   
--- Déclaration des registres internes
-  signal   uart_tx_data_r                 : std_logic_vector(WIDTH+2  -1 downto 0);
-  signal   uart_tx_bit_cnt_r              : unsigned        (WIDTH_CNT-1 downto 0);
+  -- Déclaration des registres internes
+  signal   uart_tx_data_r                 : std_logic_vector(BIT_MSB downto 0);
+  signal   uart_tx_bit_cnt_r              : std_logic_vector(BIT_MSB downto 0); 
   signal   uart_tx_active_r               : std_logic;
   signal   uart_tx_r                      : std_logic;
   signal   parity_bit                     : std_logic;
@@ -96,6 +101,8 @@ begin
       -- Have transmission ?
       if (uart_tx_active_r = '0')
       then
+        uart_tx_bit_cnt_r <= (others => '0');
+        
         -- New Data to transmit ?
         if ((s_axis_tvalid_i = '1') and
             (uart_cts_b_i    = '0'))
@@ -104,12 +111,10 @@ begin
           uart_tx_data_r      <= parity_bit & s_axis_tdata_i & '0'; 
 
           -- Update compteur depending parity to be transmit
-          if (parity_enable_i = '1')
+          if (parity_enable_i = '0')
           then
-            uart_tx_bit_cnt_r <= UART_BIT_CNT_WITH_PARITY;
-          else
-            uart_tx_bit_cnt_r <= UART_BIT_CNT_WITHOUT_PARITY;
-          end if;     
+            uart_tx_bit_cnt_r(BIT_MSB) <= '1';
+          end if;
 
           -- State is in transmisison
           uart_tx_active_r  <= '1';
@@ -120,10 +125,10 @@ begin
         then
           uart_tx_r           <= uart_tx_data_r(0);
           uart_tx_data_r      <= '1' & uart_tx_data_r(9 downto 1); -- Décalage à droite
-          uart_tx_bit_cnt_r   <= uart_tx_bit_cnt_r - 1;
+          uart_tx_bit_cnt_r   <= '1' & uart_tx_bit_cnt_r(BIT_MSB downto 1);
 
           -- Last bit, go inactive
-          if uart_tx_bit_cnt_r = 0
+          if uart_tx_bit_cnt_r(0) = '1'
           then
             uart_tx_active_r <= '0';
           end if;
@@ -132,4 +137,6 @@ begin
     end if;
   end process;
   
+  debug_o.state <= uart_tx_active_r;
+
 end rtl;

@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-05-03
+-- Last update: 2025-11-10
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -45,7 +45,7 @@ architecture rtl of uart_baud_rate_gen is
   -- Déclaration des registres
   signal   cfg_baud_tick_cnt_max      : unsigned(BAUD_TICK_CNT_WIDTH-1 downto 0);
   signal   cfg_baud_tick_cnt_max_div2 : unsigned(BAUD_TICK_CNT_WIDTH-1 downto 1);
-  signal   baud_tick_cnt_r            : unsigned(BAUD_TICK_CNT_WIDTH-1 downto 0) := (others => '0');
+  signal   baud_tick_cnt_r            : unsigned(BAUD_TICK_CNT_WIDTH-1 downto 0);
   signal   baud_tick_r                : std_logic;
   signal   baud_tick_half_r           : std_logic;
   signal   baud_tick_en_r             : std_logic;
@@ -70,26 +70,30 @@ begin
       baud_tick_r      <= '0';
       baud_tick_half_r <= '0';
 
-      -- Détection du front montant de baud_tick_en_i
-      if baud_tick_en_i = '1' and baud_tick_en_r = '0'
+      if baud_tick_en_i = '1'
       then
-        -- Initialisation du compteur à BAUD_TICK_CNT_MAX lors d'un front montant de baud_tick_en_i
-        baud_tick_cnt_r <= cfg_baud_tick_cnt_max;
-      elsif baud_tick_en_i = '1'
-      then
-        if baud_tick_cnt_r = cfg_baud_tick_cnt_max_div2
-        then
-          baud_tick_half_r <= '1';
-        end if;       
 
-        if baud_tick_cnt_r = 0
+        -- Détection du front montant de baud_tick_en_i
+        if baud_tick_en_r = '0'
         then
-          -- Réinitialisation du compteur et génération du tick
+          -- Initialisation du compteur à BAUD_TICK_CNT_MAX lors d'un front montant de baud_tick_en_i
           baud_tick_cnt_r <= cfg_baud_tick_cnt_max;
-          baud_tick_r     <= '1';
         else
-          -- Décrémentation du compteur
-          baud_tick_cnt_r <= baud_tick_cnt_r - 1;
+          
+          if baud_tick_cnt_r = cfg_baud_tick_cnt_max_div2
+          then
+            baud_tick_half_r <= '1';
+          end if;       
+
+          if baud_tick_cnt_r = 0
+          then
+            -- Réinitialisation du compteur et génération du tick
+            baud_tick_cnt_r <= cfg_baud_tick_cnt_max;
+            baud_tick_r     <= '1';
+          else
+            -- Décrémentation du compteur
+            baud_tick_cnt_r <= baud_tick_cnt_r - 1;
+          end if;
         end if;
       end if;
     end if;
