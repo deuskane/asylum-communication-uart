@@ -2,7 +2,7 @@ library IEEE;
 use     IEEE.STD_LOGIC_1164.ALL;
 use     IEEE.NUMERIC_STD.ALL;
 library asylum;
-use     asylum.pbi_pkg.all;
+use     asylum.sbi_pkg.all;
 
 package uart_pkg is
 
@@ -84,7 +84,24 @@ component uart_tx_axis is
     );
 end component uart_tx_axis;
 
-component pbi_UART is
+component uart_baud_rate_gen is
+  generic
+  (
+    BAUD_TICK_CNT_WIDTH : integer := 16
+  );
+  port
+  (
+    clk_i                   : in  std_logic;
+    arst_b_i                : in  std_logic;
+    baud_tick_en_i          : in  std_logic;
+    baud_tick_o             : out std_logic;
+    baud_tick_half_o        : out std_logic;
+
+    cfg_baud_tick_cnt_max_i : in  std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0)
+  );
+end component uart_baud_rate_gen;
+
+component sbi_UART is
   generic (
     BAUD_RATE             : integer := 115200;
     CLOCK_FREQ            : integer := 50000000;
@@ -103,8 +120,8 @@ component pbi_UART is
     arst_b_i         : in  std_logic; -- asynchronous reset
 
     -- Bus
-    pbi_ini_i        : in  pbi_ini_t;
-    pbi_tgt_o        : out pbi_tgt_t;
+    sbi_ini_i        : in  sbi_ini_t;
+    sbi_tgt_o        : out sbi_tgt_t;
     
     -- To/From IO
     uart_tx_o        : out std_logic; -- Data 
@@ -120,24 +137,7 @@ component pbi_UART is
     debug_o          : out uart_debug_t
     );
 
-end component pbi_UART;
-
-component uart_baud_rate_gen is
-  generic
-  (
-    BAUD_TICK_CNT_WIDTH : integer := 16
-  );
-  port
-  (
-    clk_i                   : in  std_logic;
-    arst_b_i                : in  std_logic;
-    baud_tick_en_i          : in  std_logic;
-    baud_tick_o             : out std_logic;
-    baud_tick_half_o        : out std_logic;
-
-    cfg_baud_tick_cnt_max_i : in  std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0)
-  );
-end component uart_baud_rate_gen;
+end component sbi_UART;
 
 -- [COMPONENT_INSERT][END]
 
