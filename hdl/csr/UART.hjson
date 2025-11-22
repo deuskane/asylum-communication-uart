@@ -2,7 +2,7 @@
     name      : "UART",
     width     : 8,
     desc      : "CSR for UART"
-    interface : "pbi"
+    interface : "sbi"
 
     parameters : [
     	{

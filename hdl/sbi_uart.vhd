@@ -1,12 +1,12 @@
 -------------------------------------------------------------------------------
--- Title      : pbi_UART
+-- Title      : sbi_UART
 -- Project    : PicoSOC
 -------------------------------------------------------------------------------
--- File       : pbi_UART.vhd
+-- File       : sbi_UART.vhd
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-11-10
+-- Last update: 2025-11-22
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -22,6 +22,7 @@
 -- 2025-05-14  1.0     mrosiere Add parameter USER_DEFINE_BAUD_TICK and default value
 -- 2025-07-09  1.1     mrosiere Add FIFO Depth
 -- 2025-08-02  1.2     mrosiere Add RTS / CTS
+-- 2025-11-22  1.3     mrosiere Use sbi instead pbi
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -34,9 +35,9 @@ library asylum;
 use     asylum.uart_pkg.ALL;
 use     asylum.GIC_pkg.ALL;
 use     asylum.UART_csr_pkg.ALL;
-use     asylum.pbi_pkg.all;
+use     asylum.sbi_pkg.all;
 
-entity pbi_UART is
+entity sbi_UART is
   generic (
     BAUD_RATE             : integer := 115200;
     CLOCK_FREQ            : integer := 50000000;
@@ -55,8 +56,8 @@ entity pbi_UART is
     arst_b_i         : in  std_logic; -- asynchronous reset
 
     -- Bus
-    pbi_ini_i        : in  pbi_ini_t;
-    pbi_tgt_o        : out pbi_tgt_t;
+    sbi_ini_i        : in  sbi_ini_t;
+    sbi_tgt_o        : out sbi_tgt_t;
     
     -- To/From IO
     uart_tx_o        : out std_logic; -- Data 
@@ -72,9 +73,9 @@ entity pbi_UART is
     debug_o          : out uart_debug_t
     );
 
-end entity pbi_UART;
+end entity sbi_UART;
 
-architecture rtl of pbi_UART is
+architecture rtl of sbi_UART is
 
 -- synthesis translate_off
   file     file_tx                : text open write_mode is FILENAME_TX;
@@ -151,8 +152,8 @@ begin  -- architecture rtl
     port map(
       clk_i                 => clk_i           ,
       arst_b_i              => arst_b_i        ,
-      pbi_ini_i             => pbi_ini_i       ,
-      pbi_tgt_o             => pbi_tgt_o       ,
+      sbi_ini_i             => sbi_ini_i       ,
+      sbi_tgt_o             => sbi_tgt_o       ,
       sw2hw_o               => sw2hw           ,
       hw2sw_i               => hw2sw   
       );
