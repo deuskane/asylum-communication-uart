@@ -838,4 +838,5 @@ begin  -- architecture rtl
     baud_tick_cnt_max_lsb_rdata when baud_tick_cnt_max_lsb_rcs = '1' else
     baud_tick_cnt_max_msb_rdata when baud_tick_cnt_max_msb_rcs = '1' else
     (others => '0'); -- Bad Address, return 0
+  sbi_tgt_o.info.name <= to_sbi_name("UART");
 end architecture rtl;
