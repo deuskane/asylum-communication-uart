@@ -35,6 +35,61 @@ package uart_pkg is
 
   
 -- [COMPONENT_INSERT][BEGIN]
+component sbi_UART is
+  generic (
+    BAUD_RATE             : integer := 115200;
+    CLOCK_FREQ            : integer := 50000000;
+    BAUD_TICK_CNT_WIDTH   : integer := 16;
+    UART_TX_ENABLE        : boolean := true;
+    UART_RX_ENABLE        : boolean := true;
+    USER_DEFINE_BAUD_TICK : boolean := true;
+    DEPTH_TX              : natural := 0;
+    DEPTH_RX              : natural := 0;
+    
+    FILENAME_TX           : string  := "dump_uart_tx.txt";
+    FILENAME_RX           : string  := "dump_uart_rx.txt"
+    );
+  port   (
+    clk_i            : in  std_logic;
+    arst_b_i         : in  std_logic; -- asynchronous reset
+
+    -- Bus
+    sbi_ini_i        : in  sbi_ini_t;
+    sbi_tgt_o        : out sbi_tgt_t;
+    
+    -- To/From IO
+    uart_tx_o        : out std_logic; -- Data 
+    uart_rx_i        : in  std_logic;
+
+    uart_cts_b_i     : in  std_logic; -- Clear   To Send (Active low)
+    uart_rts_b_o     : out std_logic; -- Request To Send (Active low)
+
+    -- Interruption
+    it_o             : out std_logic;
+
+    -- Debug
+    debug_o          : out uart_debug_t
+    );
+
+end component sbi_UART;
+
+component uart_baud_rate_gen is
+  generic
+  (
+    BAUD_TICK_CNT_WIDTH : integer := 16
+  );
+  port
+  (
+    clk_i                   : in  std_logic;
+    arst_b_i                : in  std_logic;
+    baud_tick_en_i          : in  std_logic;
+    baud_tick_o             : out std_logic;
+    baud_tick_half_o        : out std_logic;
+
+    cfg_baud_tick_cnt_max_i : in  std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0)
+  );
+end component uart_baud_rate_gen;
+
 component uart_rx_axis is
   generic (
     WIDTH           : natural := 8
@@ -83,61 +138,6 @@ component uart_tx_axis is
 
     );
 end component uart_tx_axis;
-
-component uart_baud_rate_gen is
-  generic
-  (
-    BAUD_TICK_CNT_WIDTH : integer := 16
-  );
-  port
-  (
-    clk_i                   : in  std_logic;
-    arst_b_i                : in  std_logic;
-    baud_tick_en_i          : in  std_logic;
-    baud_tick_o             : out std_logic;
-    baud_tick_half_o        : out std_logic;
-
-    cfg_baud_tick_cnt_max_i : in  std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0)
-  );
-end component uart_baud_rate_gen;
-
-component sbi_UART is
-  generic (
-    BAUD_RATE             : integer := 115200;
-    CLOCK_FREQ            : integer := 50000000;
-    BAUD_TICK_CNT_WIDTH   : integer := 16;
-    UART_TX_ENABLE        : boolean := true;
-    UART_RX_ENABLE        : boolean := true;
-    USER_DEFINE_BAUD_TICK : boolean := true;
-    DEPTH_TX              : natural := 0;
-    DEPTH_RX              : natural := 0;
-    
-    FILENAME_TX           : string  := "dump_uart_tx.txt";
-    FILENAME_RX           : string  := "dump_uart_rx.txt"
-    );
-  port   (
-    clk_i            : in  std_logic;
-    arst_b_i         : in  std_logic; -- asynchronous reset
-
-    -- Bus
-    sbi_ini_i        : in  sbi_ini_t;
-    sbi_tgt_o        : out sbi_tgt_t;
-    
-    -- To/From IO
-    uart_tx_o        : out std_logic; -- Data 
-    uart_rx_i        : in  std_logic;
-
-    uart_cts_b_i     : in  std_logic; -- Clear   To Send (Active low)
-    uart_rts_b_o     : out std_logic; -- Request To Send (Active low)
-
-    -- Interruption
-    it_o             : out std_logic;
-
-    -- Debug
-    debug_o          : out uart_debug_t
-    );
-
-end component sbi_UART;
 
 -- [COMPONENT_INSERT][END]
 
