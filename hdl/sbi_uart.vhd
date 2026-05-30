@@ -78,8 +78,11 @@ end entity sbi_UART;
 architecture rtl of sbi_UART is
 
 -- synthesis translate_off
-  file     file_tx                : text open write_mode is FILENAME_TX;
-  file     file_rx                : text open write_mode is FILENAME_RX;
+  type raw_file_t is file of character;
+  file     file_tx                : text open write_mode is FILENAME_TX & ".dbg";
+  file     file_rx                : text open write_mode is FILENAME_RX & ".dbg";
+  file     file_tx_raw            : raw_file_t open write_mode is FILENAME_TX;
+  file     file_rx_raw            : raw_file_t open write_mode is FILENAME_RX;
 -- synthesis translate_on
 
   -- Compute Max baud tick counter
@@ -369,6 +372,7 @@ begin  -- architecture rtl
 
   process (clk_i) is
     variable line_buffer : line;
+    variable line_raw    : line;
   begin  -- process
 
     if rising_edge(clk_i)
@@ -382,6 +386,9 @@ begin  -- architecture rtl
         write    (line_buffer, string'(" - "));
         write    (line_buffer, character'val(to_integer(unsigned(tx_tdata))));
         writeline(file_tx, line_buffer);
+
+        write    (file_tx_raw, character'val(to_integer(unsigned(tx_tdata))));
+        flush    (file_tx_raw);
       end if;
 
       if (rx_tvalid and rx_tready)
@@ -392,6 +399,9 @@ begin  -- architecture rtl
         write    (line_buffer, string'(" - "));
         write    (line_buffer, character'val(to_integer(unsigned(rx_tdata))));
         writeline(file_rx, line_buffer);
+
+        write    (file_rx_raw, character'val(to_integer(unsigned(rx_tdata))));
+        flush    (file_rx_raw);
       end if;
       
     end if;

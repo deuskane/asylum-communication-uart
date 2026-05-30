@@ -27,9 +27,10 @@ CAPI=2:
 # 2025-09-05  1.9.1    mrosiere Add Package
 # 2025-11-10  1.10.0   mrosiere Update counter with shift register
 # 2025-11-22  1.10.1   mrosiere Use sbi instead pbi
+# 2026-05-30  1.10.2   mrosiere Generate 2 dumps file : one raw, one debug
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:1.10.1
+name        : asylum:communication:uart:1.10.2
 description : UART TX and RX
 
 #=========================================
