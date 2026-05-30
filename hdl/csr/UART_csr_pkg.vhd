@@ -245,6 +245,7 @@ package UART_csr_pkg is
     data : UART_data_hw2sw_t;
   end record UART_hw2sw_t;
 
+
   constant UART_ADDR_WIDTH : natural := 3;
   constant UART_DATA_WIDTH : natural := 8;
 
@@ -260,14 +261,14 @@ component UART_registers is
   );
   port (
     -- Clock and Reset
-    clk_i      : in  std_logic;
-    arst_b_i   : in  std_logic;
+    clk_i      : in  std_logic
+   ;arst_b_i   : in  std_logic
     -- Bus
-    sbi_ini_i  : in  sbi_ini_t;
-    sbi_tgt_o  : out sbi_tgt_t;
+   ;sbi_ini_i  : in  sbi_ini_t
+   ;sbi_tgt_o  : out sbi_tgt_t
     -- CSR
-    sw2hw_o    : out UART_sw2hw_t;
-    hw2sw_i    : in  UART_hw2sw_t
+   ;sw2hw_o    : out UART_sw2hw_t
+   ;hw2sw_i    : in  UART_hw2sw_t
   );
 end component UART_registers;
 
