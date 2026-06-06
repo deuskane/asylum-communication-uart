@@ -254,7 +254,8 @@ package UART_csr_pkg is
   ------------------------------------
 component UART_registers is
   generic (
-    USER_DEFINE_BAUD_TICK : boolean -- Parameters to use the enable the User define Baud Tick
+    MODULE_NAME :  string := "" -- Name of the module
+   ;USER_DEFINE_BAUD_TICK : boolean -- Parameters to use the enable the User define Baud Tick
    ;BAUD_TICK_CNT_MAX : std_logic_vector(15 downto 0) -- Default value for Baud Tick Timer
    ;DEPTH_TX : natural -- Depth of FIFO TX (SW2HW)
    ;DEPTH_RX : natural -- Depth of FIFO RX (HW2SW)

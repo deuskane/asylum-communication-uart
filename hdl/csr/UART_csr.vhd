@@ -19,7 +19,8 @@ use     asylum.sbi_pkg.all;
 --==================================
 entity UART_registers is
   generic (
-    USER_DEFINE_BAUD_TICK : boolean -- Parameters to use the enable the User define Baud Tick
+    MODULE_NAME :  string := "" -- Name of the module
+   ;USER_DEFINE_BAUD_TICK : boolean -- Parameters to use the enable the User define Baud Tick
    ;BAUD_TICK_CNT_MAX : std_logic_vector(15 downto 0) -- Default value for Baud Tick Timer
    ;DEPTH_TX : natural -- Depth of FIFO TX (SW2HW)
    ;DEPTH_RX : natural -- Depth of FIFO RX (HW2SW)
@@ -838,5 +839,11 @@ begin  -- architecture rtl
     baud_tick_cnt_max_lsb_rdata when baud_tick_cnt_max_lsb_rcs = '1' else
     baud_tick_cnt_max_msb_rdata when baud_tick_cnt_max_msb_rcs = '1' else
     (others => '0'); -- Bad Address, return 0
-  sbi_tgt_o.info.name <= to_sbi_name("UART");
+
+  gen_tgt_info_name : if MODULE_NAME = ""
+  generate
+    sbi_tgt_o.info.name <= to_sbi_name("UART");
+  else generate
+    sbi_tgt_o.info.name <= to_sbi_name(MODULE_NAME);
+  end generate;
 end architecture rtl;

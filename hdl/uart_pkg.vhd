@@ -37,6 +37,7 @@ package uart_pkg is
 -- [COMPONENT_INSERT][BEGIN]
 component sbi_UART is
   generic (
+    NAME                  : string  := "";
     BAUD_RATE             : integer := 115200;
     CLOCK_FREQ            : integer := 50000000;
     BAUD_TICK_CNT_WIDTH   : integer := 16;

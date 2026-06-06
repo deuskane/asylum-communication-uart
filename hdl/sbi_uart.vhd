@@ -39,6 +39,7 @@ use     asylum.sbi_pkg.all;
 
 entity sbi_UART is
   generic (
+    NAME                  : string  := "";
     BAUD_RATE             : integer := 115200;
     CLOCK_FREQ            : integer := 50000000;
     BAUD_TICK_CNT_WIDTH   : integer := 16;
@@ -147,6 +148,7 @@ begin  -- architecture rtl
   -----------------------------------------------------------------------------
   ins_csr : UART_registers
     generic map(
+      MODULE_NAME           => NAME,
       USER_DEFINE_BAUD_TICK => USER_DEFINE_BAUD_TICK,
       BAUD_TICK_CNT_MAX     => BAUD_TICK_CNT_MAX_SLV,
       DEPTH_TX              => DEPTH_TX,
