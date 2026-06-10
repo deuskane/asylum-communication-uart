@@ -60,17 +60,17 @@ architecture rtl of uart_rx_axis is
   constant BIT_PARITY                     : natural := BIT_DATA_MSB+1;
   constant BIT_MSB                        : natural := WIDTH+2-1;
   
-  type     state_t is (IDLE, ACTIVE, STOP);
+  type     state_t is (IDLE, START, ACTIVE, STOP);
   signal   state_r                        : state_t;
   
-  -- Déclaration des registres internes
+  -- Internal registers declaration
   signal   uart_rx_data_r                 : std_logic_vector(BIT_MSB     downto 0); 
   signal   uart_rx_bit_cnt_r              : std_logic_vector(BIT_MSB     downto 0); 
   signal   parity_bit_r                   : std_logic;
   
 begin
   
-  -- Logique de réception UART
+  -- UART reception logic
   process(clk_i, arst_b_i)
   begin
     if arst_b_i = '0'
@@ -83,7 +83,6 @@ begin
     elsif rising_edge(clk_i)
     then
       baud_tick_en_o    <= '0';
-
       
       -- FIFO consume the character
       if m_axis_tready_i = '1'
@@ -98,23 +97,38 @@ begin
 
           if (parity_enable_i = '0')
           then
-            uart_rx_bit_cnt_r(BIT_MSB) <= '1';
+            uart_rx_bit_cnt_r(BIT_PARITY) <= '1';
           end if;   
           
           -- No transmission, wait START Bit
           if uart_rx_i = '0'
           then
+            state_r          <= START;
+          end if;
+        when START =>
+          baud_tick_en_o    <= '1';
 
-            state_r          <= ACTIVE;
+          if baud_tick_half_i = '1'
+          then
+            uart_rx_data_r    <= uart_rx_i & uart_rx_data_r   (BIT_MSB downto 1);
+            uart_rx_bit_cnt_r <= '1'       & uart_rx_bit_cnt_r(BIT_MSB downto 1);
+
+            -- Check for False Start Bit
+            if uart_rx_i = '1' then
+              state_r        <= IDLE;
+              baud_tick_en_o <= '0';
+            else
+              state_r        <= ACTIVE;
+            end if;
           end if;
         when ACTIVE =>
           baud_tick_en_o    <= '1';
 
-        -- Reception in progress, have tick ?
+          -- Reception in progress, have tick ?
           if baud_tick_half_i = '1'
           then
-            uart_rx_data_r    <= uart_rx_i & uart_rx_data_r   (BIT_MSB downto 1); -- Décalage à gauche
-
+            -- Shift in data
+            uart_rx_data_r    <= uart_rx_i & uart_rx_data_r   (BIT_MSB downto 1);
             uart_rx_bit_cnt_r <= '1'       & uart_rx_bit_cnt_r(BIT_MSB downto 1);
             
             -- Last bit, go inactive
@@ -125,8 +139,8 @@ begin
           end if;
         when STOP =>
           state_r         <= IDLE;
-          m_axis_tdata_o  <= uart_rx_data_r(BIT_DATA_MSB downto BIT_DATA_LSB); -- Extraire les bits de données
-          parity_bit_r    <= uart_rx_data_r(BIT_PARITY); -- Extraire le bit de parité
+          m_axis_tdata_o  <= uart_rx_data_r(BIT_DATA_MSB downto BIT_DATA_LSB); -- Extract data bits
+          parity_bit_r    <= uart_rx_data_r(BIT_PARITY); -- Extract parity bit
           m_axis_tvalid_o <= '1';
         when others =>
           state_r         <= IDLE;
@@ -134,20 +148,20 @@ begin
     end if;
   end process;
 
---  -- Vérification de la parité
+--  -- Parity check
 --  process(clk_i, arst_b_i)
 --  begin
 --    if arst_b_i = '0' then
---      -- Réinitialisation
+--      -- Reset
 --    elsif rising_edge(clk_i) then
 --      if m_axis_tvalid_o = '1' and parity_enable_i = '1' then
 --        if parity_odd_i = '1' then
 --          if (parity_bit xor reduce_xor(m_axis_tdata_o)) = '0' then
---            -- Erreur de parité impaire
+--            -- Odd parity error
 --          end if;
 --        else
 --          if (parity_bit xor reduce_xor(m_axis_tdata_o)) = '1' then
---            -- Erreur de parité paire
+--            -- Even parity error
 --          end if;
 --        end if;
 --      end if;

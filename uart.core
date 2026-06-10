@@ -28,10 +28,11 @@ CAPI=2:
 # 2025-11-10  1.10.0   mrosiere Update counter with shift register
 # 2025-11-22  1.10.1   mrosiere Use sbi instead pbi
 # 2026-05-30  1.10.2   mrosiere Generate 2 dumps file : one raw, one debug
-# 2026-06-06  1.10.3    mrosiere Add Name
+# 2026-06-06  1.10.3   mrosiere Add Name
+# 2026-06-10  1.10.4   mrosiere Add state in rx to support start glitch
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:1.10.3
+name        : asylum:communication:uart:1.10.4
 description : UART TX and RX
 
 #=========================================
@@ -65,7 +66,18 @@ filesets:
     logical_name : asylum
     depend :
       - asylum:utils:pkg
+      - asylum:component:fifo
       - asylum:system:GIC
+
+  #---------------------------------------
+  sim_basic:
+  #---------------------------------------
+    files        :
+      - sim/tb_uart.vhd
+    file_type    : vhdlSource-2008
+    #logical_name : asylum
+    depend       :
+      - bitvis:verification:uvvm      
 
 #=========================================
 targets:
@@ -79,3 +91,17 @@ targets:
       - rtl
     generate        :
       - gen_csr
+
+  #---------------------------------------
+  sim_basic:
+  #---------------------------------------
+    << : *default
+    description     : Simulation of basic unit tests
+    filesets_append :
+      - sim_basic
+    toplevel        : tb_uart
+    default_tool    : ghdl
+    tools :
+      ghdl :
+        analyze_options : ["-Wall","-fsynopsys","-frelaxed","--no-vital-checks"]
+        run_options     : ["--fst=dut.fst","--ieee-asserts=disable"]
