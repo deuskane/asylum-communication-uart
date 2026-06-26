@@ -147,13 +147,13 @@
 #define UART_BAUD_TICK_CNT_MAX_MSB_VALUE_MASK 255
 
 //----------------------------------
-// Structure {module}_t
+// Structure UART_t
 //----------------------------------
 typedef struct {
   uint8_t isr; // 0x0
   uint8_t imr; // 0x1
   uint8_t data; // 0x2
-  uint8_t __dummy_0x3__
+  uint8_t __dummy_0x3__;
   uint8_t ctrl_tx; // 0x4
   uint8_t ctrl_rx; // 0x5
   uint8_t baud_tick_cnt_max_lsb; // 0x6
