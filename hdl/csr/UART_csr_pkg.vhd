@@ -14,6 +14,13 @@ use     asylum.sbi_pkg.all;
 
 package UART_csr_pkg is
 
+  ------------------------------------
+  -- Global Constants
+  ------------------------------------
+
+  constant UART_ADDR_WIDTH : natural := 3;
+  constant UART_DATA_WIDTH : natural := 8;
+
   --==================================
   -- Register    : isr
   -- Description : Interruption Status Register
@@ -23,6 +30,8 @@ package UART_csr_pkg is
   -- Hw Access   : rw
   -- Hw Type     : reg
   --==================================
+  constant UART_ISR : unsigned(UART_ADDR_WIDTH-1 downto 0) := to_unsigned(0, UART_ADDR_WIDTH);
+
   type UART_isr_sw2hw_t is record
     re : std_logic;
     we : std_logic;
@@ -53,6 +62,8 @@ package UART_csr_pkg is
   -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
+  constant UART_IMR : unsigned(UART_ADDR_WIDTH-1 downto 0) := to_unsigned(1, UART_ADDR_WIDTH);
+
   type UART_imr_sw2hw_t is record
     re : std_logic;
     we : std_logic;
@@ -73,6 +84,8 @@ package UART_csr_pkg is
   -- Hw Access   : rw
   -- Hw Type     : fifo
   --==================================
+  constant UART_DATA : unsigned(UART_ADDR_WIDTH-1 downto 0) := to_unsigned(2, UART_ADDR_WIDTH);
+
   type UART_data_sw2hw_t is record
     ready : std_logic;
     valid : std_logic;
@@ -108,6 +121,8 @@ package UART_csr_pkg is
   -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
+  constant UART_CTRL_TX : unsigned(UART_ADDR_WIDTH-1 downto 0) := to_unsigned(4, UART_ADDR_WIDTH);
+
   type UART_ctrl_tx_sw2hw_t is record
     re : std_logic;
     we : std_logic;
@@ -152,6 +167,8 @@ package UART_csr_pkg is
   -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
+  constant UART_CTRL_RX : unsigned(UART_ADDR_WIDTH-1 downto 0) := to_unsigned(5, UART_ADDR_WIDTH);
+
   type UART_ctrl_rx_sw2hw_t is record
     re : std_logic;
     we : std_logic;
@@ -196,6 +213,8 @@ package UART_csr_pkg is
   -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
+  constant UART_BAUD_TICK_CNT_MAX_LSB : unsigned(UART_ADDR_WIDTH-1 downto 0) := to_unsigned(6, UART_ADDR_WIDTH);
+
   type UART_baud_tick_cnt_max_lsb_sw2hw_t is record
     re : std_logic;
     we : std_logic;
@@ -216,6 +235,8 @@ package UART_csr_pkg is
   -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
+  constant UART_BAUD_TICK_CNT_MAX_MSB : unsigned(UART_ADDR_WIDTH-1 downto 0) := to_unsigned(7, UART_ADDR_WIDTH);
+
   type UART_baud_tick_cnt_max_msb_sw2hw_t is record
     re : std_logic;
     we : std_logic;
@@ -244,10 +265,6 @@ package UART_csr_pkg is
     isr : UART_isr_hw2sw_t;
     data : UART_data_hw2sw_t;
   end record UART_hw2sw_t;
-
-
-  constant UART_ADDR_WIDTH : natural := 3;
-  constant UART_DATA_WIDTH : natural := 8;
 
   ------------------------------------
   -- Component
