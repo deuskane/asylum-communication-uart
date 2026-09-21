@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-11-22
+-- Last update: 2026-09-21
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -23,6 +23,7 @@
 -- 2025-07-09  1.1     mrosiere Add FIFO Depth
 -- 2025-08-02  1.2     mrosiere Add RTS / CTS
 -- 2025-11-22  1.3     mrosiere Use sbi instead pbi
+-- 2026-09-21  1.4     mrosiere cts_b use sync2dff from top to sbi_uart
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -93,6 +94,7 @@ architecture rtl of sbi_UART is
   signal   uart_tx                : std_logic;
   signal   uart_rx                : std_logic;
 
+  signal   uart_cts_b_sync        : std_logic;
   signal   uart_cts_b             : std_logic;
   signal   uart_rts_b             : std_logic;
 
@@ -136,6 +138,17 @@ architecture rtl of sbi_UART is
   signal   it_tx_empty_b          : std_logic;
   
 begin  -- architecture rtl
+
+  -----------------------------------------------------------------------------
+  -- Input of UART
+  -----------------------------------------------------------------------------
+  ins_uart_cts_b_sync : sync2dffrn
+    port map
+    (clk_i    => clk_i     
+    ,arst_b_i => arst_b_i
+    ,d_i      => uart_cts_b_i
+    ,q_o      => uart_cts_b_sync
+    );
 
   -----------------------------------------------------------------------------
   -- Output of UART
@@ -223,7 +236,7 @@ begin  -- architecture rtl
       hw2sw.data.ready <= tx_tready        when tx_use_loopback = '0' else
                           '1';-- Always accept 
       uart_cts_b       <= '0'              when cts_enable      = '0' else -- Always Active
-                          uart_cts_b_i     when tx_use_loopback = '0' else
+                          uart_cts_b_sync  when tx_use_loopback = '0' else
                           uart_rts_b;                                      -- Loop With RTS from RX
     end generate gen_uart_rx;
 
@@ -234,7 +247,7 @@ begin  -- architecture rtl
       tx_tvalid        <= sw2hw.data.valid;
       hw2sw.data.ready <= tx_tready;
       uart_cts_b       <= '0'              when cts_enable      = '0' else
-                          uart_cts_b_i;
+                          uart_cts_b_sync;
     end generate gen_uart_rx_b;
     
   end generate gen_uart_tx;
