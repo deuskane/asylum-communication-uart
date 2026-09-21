@@ -69,6 +69,7 @@ filesets:
       - asylum:utils:pkg
       - asylum:component:fifo
       - asylum:system:GIC
+      - asylum:target:techmap
 
   #---------------------------------------
   sim_basic:

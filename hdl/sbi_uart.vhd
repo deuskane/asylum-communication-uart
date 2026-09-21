@@ -37,6 +37,7 @@ use     asylum.uart_pkg.ALL;
 use     asylum.GIC_pkg.ALL;
 use     asylum.UART_csr_pkg.ALL;
 use     asylum.sbi_pkg.all;
+use     asylum.techmap_pkg.all;
 
 entity sbi_UART is
   generic (
