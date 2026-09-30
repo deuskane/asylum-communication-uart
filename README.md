@@ -1,3 +1,5 @@
+[![CI](https://github.com/deuskane/asylum-communication-uart/actions/workflows/ci.yml/badge.svg)](https://github.com/deuskane/asylum-communication-uart/actions/workflows/ci.yml)
+
 # UART - Serial Communication Module
 
 ## Table of Contents
