@@ -1,3 +1,18 @@
+-------------------------------------------------------------------------------
+-- Title      : uart_pkg
+-- Project    : Asylum
+-------------------------------------------------------------------------------
+-- File       : uart_pkg.vhd
+-- Author     : Mathieu Rosiere
+-------------------------------------------------------------------------------
+-- Description: UART types and components
+-------------------------------------------------------------------------------
+-- Revisions  :
+-- Date        Version  Author   Description
+-- 2026-10-05  1.1      mrosiere Add parity_error in uart_rx_debug_t and
+--                               parity_error_o in uart_rx_axis
+-------------------------------------------------------------------------------
+
 library IEEE;
 use     IEEE.STD_LOGIC_1164.ALL;
 use     IEEE.NUMERIC_STD.ALL;
@@ -21,6 +36,7 @@ package uart_pkg is
     state          : std_logic_vector(2-1 downto 0);
     bit_cnt        : std_logic_vector(4-1 downto 0);
     baud_tick_half : std_logic;
+    parity_error   : std_logic; -- Parity error on the last received frame
   end record uart_rx_debug_t;
 
   -----------------------------------------------------------------------------
@@ -111,6 +127,10 @@ component uart_rx_axis is
 
     parity_enable_i : in  std_logic;
     parity_odd_i    : in  std_logic;
+
+    -- Parity status of the last received frame (updated with m_axis_tvalid_o)
+    -- 0 : parity ok or parity disabled, 1 : parity error
+    parity_error_o  : out std_logic;
 
     debug_o         : out uart_rx_debug_t
   );

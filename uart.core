@@ -31,9 +31,13 @@ CAPI=2:
 # 2026-06-06  1.10.3   mrosiere Add Name
 # 2026-06-10  1.10.4   mrosiere Add state in rx to support start glitch
 # 2026-09-21  1.10.5   mrosiere Move cts_b sync2dff from to to sbi_uart
+# 2026-10-05  1.11.0   mrosiere Fix RX data bit 0 lost with parity, restore RX
+#                               parity check (debug_o.uart_rx.parity_error),
+#                               default toplevel sbi_UART, depend on generators,
+#                               parity tests in tb_uart
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:1.10.4
+name        : asylum:communication:uart:1.11.0
 description : UART TX and RX
 
 #=========================================
@@ -70,6 +74,7 @@ filesets:
       - asylum:component:fifo
       - asylum:system:GIC
       - asylum:target:techmap
+      - asylum:utils:generators
 
   #---------------------------------------
   sim_basic:
@@ -91,6 +96,7 @@ targets:
     description     : Default Target
     filesets        :
       - rtl
+    toplevel        : sbi_UART
     generate        :
       - gen_csr
 

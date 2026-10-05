@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-11-10
+-- Last update: 2026-10-05
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -17,6 +17,7 @@
 -- Revisions  :
 -- Date        Version  Author   Description
 -- 2025-01-21  1.0      mrosiere Created
+-- 2026-10-05  1.1      mrosiere Use BIT_MSB instead of hardcoded 9 in shift
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -124,7 +125,7 @@ begin
         if baud_tick_i = '1'
         then
           uart_tx_r           <= uart_tx_data_r(0);
-          uart_tx_data_r      <= '1' & uart_tx_data_r(9 downto 1); -- Décalage à droite
+          uart_tx_data_r      <= '1' & uart_tx_data_r(BIT_MSB downto 1); -- Décalage à droite
           uart_tx_bit_cnt_r   <= '1' & uart_tx_bit_cnt_r(BIT_MSB downto 1);
 
           -- Last bit, go inactive

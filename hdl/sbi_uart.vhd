@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2026-09-21
+-- Last update: 2026-10-05
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -24,6 +24,7 @@
 -- 2025-08-02  1.2     mrosiere Add RTS / CTS
 -- 2025-11-22  1.3     mrosiere Use sbi instead pbi
 -- 2026-09-21  1.4     mrosiere cts_b use sync2dff from top to sbi_uart
+-- 2026-10-05  1.5     mrosiere Connect RX parity error (debug only, no CSR)
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -308,6 +309,7 @@ begin  -- architecture rtl
        ,baud_tick_half_i=> rx_baud_tick_half
        ,parity_enable_i => rx_parity_enable
        ,parity_odd_i    => rx_parity_odd
+       ,parity_error_o  => open -- available on debug_o.uart_rx.parity_error
        ,debug_o         => debug_o.uart_rx
 
         );
@@ -346,6 +348,7 @@ begin  -- architecture rtl
     debug_o.uart_rx.state          <= (others => '0');
     debug_o.uart_rx.bit_cnt        <= (others => '0');
     debug_o.uart_rx.baud_tick_half <= '0';
+    debug_o.uart_rx.parity_error   <= '0';
     
   end generate gen_uart_rx_b;
 

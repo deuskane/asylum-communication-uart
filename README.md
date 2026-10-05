@@ -1,288 +1,384 @@
+<!--
+  README GENERATION INSTRUCTIONS (for the next regeneration run)
+  ----------------------------------------------------------------
+  This README follows the common Asylum IP model. Regenerate it from the
+  sources, never from the previous README text alone.
+
+  Sources of truth (in priority order):
+    1. hdl/*.vhd            : entities, generics, ports, packages
+    2. hdl/csr/*.hjson      : register map (regtool); *_csr.md/.h are generated
+    3. <IP>.core            : VLNV (name), filesets, targets, depends, revisions
+    4. mk/targets.txt       : target list shown by `make help`; mk/defs.mk
+    5. sim/, syn/, esw/, boards/ : testbenches, constraints, software
+  Section order (keep it, same headings in every IP):
+    CI badge / Title + one-line description + VLNV / Table of Contents /
+    Introduction (Key Features) / Block Diagram / Top-Level (Parameters,
+    Ports, Instantiation Example) / HDL Modules / Register Map /
+    Verification / Synthesis / Design Notes (optional) /
+    Directory Structure / Dependencies
+  Rules:
+    - Language: English. Tables: Parameters = Name|Type|Default|Description,
+      Ports = Name|Direction|Type|Description (grouped by interface).
+    - Register Map: link to the generated hdl/csr/<X>_csr.md (plus the
+      .hjson source and _csr.h header); never copy register tables here.
+    - Top-Level = sbi_* wrapper if present, else the entity used by the
+      `default` target, else the main entity (libraries: list packages).
+    - Write "This IP has no software-visible registers." / "No dedicated
+      synthesis target ..." instead of removing a section.
+    - Keep still-accurate hand-written content (ISA tables, results,
+      images) in "Design Notes"; drop anything not backed by the sources.
+    - Block diagram: doc/<NAME>.drawio (NAME = 4th field of the VLNV),
+      top entity box with generics on top, inputs left, outputs right,
+      bus interfaces as bold arrows, internal blocks colour-coded
+      (CSR yellow, FIFO/memory green, core logic blue, external grey).
+      Update it whenever ports/generics/sub-blocks change.
+    - Do not edit generated files (hdl/csr/*_csr.*) or the CI badge URL.
+-->
 [![CI](https://github.com/deuskane/asylum-communication-uart/actions/workflows/ci.yml/badge.svg)](https://github.com/deuskane/asylum-communication-uart/actions/workflows/ci.yml)
 
-# UART - Serial Communication Module
+# asylum-communication-uart
+
+**UART transmitter / receiver with CSR access over the SBI bus, TX / RX FIFOs, CTS / RTS flow control, loopback modes and an interrupt output.**
+
+VLNV: `asylum:communication:uart:1.11.0`
 
 ## Table of Contents
 
-- [UART - Serial Communication Module](#uart---serial-communication-module)
-  - [Table of Contents](#table-of-contents)
-  - [Introduction](#introduction)
-  - [Module Architecture](#module-architecture)
-  - [HDL Modules](#hdl-modules)
-    - [uart\_baud\_rate\_gen](#uart_baud_rate_gen)
-    - [uart\_tx\_axis](#uart_tx_axis)
-    - [uart\_rx\_axis](#uart_rx_axis)
-    - [sbi\_UART](#sbi_uart)
-  - [CSR Registers](#csr-registers)
-    - [Control Register Fields](#control-register-fields)
-  - [Component Verification](#component-verification)
-    - [FuseSoC Project Organization](#fusesoc-project-organization)
-    - [CSR Register Generation](#csr-register-generation)
-    - [Debugging and Validation](#debugging-and-validation)
-
----
+1. [Introduction](#introduction)
+2. [Block Diagram](#block-diagram)
+3. [Top-Level](#top-level)
+4. [HDL Modules](#hdl-modules)
+5. [Register Map](#register-map)
+6. [Verification](#verification)
+7. [Synthesis](#synthesis)
+8. [Design Notes](#design-notes)
+9. [Directory Structure](#directory-structure)
+10. [Dependencies](#dependencies)
 
 ## Introduction
 
-This repository contains the implementation of a basic UART (Universal Asynchronous Receiver-Transmitter) module with AXI-Stream interface for transmission (TX) and reception (RX) operations.
+This IP is the UART of the Asylum project. Software drives it through a small CSR bank on the SBI bus: bytes written to the `data` register go through a TX FIFO to the transmitter (`uart_tx_axis`), and bytes received by `uart_rx_axis` are pushed into an RX FIFO and read back from the same `data` register. Each direction has its own baud rate generator, enable, parity configuration and loopback option. FIFO status flags are turned into an interrupt by a `GIC_core` instance (ISR / IMR registers in the CSR bank).
 
-The module provides:
-- **AXI-Stream Interface** for data transmission and reception
-- **Configurable Baud Rate Generator** allowing custom baud rates
-- **Configuration and Status Registers (CSR)** to control UART behavior
-- **Parity Support** (even or odd)
-- **Flow Control Support** (CTS/RTS - Clear To Send / Request To Send)
-- **Interrupt Support** for signaling UART events
-- **Loopback Mode** for testing
-- **Configurable FIFOs** for TX and RX data
+### Key Features
 
-The architecture uses an SBI (Simple Bus Interface) interface for CSR register access via an automatic generation process (regtool).
+- 8-bit frames: 1 start bit, 8 data bits LSB first, optional parity bit (even / odd), 1 stop bit
+- Baud rate set at elaboration from `CLOCK_FREQ` / `BAUD_RATE`, optionally software-writable through a 16-bit counter (`USER_DEFINE_BAUD_TICK = true`)
+- Separate TX and RX enables (`ctrl_tx.tx_enable`, `ctrl_rx.rx_enable`), each used as the reset of its path
+- Configurable FIFO depths (`DEPTH_TX`, `DEPTH_RX`, 0 = no FIFO), blocking read / write on the `data` register
+- Hardware flow control: CTS# (synchronized, `ctrl_tx.cts_enable`) and RTS# driven by the RX FIFO full flag (`ctrl_rx.rts_enable`)
+- Two loopback modes: serial loopback TX to RX (`rx_use_loopback`) and echo of received bytes on TX (`tx_use_loopback`)
+- 4 interrupt sources (TX FIFO not empty / full, RX FIFO not empty / full) with status and mask registers
+- TX or RX path can be removed at elaboration (`UART_TX_ENABLE`, `UART_RX_ENABLE`)
+- Debug port with the TX / RX FSM states and the parity error flag of the last received frame
+- Simulation-only dump of TX / RX bytes into raw and annotated text files
 
----
+## Block Diagram
 
-## Module Architecture
+Diagram: [doc/uart.drawio](doc/uart.drawio) (open with diagrams.net or the VS Code Draw.io extension).
 
-The general architecture of the UART module is organized as follows:
+- The SBI bus accesses `UART_registers` (generated by regtool from [hdl/csr/UART.hjson](hdl/csr/UART.hjson)).
+- The `data` register is a bidirectional `csr_fifo`: writes fill the TX FIFO, reads drain the RX FIFO.
+- `uart_tx_axis` and `uart_rx_axis` exchange bytes with the FIFOs as AXI-Stream-like valid/ready channels; each one has its own `uart_baud_rate_gen` (the RX one also provides the mid-bit `baud_tick_half` used for sampling).
+- `uart_cts_b_i` goes through a `sync2dffrn` synchronizer (techmap) before reaching the transmitter.
+- The FIFO full / not-empty flags feed `GIC_core`, which updates the `isr` register and drives `it_o`.
 
-- **sbi_UART**: Main wrapper that encapsulates:
-  - CSR modules (Configuration and Status Registers)
-  - Baud rate generation module
-  - Transmission module (uart_tx_axis)
-  - Reception module (uart_rx_axis)
-  - FIFOs for TX and RX
+## Top-Level
 
----
+Top-level entity: **`sbi_UART`** ([hdl/sbi_uart.vhd](hdl/sbi_uart.vhd)), library `asylum`, component declared in `asylum.uart_pkg`.
+
+### Parameters
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `NAME` | string | `""` | Instance name, forwarded to the CSR block (`MODULE_NAME`, visible in `sbi_tgt_o.info`) |
+| `BAUD_RATE` | integer | `115200` | Baud rate (bit/s) used to compute the default baud tick counter |
+| `CLOCK_FREQ` | integer | `50000000` | Frequency of `clk_i` in Hz |
+| `BAUD_TICK_CNT_WIDTH` | integer | `16` | Width of the counter of `uart_baud_rate_gen`; must stay 16 because `sbi_UART` drives it with the 16-bit `baud_tick_cnt_max_msb & baud_tick_cnt_max_lsb` |
+| `UART_TX_ENABLE` | boolean | `true` | `false`: no transmitter (`uart_tx_o = '1'`, bytes written to `data` are accepted and dropped) |
+| `UART_RX_ENABLE` | boolean | `true` | `false`: no receiver (RX FIFO never written, `uart_rts_b_o = '0'`) |
+| `USER_DEFINE_BAUD_TICK` | boolean | `true` | `true`: `baud_tick_cnt_max_lsb/msb` registers exist and are software-writable; `false`: the counter is fixed to `CLOCK_FREQ / BAUD_RATE - 1` |
+| `DEPTH_TX` | natural | `0` | Depth of the TX FIFO (software to hardware, 0 = no FIFO) |
+| `DEPTH_RX` | natural | `0` | Depth of the RX FIFO (hardware to software, 0 = no FIFO) |
+| `FILENAME_TX` | string | `"dump_uart_tx.txt"` | Simulation only: raw dump of transmitted bytes (annotated copy in `FILENAME_TX & ".dbg"`) |
+| `FILENAME_RX` | string | `"dump_uart_rx.txt"` | Simulation only: raw dump of received bytes (annotated copy in `FILENAME_RX & ".dbg"`) |
+
+### Ports
+
+#### Clock & Reset
+
+| Name | Direction | Type | Description |
+|------|-----------|------|-------------|
+| `clk_i` | in | std_logic | System clock |
+| `arst_b_i` | in | std_logic | Asynchronous reset, active low |
+
+#### Bus (SBI)
+
+| Name | Direction | Type | Description |
+|------|-----------|------|-------------|
+| `sbi_ini_i` | in | sbi_ini_t | SBI request from the initiator (`cs`, `re`, `we`, `addr`, `wdata`) |
+| `sbi_tgt_o` | out | sbi_tgt_t | SBI response to the initiator (`ready`, `rdata`, `info`) |
+
+#### UART
+
+| Name | Direction | Type | Description |
+|------|-----------|------|-------------|
+| `uart_tx_o` | out | std_logic | Serial data output (idle high) |
+| `uart_rx_i` | in | std_logic | Serial data input (not synchronized inside the IP) |
+| `uart_cts_b_i` | in | std_logic | Clear To Send, active low; synchronized by `sync2dffrn`, only used when `ctrl_tx.cts_enable = 1` |
+| `uart_rts_b_o` | out | std_logic | Request To Send, active low: `'0'` when `ctrl_rx.rts_enable = 0`, else the RX FIFO full flag |
+
+#### Interrupts
+
+| Name | Direction | Type | Description |
+|------|-----------|------|-------------|
+| `it_o` | out | std_logic | Interrupt request: OR of the `isr` bits |
+
+#### Debug
+
+| Name | Direction | Type | Description |
+|------|-----------|------|-------------|
+| `debug_o` | out | uart_debug_t | `uart_tx.state` (TX active), `uart_rx.state` (RX FSM state), `uart_rx.bit_cnt` (4 LSB of the bit counter), `uart_rx.baud_tick_half`, `uart_rx.parity_error` (parity error on the last received frame) |
+
+### Instantiation Example
+
+```vhdl
+library asylum;
+use     asylum.sbi_pkg.all;
+use     asylum.uart_pkg.all;
+
+  ins_uart : entity asylum.sbi_UART
+    generic map
+    ( NAME                  => "UART0"
+     ,BAUD_RATE             => 115200
+     ,CLOCK_FREQ            => 50000000
+     ,BAUD_TICK_CNT_WIDTH   => 16
+     ,UART_TX_ENABLE        => true
+     ,UART_RX_ENABLE        => true
+     ,USER_DEFINE_BAUD_TICK => true
+     ,DEPTH_TX              => 16
+     ,DEPTH_RX              => 16
+     ,FILENAME_TX           => "dump_uart0_tx.txt"
+     ,FILENAME_RX           => "dump_uart0_rx.txt"
+    )
+    port map
+    ( clk_i        => clk
+     ,arst_b_i     => arst_b
+     ,sbi_ini_i    => sbi_inis(UART0_ID)  -- sbi_ini_t(addr(2 downto 0), wdata(7 downto 0))
+     ,sbi_tgt_o    => sbi_tgts(UART0_ID)  -- sbi_tgt_t(rdata(7 downto 0))
+     ,uart_tx_o    => uart_tx
+     ,uart_rx_i    => uart_rx_sync
+     ,uart_cts_b_i => uart_cts_b
+     ,uart_rts_b_o => uart_rts_b
+     ,it_o         => it_uart0
+     ,debug_o      => uart0_debug          -- uart_debug_t
+    );
+```
+
+The CSR bank uses 3 address bits (`UART_ADDR_WIDTH = 3`) and 8-bit data (`UART_DATA_WIDTH = 8`), see `asylum.UART_csr_pkg`.
 
 ## HDL Modules
 
+| File | Unit | Kind | Role |
+|------|------|------|------|
+| [hdl/uart_pkg.vhd](hdl/uart_pkg.vhd) | `uart_pkg` | package | Debug record types (`uart_tx_debug_t`, `uart_rx_debug_t`, `uart_debug_t`) and component declarations of `sbi_UART`, `uart_baud_rate_gen`, `uart_rx_axis`, `uart_tx_axis` |
+| [hdl/uart_baud_rate_gen.vhd](hdl/uart_baud_rate_gen.vhd) | `uart_baud_rate_gen` | entity | Baud tick and half-baud tick generator |
+| [hdl/uart_tx_axis.vhd](hdl/uart_tx_axis.vhd) | `uart_tx_axis` | entity | Transmitter with AXI-Stream-like slave input, parity generation, CTS# gating |
+| [hdl/uart_rx_axis.vhd](hdl/uart_rx_axis.vhd) | `uart_rx_axis` | entity | Receiver FSM with false start bit rejection, parity check and AXI-Stream-like master output |
+| [hdl/sbi_uart.vhd](hdl/sbi_uart.vhd) | `sbi_UART` | entity | Top-level: CSR + TX / RX paths + loopback / flow control muxes + `GIC_core`, simulation dumps |
+| hdl/csr/UART_csr.vhd | `UART_registers` | entity | Generated CSR bank (regtool), TX / RX FIFO included |
+| hdl/csr/UART_csr_pkg.vhd | `UART_csr_pkg` | package | Generated types (`UART_sw2hw_t`, `UART_hw2sw_t`), address constants and `UART_registers` component |
+
 ### uart_baud_rate_gen
 
-**Description:** Baud rate generator that produces synchronization signals (`baud_tick` and `baud_tick_half`) necessary for sampling and transmitting data at the appropriate speed.
+#### Parameters
 
-**Generics:**
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `BAUD_TICK_CNT_WIDTH` | integer | `16` | Width of the down counter |
 
-| Generic | Type | Default Value | Description |
-|---------|------|---------------|-------------|
-| `BAUD_TICK_CNT_WIDTH` | integer | 16 | Width of the baud rate counter |
+#### Ports
 
-**Inputs/Outputs:**
-
-| Port | Direction | Type | Description |
+| Name | Direction | Type | Description |
 |------|-----------|------|-------------|
-| `clk_i` | Input | std_logic | System clock |
-| `arst_b_i` | Input | std_logic | Asynchronous reset (active low) |
-| `baud_tick_en_i` | Input | std_logic | Baud rate generator enable |
-| `cfg_baud_tick_cnt_max_i` | Input | std_logic_vector | Maximum value of baud rate counter |
-| `baud_tick_o` | Output | std_logic | Baud rate pulse (1 cycle) |
-| `baud_tick_half_o` | Output | std_logic | Mid-baud pulse (for sampling) |
-
-**Operation:**
-
-1. When `baud_tick_en_i` goes to '1', the counter is initialized to `cfg_baud_tick_cnt_max_i`
-2. The counter decrements at each clock cycle
-3. When the counter reaches zero, a `baud_tick_o` pulse is generated and the counter is reinitialized
-4. At mid-count (cfg_baud_tick_cnt_max / 2), a `baud_tick_half_o` pulse is generated for sampling
-
----
+| `clk_i` | in | std_logic | System clock |
+| `arst_b_i` | in | std_logic | Asynchronous reset, active low (connected to `tx_enable` / `rx_enable` in `sbi_UART`) |
+| `baud_tick_en_i` | in | std_logic | Enable; the counter is loaded with `cfg_baud_tick_cnt_max_i` on its rising edge |
+| `baud_tick_o` | out | std_logic | One-cycle pulse when the counter reaches 0 (every `cfg_baud_tick_cnt_max_i + 1` cycles) |
+| `baud_tick_half_o` | out | std_logic | One-cycle pulse when the counter equals `cfg_baud_tick_cnt_max_i / 2` (mid-bit) |
+| `cfg_baud_tick_cnt_max_i` | in | std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) | Reload value of the counter |
 
 ### uart_tx_axis
 
-**Description:** UART transmission module with AXI-Stream slave interface. Accepts data via AXI-Stream interface and transmits it serially on the `uart_tx_o` line.
+#### Parameters
 
-**Generics:**
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `WIDTH` | natural | `8` | Data width (`sbi_UART` uses 8) |
 
-| Generic | Type | Default Value | Description |
-|---------|------|---------------|-------------|
-| `WIDTH` | natural | 8 | Data width in bits |
+#### Ports
 
-**Inputs/Outputs:**
-
-| Port | Direction | Type | Description |
+| Name | Direction | Type | Description |
 |------|-----------|------|-------------|
-| `clk_i` | Input | std_logic | System clock |
-| `arst_b_i` | Input | std_logic | Asynchronous reset (active low) |
-| `s_axis_tdata_i` | Input | std_logic_vector | AXI-Stream data to transmit |
-| `s_axis_tvalid_i` | Input | std_logic | Data validity signal |
-| `s_axis_tready_o` | Output | std_logic | Ready to receive data signal |
-| `uart_tx_o` | Output | std_logic | UART transmission line |
-| `uart_cts_b_i` | Input | std_logic | Clear To Send (active low) |
-| `baud_tick_i` | Input | std_logic | Baud rate pulse |
-| `parity_enable_i` | Input | std_logic | Parity enable |
-| `parity_odd_i` | Input | std_logic | Parity selection (1=odd, 0=even) |
-| `debug_o` | Output | uart_tx_debug_t | Debug signals |
-
-**Operation:**
-
-1. When both `s_axis_tvalid_i` and `s_axis_tready_o` are '1', data is captured
-2. The module builds the transmission frame: START (0) + DATA (8 bits) + PARITY (optional) + STOP (1)
-3. At each `baud_tick_i` pulse, one bit is sent on `uart_tx_o`
-4. The `s_axis_tready_o` signal remains low during transmission
-5. If `parity_enable_i` is activated, a parity bit is calculated and inserted before the STOP bit
-6. The `uart_cts_b_i` signal (Clear To Send) can suspend transmission
-
----
+| `clk_i` | in | std_logic | System clock |
+| `arst_b_i` | in | std_logic | Asynchronous reset, active low (connected to `tx_enable`) |
+| `s_axis_tdata_i` | in | std_logic_vector(WIDTH-1 downto 0) | Byte to transmit |
+| `s_axis_tvalid_i` | in | std_logic | Byte valid |
+| `s_axis_tready_o` | out | std_logic | Ready (high while no frame is being sent) |
+| `uart_tx_o` | out | std_logic | Serial output (reset value `'1'`) |
+| `uart_cts_b_i` | in | std_logic | A new frame only starts when `'0'` |
+| `baud_tick_i` | in | std_logic | Baud tick: one bit is shifted out per tick |
+| `parity_enable_i` | in | std_logic | 1: insert a parity bit before the stop bit |
+| `parity_odd_i` | in | std_logic | 0: even parity, 1: odd parity |
+| `debug_o` | out | uart_tx_debug_t | `state` = transmitter active |
 
 ### uart_rx_axis
 
-**Description:** UART reception module with AXI-Stream master interface. Receives data serially on the `uart_rx_i` line and provides it via AXI-Stream interface.
+#### Parameters
 
-**Generics:**
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `WIDTH` | natural | `8` | Data width |
 
-| Generic | Type | Default Value | Description |
-|---------|------|---------------|-------------|
-| `WIDTH` | natural | 8 | Data width in bits |
+#### Ports
 
-**Inputs/Outputs:**
-
-| Port | Direction | Type | Description |
+| Name | Direction | Type | Description |
 |------|-----------|------|-------------|
-| `clk_i` | Input | std_logic | System clock |
-| `arst_b_i` | Input | std_logic | Asynchronous reset (active low) |
-| `uart_rx_i` | Input | std_logic | UART reception line |
-| `m_axis_tdata_o` | Output | std_logic_vector | Received AXI-Stream data |
-| `m_axis_tvalid_o` | Output | std_logic | Data validity signal |
-| `m_axis_tready_i` | Input | std_logic | Receiver ready signal |
-| `baud_tick_i` | Input | std_logic | Baud rate pulse |
-| `baud_tick_half_i` | Input | std_logic | Mid-baud pulse (for sampling) |
-| `baud_tick_en_o` | Output | std_logic | Baud rate generator enable |
-| `parity_enable_i` | Input | std_logic | Parity enable |
-| `parity_odd_i` | Input | std_logic | Parity selection (1=odd, 0=even) |
-| `debug_o` | Output | uart_rx_debug_t | Debug signals |
+| `clk_i` | in | std_logic | System clock |
+| `arst_b_i` | in | std_logic | Asynchronous reset, active low (connected to `rx_enable`) |
+| `uart_rx_i` | in | std_logic | Serial input |
+| `m_axis_tdata_o` | out | std_logic_vector(WIDTH-1 downto 0) | Received byte |
+| `m_axis_tvalid_o` | out | std_logic | Received byte valid (cleared when `m_axis_tready_i = 1`) |
+| `m_axis_tready_i` | in | std_logic | Byte accepted |
+| `baud_tick_i` | in | std_logic | Baud tick (not used by the FSM, sampling uses `baud_tick_half_i`) |
+| `baud_tick_half_i` | in | std_logic | Mid-bit sampling pulse |
+| `baud_tick_en_o` | out | std_logic | Enable of the RX baud rate generator (high in START / ACTIVE) |
+| `parity_enable_i` | in | std_logic | 1: a parity bit is expected after the data bits |
+| `parity_odd_i` | in | std_logic | 0: even parity, 1: odd parity (sampled with `parity_enable_i` at the start of each frame) |
+| `parity_error_o` | out | std_logic | Parity status of the last received frame, updated with `m_axis_tvalid_o` (0: parity ok or disabled, 1: parity error) |
+| `debug_o` | out | uart_rx_debug_t | FSM state, bit counter, `baud_tick_half`, `parity_error` |
 
-**Operation:**
+## Register Map
 
-1. The module starts in IDLE state, waiting for a falling edge on `uart_rx_i` (START bit beginning)
-2. Upon edge detection, `baud_tick_en_o` is activated to start the baud generator
-3. At each `baud_tick_i` pulse, one bit is received and accumulated
-4. Data is sampled in the middle of each bit (thanks to `baud_tick_half_i`)
-5. After receiving the STOP bit, data is validated and `m_axis_tvalid_o` is activated
-6. The module waits for `m_axis_tready_i` to be '1' to consume the data
-7. If `parity_enable_i` is activated, parity is verified
+The register map is generated by regtool from [hdl/csr/UART.hjson](hdl/csr/UART.hjson):
 
----
+- Register documentation: **[hdl/csr/UART_csr.md](hdl/csr/UART_csr.md)**
+- C header: [hdl/csr/UART_csr.h](hdl/csr/UART_csr.h)
 
-### sbi_UART
+Notes:
 
-**Description:** Main wrapper that encapsulates basic UART modules with an SBI interface for CSR register access. This module manages FIFOs, interrupts, and coordinates all sub-modules.
+- `data` is a FIFO register with blocking read / write: writes go to the TX FIFO (`DEPTH_TX`), reads come from the RX FIFO (`DEPTH_RX`).
+- `baud_tick_cnt_max_lsb` / `baud_tick_cnt_max_msb` only exist when `USER_DEFINE_BAUD_TICK = true`; their reset value is `CLOCK_FREQ / BAUD_RATE - 1` (computed in `sbi_UART`). The value must be written as `f_clk / baud - 1`.
+- The meaning of the 4 `isr` / `imr` bits is set by `sbi_UART`: bit 0 = TX FIFO not empty, bit 1 = TX FIFO full, bit 2 = RX FIFO not empty, bit 3 = RX FIFO full.
 
-**Generics:**
+## Verification
 
-| Generic | Type | Default Value | Description |
-|---------|------|---------------|-------------|
-| `BAUD_RATE` | integer | 115200 | Target baud rate in bits/s |
-| `CLOCK_FREQ` | integer | 50000000 | Clock frequency in Hz |
-| `BAUD_TICK_CNT_WIDTH` | integer | 16 | Width of baud rate counter |
-| `UART_TX_ENABLE` | boolean | true | Enable transmission |
-| `UART_RX_ENABLE` | boolean | true | Enable reception |
-| `USER_DEFINE_BAUD_TICK` | boolean | true | Allow user-defined baud rate configuration |
-| `DEPTH_TX` | natural | 0 | TX FIFO depth (0 = no FIFO) |
-| `DEPTH_RX` | natural | 0 | RX FIFO depth (0 = no FIFO) |
-| `FILENAME_TX` | string | "dump_uart_tx.txt" | TX dump output file (simulation) |
-| `FILENAME_RX` | string | "dump_uart_rx.txt" | RX dump output file (simulation) |
+### Testbenches
 
-**Main Inputs/Outputs:**
+| File | DUT | Description |
+|------|-----|-------------|
+| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (386 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag. CTS / RTS flow control and `tx_use_loopback` are not checked |
 
-| Port | Direction | Type | Description |
-|------|-----------|------|-------------|
-| `clk_i` | Input | std_logic | System clock |
-| `arst_b_i` | Input | std_logic | Asynchronous reset (active low) |
-| `sbi_ini_i` | Input | sbi_ini_t | SBI initiator interface (register read/write) |
-| `sbi_tgt_o` | Output | sbi_tgt_t | SBI target interface |
-| `uart_tx_o` | Output | std_logic | UART transmission line |
-| `uart_rx_i` | Input | std_logic | UART reception line |
-| `uart_cts_b_i` | Input | std_logic | Clear To Send (active low) |
-| `uart_rts_b_o` | Output | std_logic | Request To Send (active low) |
-| `it_o` | Output | std_logic | Interrupt signal |
-| `debug_o` | Output | uart_debug_t | Debug signals |
+### Targets
 
-**Operation:**
+| Target | Toplevel | Description |
+|--------|----------|-------------|
+| `default` | `sbi_UART` | RTL fileset + CSR generation (not a simulation) |
+| `sim_basic` | `tb_uart` | Simulation of basic unit tests (GHDL) |
 
-1. The module automatically calculates the baud rate counter value from `CLOCK_FREQ` and `BAUD_RATE` parameters
-2. CSR registers allow configuration of:
-   - TX and RX activation
-   - Parity parameters
-   - Loopback mode
-   - Flow control (CTS/RTS)
-   - Interrupts
-   - FIFO depth and status
-3. Transmitted and received data pass through FIFOs (if configured)
-4. Interrupts can be generated on specific events (FIFO empty, FIFO full, etc.)
+### How to Run
 
----
+The default tool is GHDL (`mk/defs.mk`: `TOOL ?= ghdl`, `TARGET ?= sim_basic`).
 
-## CSR Registers
+```bash
+make help                 # variables, rules and target list (mk/targets.txt)
+make sim_basic            # run one target (log in log/)
+make nonreg_sim           # run every sim_* target
+make clean                # remove build/ and log/
+```
 
-The UART module has several registers accessible via the SBI interface:
+Equivalent FuseSoC command:
 
-| Register | Address | Access | Description |
-|----------|---------|--------|-------------|
-| `isr` | 0x0 | RW1C | Interrupt Status Register |
-| `imr` | 0x1 | RW | Interrupt Mask Register |
-| `data` | 0x2 | RW | Data FIFO - TX/RX data |
-| `ctrl_tx` | 0x4 | RW | TX Control Register |
-| `ctrl_rx` | 0x5 | RW | RX Control Register |
-| `baud_tick_cnt_max_lsb` | 0x6 | RW | Baud counter LSB (if USER_DEFINE_BAUD_TICK=true) |
-| `baud_tick_cnt_max_msb` | 0x7 | RW | Baud counter MSB (if USER_DEFINE_BAUD_TICK=true) |
+```bash
+fusesoc --cores-root . run --build-root build --target sim_basic asylum:communication:uart:1.11.0
+```
 
-### Control Register Fields
+The `sim_basic` target runs GHDL with `--fst=dut.fst --ieee-asserts=disable`. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `sim_basic`.
 
-**ctrl_tx**:
-- Bit 0: `tx_enable` - Transmission enable
-- Bit 1: `tx_parity_enable` - Parity enable
-- Bit 2: `tx_parity_odd` - Parity selection (0=even, 1=odd)
-- Bit 3: `tx_use_loopback` - Loopback mode (RX input → TX output)
-- Bit 4: `cts_enable` - CTS control enable
+### Simulation Features
 
-**ctrl_rx**:
-- Bit 0: `rx_enable` - Reception enable
-- Bit 1: `rx_parity_enable` - Parity enable
-- Bit 2: `rx_parity_odd` - Parity selection (0=even, 1=odd)
-- Bit 3: `rx_use_loopback` - Loopback mode (TX input → RX output)
-- Bit 4: `rts_enable` - RTS control enable
+- `sbi_UART` writes every transmitted / received byte to `FILENAME_TX` / `FILENAME_RX` (raw characters) and to `<FILENAME>.dbg` (binary, hexadecimal and character per line); code inside `synthesis translate_off`.
+- At elaboration `sbi_UART` reports `CLOCK_FREQ`, `BAUD_RATE` and the computed baud tick counter values.
+- `ctrl_rx.rx_use_loopback = 1` loops `uart_tx` back to the receiver for tests without an external device.
 
-**isr** (Bits 3:0):
-- Bit 0: TX Interrupt
-- Bit 1: RX Interrupt
-- Bit 2: TX FIFO Full Interrupt
-- Bit 3: RX FIFO Full Interrupt
+## Synthesis
 
-**imr** (Bits 3:0):
-- Mask for corresponding interrupts
+No dedicated synthesis target. The HDL sources of the `default` target (`hdl/*.vhd` + generated CSR) are synthesizable: the file dumps and reports of `sbi_UART` are enclosed in `synthesis translate_off / translate_on` (only the `textio` `use` clauses remain outside). Resource usage mainly depends on `DEPTH_TX` / `DEPTH_RX` (FIFOs in the CSR bank), `UART_TX_ENABLE` / `UART_RX_ENABLE` and `USER_DEFINE_BAUD_TICK`. `uart_rx_i` is not synchronized inside the IP (only `uart_cts_b_i` goes through `sync2dffrn`); synchronize it at the chip / FPGA top level if it comes from a pad.
 
----
+## Design Notes
 
-## Component Verification
+### Baud Rate
 
-### FuseSoC Project Organization
+`baud_tick_cnt_max = CLOCK_FREQ / BAUD_RATE - 1` (integer division). Each `uart_baud_rate_gen` emits one `baud_tick` every `baud_tick_cnt_max + 1` clock cycles and a `baud_tick_half` when the counter is at `baud_tick_cnt_max / 2`. Example: 50 MHz and 115200 baud give `baud_tick_cnt_max = 433` (actual rate 115207 baud).
 
-The project uses FuseSoC for file management and simulation. The `uart.core` file at the root of the project defines:
+### Transmitter
 
-**Available Targets:**
-- `default`: Default target including RTL files and CSR generation
+When idle (`s_axis_tready_o = 1`), a byte is accepted if `s_axis_tvalid_i = 1` and CTS# is low. The frame `start + 8 data bits (LSB first) + [parity] + stop` is shifted out, one bit per `baud_tick`. With `ctrl_tx.cts_enable = 0` CTS# is forced low (always clear to send).
 
-**Generators:**
-- `gen_csr`: Automatically generates CSR registers from the `hdl/csr/UART.hjson` file using the `regtool` tool
+### Receiver FSM
 
-**Dependencies:**
-- `asylum:utils:pkg` - Utility package
-- `asylum:system:GIC` - Interrupt controller
+- **IDLE**: waits for `uart_rx_i = 0` (start bit).
+- **START**: enables the RX baud generator and samples the start bit at mid-bit; a `'1'` is a false start (glitch) and goes back to IDLE.
+- **ACTIVE**: samples one bit per `baud_tick_half` until all bits are received.
+- **STOP**: extracts the data byte and the parity bit, asserts `m_axis_tvalid_o`, back to IDLE.
 
-### CSR Register Generation
+The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 11 with parity) and the data bits are extracted at the position that matches the parity configuration sampled at the start of the frame. With `rx_parity_enable = 1` the received parity bit is checked (even: `xor(data, parity) = 0`, odd: `xor(data, parity) = 1`); the result is available on `parity_error_o` of `uart_rx_axis` and on `debug_o.uart_rx.parity_error` of `sbi_UART` (status of the last received frame). The byte is pushed into the RX FIFO even when its parity is wrong: the CSR map has no parity error flag, so software cannot see the error.
 
-CSR registers are defined in the `hdl/csr/UART.hjson` file and are automatically generated as VHDL and C files:
+### Loopback and Flow Control
 
-**Generated Files:**
-- `hdl/csr/UART_csr.vhd` - CSR registers in VHDL
-- `hdl/csr/UART_csr.h` - Register definitions in C
-- `hdl/csr/UART_csr_pkg.vhd` - VHDL package with types and constants
+- `ctrl_rx.rx_use_loopback = 1`: the receiver input is `uart_tx` instead of `uart_rx_i` (serial loopback).
+- `ctrl_tx.tx_use_loopback = 1`: received bytes are sent directly to the transmitter (echo); the `data` register then always accepts writes and returns no RX data. In this mode, with `cts_enable = 1`, CTS# is taken from the internal RTS#.
+- `ctrl_rx.rts_enable = 1`: `uart_rts_b_o` goes high when the RX FIFO is full.
 
-This approach enables consistent register management between firmware and HDL.
+### Interrupts
 
-### Debugging and Validation
+`GIC_core` computes `isr_next = (imr and status) or isr` every cycle and `it_o = or(isr)`: only unmasked events are latched; software clears them by writing 1 into `isr` (rw1c).
 
-The module provides debug signals exported via the `debug_o` port of type `uart_debug_t` which includes:
+## Directory Structure
 
-- **uart_tx**: TX state machine state
-- **uart_rx**: RX state machine state, bit counter, baud_tick_half signal
+```
+asylum-communication-uart/
+├── uart.core               # FuseSoC core (asylum:communication:uart)
+├── Makefile                # Common Asylum Makefile (FuseSoC wrapper)
+├── mk/
+│   ├── defs.mk             # FILE_CORE, default TARGET and TOOL
+│   └── targets.txt         # Target list (generated from the .core)
+├── .github/workflows/
+│   └── ci.yml              # CI jobs (generated by make ci_generate)
+├── doc/
+│   └── uart.drawio         # Block diagram
+├── hdl/
+│   ├── uart_pkg.vhd
+│   ├── uart_baud_rate_gen.vhd
+│   ├── uart_rx_axis.vhd
+│   ├── uart_tx_axis.vhd
+│   ├── sbi_uart.vhd
+│   └── csr/
+│       ├── UART.hjson       # Register description (source)
+│       ├── UART_csr.vhd     # Generated
+│       ├── UART_csr_pkg.vhd # Generated
+│       ├── UART_csr.md      # Generated
+│       └── UART_csr.h       # Generated
+└── sim/
+    └── tb_uart.vhd         # UVVM testbench
+```
 
-These signals can be used in simulation to validate the behavior of the module.
+## Dependencies
+
+| Core | Used by (fileset) | Purpose |
+|------|-------------------|---------|
+| `asylum:utils:pkg` | `rtl` | Common packages (`sbi_pkg`, `math_pkg`, `convert_pkg`, ...) |
+| `asylum:component:fifo` | `rtl` | FIFO used by the `csr_fifo` of the `data` register |
+| `asylum:system:GIC` | `rtl` | `GIC_core` (interrupt status / mask / merge) |
+| `asylum:target:techmap` | `rtl` | `sync2dffrn` synchronizer of `uart_cts_b_i` (`techmap_pkg`) |
+| `asylum:utils:generators` | `rtl` | regtool generator (`gen_csr`) and CSR building blocks |
+| `bitvis:verification:uvvm` | `sim_basic` | UVVM utility library and SBI VIP |
