@@ -95,6 +95,9 @@ architecture rtl of sbi_UART is
   
   signal   uart_tx                : std_logic;
   signal   uart_rx                : std_logic;
+  signal   uart_rx_b              : std_logic;
+  signal   uart_rx_b_sync         : std_logic;
+  signal   uart_rx_sync           : std_logic;
 
   signal   uart_cts_b_sync        : std_logic;
   signal   uart_cts_b             : std_logic;
@@ -151,6 +154,21 @@ begin  -- architecture rtl
     ,d_i      => uart_cts_b_i
     ,q_o      => uart_cts_b_sync
     );
+
+  -- RX is asynchronous : synchronize it before the receiver FSM.
+  -- sync2dffrn is reset to '0', so the inverted line is synchronized
+  -- to have the idle level ('1') on uart_rx_sync during reset
+  uart_rx_b            <= not uart_rx_i;
+
+  ins_uart_rx_b_sync : sync2dffrn
+    port map
+    (clk_i    => clk_i
+    ,arst_b_i => arst_b_i
+    ,d_i      => uart_rx_b
+    ,q_o      => uart_rx_b_sync
+    );
+
+  uart_rx_sync         <= not uart_rx_b_sync;
 
   -----------------------------------------------------------------------------
   -- Output of UART
@@ -317,7 +335,7 @@ begin  -- architecture rtl
     gen_uart_tx: if UART_TX_ENABLE = true
     generate
       uart_rx          <= uart_tx when rx_use_loopback = '1' else
-                          uart_rx_i;
+                          uart_rx_sync;
 
       hw2sw.data.value <= rx_tdata         when tx_use_loopback = '0' else (others => '0');
       hw2sw.data.valid <= rx_tvalid        when tx_use_loopback = '0' else '0';
@@ -327,7 +345,7 @@ begin  -- architecture rtl
     gen_uart_tx_b: if UART_TX_ENABLE = false
     generate
       -- No TX, No loopback
-      uart_rx          <= uart_rx_i;
+      uart_rx          <= uart_rx_sync;
 
       hw2sw.data.value <= rx_tdata ;
       hw2sw.data.valid <= rx_tvalid;
