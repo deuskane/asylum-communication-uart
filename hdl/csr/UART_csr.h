@@ -15,10 +15,10 @@
 #define UART_ISR 0x0
 
 // Field       : isr.value
-// Description : 0: interrupt is inactive, 1: interrupt is active
-// Range       : [3:0]
+// Description : 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO not empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full, [4] reserved, [5] RX framing error, [6] RX parity error, [7] RX break (status bits 7:5)
+// Range       : [7:0]
 #define UART_ISR_VALUE      0
-#define UART_ISR_VALUE_MASK 15
+#define UART_ISR_VALUE_MASK 255
 
 //==================================
 // Register    : imr
@@ -29,9 +29,9 @@
 
 // Field       : imr.enable
 // Description : 0: interrupt is disable, 1: interrupt is enable
-// Range       : [3:0]
+// Range       : [7:0]
 #define UART_IMR_ENABLE      0
-#define UART_IMR_ENABLE_MASK 15
+#define UART_IMR_ENABLE_MASK 255
 
 //==================================
 // Register    : data
@@ -45,6 +45,31 @@
 // Range       : [7:0]
 #define UART_DATA_VALUE      0
 #define UART_DATA_VALUE_MASK 255
+
+//==================================
+// Register    : status
+// Description : Status Register, same bit mapping as isr and imr. Sticky bits are cleared by writing 1, writes have no effect on the other bits
+// Address     : 0x3
+//==================================
+#define UART_STATUS 0x3
+
+// Field       : status.rx_frame_error
+// Description : Sticky, write 1 to clear. 1 : a byte was received with its stop bit at 0 (framing error)
+// Range       : [5]
+#define UART_STATUS_RX_FRAME_ERROR      5
+#define UART_STATUS_RX_FRAME_ERROR_MASK 1
+
+// Field       : status.rx_parity_error
+// Description : Sticky, write 1 to clear. 1 : a byte was received with a wrong parity bit (rx_parity_enable = 1)
+// Range       : [6]
+#define UART_STATUS_RX_PARITY_ERROR      6
+#define UART_STATUS_RX_PARITY_ERROR_MASK 1
+
+// Field       : status.rx_break
+// Description : Sticky, write 1 to clear. 1 : a break was received (all bits of the frame at 0, a single 0x00 byte is received)
+// Range       : [7]
+#define UART_STATUS_RX_BREAK      7
+#define UART_STATUS_RX_BREAK_MASK 1
 
 //==================================
 // Register    : ctrl_tx
@@ -153,7 +178,7 @@ typedef struct {
   uint8_t isr; // 0x0
   uint8_t imr; // 0x1
   uint8_t data; // 0x2
-  uint8_t __dummy_0x3__;
+  uint8_t status; // 0x3
   uint8_t ctrl_tx; // 0x4
   uint8_t ctrl_rx; // 0x5
   uint8_t baud_tick_cnt_max_lsb; // 0x6

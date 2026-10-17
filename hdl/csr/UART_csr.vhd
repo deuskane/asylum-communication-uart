@@ -56,46 +56,46 @@ architecture rtl of UART_registers is
 
   function INIT_isr
     return std_logic_vector is
-    variable tmp : std_logic_vector(4-1 downto 0);
+    variable tmp : std_logic_vector(8-1 downto 0);
   begin  -- function INIT_isr
-    tmp(3 downto 0) := "0000"; -- value
+    tmp(7 downto 0) := "00000000"; -- value
     return tmp;
   end function INIT_isr;
 
   signal   isr_wcs       : std_logic;
   signal   isr_we        : std_logic;
   signal   isr_wdata     : std_logic_vector(8-1 downto 0);
-  signal   isr_wdata_sw  : std_logic_vector(4-1 downto 0);
-  signal   isr_wdata_hw  : std_logic_vector(4-1 downto 0);
+  signal   isr_wdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   isr_wdata_hw  : std_logic_vector(8-1 downto 0);
   signal   isr_wbusy     : std_logic;
 
   signal   isr_rcs       : std_logic;
   signal   isr_re        : std_logic;
   signal   isr_rdata     : std_logic_vector(8-1 downto 0);
-  signal   isr_rdata_sw  : std_logic_vector(4-1 downto 0);
-  signal   isr_rdata_hw  : std_logic_vector(4-1 downto 0);
+  signal   isr_rdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   isr_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   isr_rbusy     : std_logic;
 
   function INIT_imr
     return std_logic_vector is
-    variable tmp : std_logic_vector(4-1 downto 0);
+    variable tmp : std_logic_vector(8-1 downto 0);
   begin  -- function INIT_imr
-    tmp(3 downto 0) := "0000"; -- enable
+    tmp(7 downto 0) := "00000000"; -- enable
     return tmp;
   end function INIT_imr;
 
   signal   imr_wcs       : std_logic;
   signal   imr_we        : std_logic;
   signal   imr_wdata     : std_logic_vector(8-1 downto 0);
-  signal   imr_wdata_sw  : std_logic_vector(4-1 downto 0);
-  signal   imr_wdata_hw  : std_logic_vector(4-1 downto 0);
+  signal   imr_wdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   imr_wdata_hw  : std_logic_vector(8-1 downto 0);
   signal   imr_wbusy     : std_logic;
 
   signal   imr_rcs       : std_logic;
   signal   imr_re        : std_logic;
   signal   imr_rdata     : std_logic_vector(8-1 downto 0);
-  signal   imr_rdata_sw  : std_logic_vector(4-1 downto 0);
-  signal   imr_rdata_hw  : std_logic_vector(4-1 downto 0);
+  signal   imr_rdata_sw  : std_logic_vector(8-1 downto 0);
+  signal   imr_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   imr_rbusy     : std_logic;
 
   function INIT_data
@@ -119,6 +119,30 @@ architecture rtl of UART_registers is
   signal   data_rdata_sw  : std_logic_vector(8-1 downto 0);
   signal   data_rdata_hw  : std_logic_vector(8-1 downto 0);
   signal   data_rbusy     : std_logic;
+
+  function INIT_status
+    return std_logic_vector is
+    variable tmp : std_logic_vector(3-1 downto 0);
+  begin  -- function INIT_status
+    tmp(0 downto 0) := "0"; -- rx_frame_error
+    tmp(1 downto 1) := "0"; -- rx_parity_error
+    tmp(2 downto 2) := "0"; -- rx_break
+    return tmp;
+  end function INIT_status;
+
+  signal   status_wcs       : std_logic;
+  signal   status_we        : std_logic;
+  signal   status_wdata     : std_logic_vector(8-1 downto 0);
+  signal   status_wdata_sw  : std_logic_vector(3-1 downto 0);
+  signal   status_wdata_hw  : std_logic_vector(3-1 downto 0);
+  signal   status_wbusy     : std_logic;
+
+  signal   status_rcs       : std_logic;
+  signal   status_re        : std_logic;
+  signal   status_rdata     : std_logic_vector(8-1 downto 0);
+  signal   status_rdata_sw  : std_logic_vector(3-1 downto 0);
+  signal   status_rdata_hw  : std_logic_vector(3-1 downto 0);
+  signal   status_rbusy     : std_logic;
 
   function INIT_ctrl_tx
     return std_logic_vector is
@@ -240,15 +264,15 @@ begin  -- architecture rtl
   -- Register    : isr
   -- Description : Interruption Status Register
   -- Address     : 0x0
-  -- Width       : 4
+  -- Width       : 8
   -- Sw Access   : rw1c
   -- Hw Access   : rw
   -- Hw Type     : reg
   --==================================
   --==================================
   -- Field       : value
-  -- Description : 0: interrupt is inactive, 1: interrupt is active
-  -- Width       : 4
+  -- Description : 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO not empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full, [4] reserved, [5] RX framing error, [6] RX parity error, [7] RX break (status bits 7:5)
+  -- Width       : 8
   --==================================
 
 
@@ -259,18 +283,22 @@ begin  -- architecture rtl
       1 => isr_rdata_sw(1), -- value(1)
       2 => isr_rdata_sw(2), -- value(2)
       3 => isr_rdata_sw(3), -- value(3)
+      4 => isr_rdata_sw(4), -- value(4)
+      5 => isr_rdata_sw(5), -- value(5)
+      6 => isr_rdata_sw(6), -- value(6)
+      7 => isr_rdata_sw(7), -- value(7)
       others => '0');
 
     isr_wcs     <= '1' when       (sig_waddr = UART_ISR)   else '0';
     isr_we      <= sig_wcs and sig_we and isr_wcs;
     isr_wdata   <= sig_wdata;
-    isr_wdata_sw(3 downto 0) <= isr_wdata(3 downto 0); -- value
-    isr_wdata_hw(3 downto 0) <= hw2sw_i.isr.value; -- value
-    sw2hw_o.isr.value <= isr_rdata_hw(3 downto 0); -- value
+    isr_wdata_sw(7 downto 0) <= isr_wdata(7 downto 0); -- value
+    isr_wdata_hw(7 downto 0) <= hw2sw_i.isr.value; -- value
+    sw2hw_o.isr.value <= isr_rdata_hw(7 downto 0); -- value
 
     ins_isr : csr_reg
       generic map
-        (WIDTH         => 4
+        (WIDTH         => 8
         ,INIT          => INIT_isr
         ,MODEL         => "rw1c"
         )
@@ -299,7 +327,7 @@ begin  -- architecture rtl
     isr_rdata   <= (others => '0');
     isr_wcs      <= '0';
     isr_wbusy    <= '0';
-    sw2hw_o.isr.value <= "0000";
+    sw2hw_o.isr.value <= "00000000";
     sw2hw_o.isr.re <= '0';
     sw2hw_o.isr.we <= '0';
   end generate gen_isr_b;
@@ -310,7 +338,7 @@ begin  -- architecture rtl
   -- Register    : imr
   -- Description : Interruption Mask Register
   -- Address     : 0x1
-  -- Width       : 4
+  -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
   -- Hw Type     : reg
@@ -318,7 +346,7 @@ begin  -- architecture rtl
   --==================================
   -- Field       : enable
   -- Description : 0: interrupt is disable, 1: interrupt is enable
-  -- Width       : 4
+  -- Width       : 8
   --==================================
 
 
@@ -329,17 +357,21 @@ begin  -- architecture rtl
       1 => imr_rdata_sw(1), -- enable(1)
       2 => imr_rdata_sw(2), -- enable(2)
       3 => imr_rdata_sw(3), -- enable(3)
+      4 => imr_rdata_sw(4), -- enable(4)
+      5 => imr_rdata_sw(5), -- enable(5)
+      6 => imr_rdata_sw(6), -- enable(6)
+      7 => imr_rdata_sw(7), -- enable(7)
       others => '0');
 
     imr_wcs     <= '1' when       (sig_waddr = UART_IMR)   else '0';
     imr_we      <= sig_wcs and sig_we and imr_wcs;
     imr_wdata   <= sig_wdata;
-    imr_wdata_sw(3 downto 0) <= imr_wdata(3 downto 0); -- enable
-    sw2hw_o.imr.enable <= imr_rdata_hw(3 downto 0); -- enable
+    imr_wdata_sw(7 downto 0) <= imr_wdata(7 downto 0); -- enable
+    sw2hw_o.imr.enable <= imr_rdata_hw(7 downto 0); -- enable
 
     ins_imr : csr_reg
       generic map
-        (WIDTH         => 4
+        (WIDTH         => 8
         ,INIT          => INIT_imr
         ,MODEL         => "rw"
         )
@@ -368,7 +400,7 @@ begin  -- architecture rtl
     imr_rdata   <= (others => '0');
     imr_wcs      <= '0';
     imr_wbusy    <= '0';
-    sw2hw_o.imr.enable <= "0000";
+    sw2hw_o.imr.enable <= "00000000";
     sw2hw_o.imr.re <= '0';
     sw2hw_o.imr.we <= '0';
   end generate gen_imr_b;
@@ -453,6 +485,93 @@ begin  -- architecture rtl
     sw2hw_o.data.ready <= '0';
     sw2hw_o.data.valid <= '0';
   end generate gen_data_b;
+
+  gen_status: if (True)
+  generate
+  --==================================
+  -- Register    : status
+  -- Description : Status Register, same bit mapping as isr and imr. Sticky bits are cleared by writing 1, writes have no effect on the other bits
+  -- Address     : 0x3
+  -- Width       : 3
+  -- Sw Access   : rw1c
+  -- Hw Access   : rw
+  -- Hw Type     : ext
+  --==================================
+  --==================================
+  -- Field       : rx_frame_error
+  -- Description : Sticky, write 1 to clear. 1 : a byte was received with its stop bit at 0 (framing error)
+  -- Width       : 1
+  --==================================
+
+  --==================================
+  -- Field       : rx_parity_error
+  -- Description : Sticky, write 1 to clear. 1 : a byte was received with a wrong parity bit (rx_parity_enable = 1)
+  -- Width       : 1
+  --==================================
+
+  --==================================
+  -- Field       : rx_break
+  -- Description : Sticky, write 1 to clear. 1 : a break was received (all bits of the frame at 0, a single 0x00 byte is received)
+  -- Width       : 1
+  --==================================
+
+
+    status_rcs     <= '1' when (sig_raddr = UART_STATUS) else '0';
+    status_re      <= sig_rcs and sig_re and status_rcs;
+    status_rdata   <= (
+      5 => status_rdata_sw(0), -- rx_frame_error(0)
+      6 => status_rdata_sw(1), -- rx_parity_error(0)
+      7 => status_rdata_sw(2), -- rx_break(0)
+      others => '0');
+
+    status_wcs     <= '1' when       (sig_waddr = UART_STATUS)   else '0';
+    status_we      <= sig_wcs and sig_we and status_wcs;
+    status_wdata   <= sig_wdata;
+    status_wdata_sw(0 downto 0) <= status_wdata(5 downto 5); -- rx_frame_error
+    status_wdata_sw(1 downto 1) <= status_wdata(6 downto 6); -- rx_parity_error
+    status_wdata_sw(2 downto 2) <= status_wdata(7 downto 7); -- rx_break
+    status_wdata_hw(0 downto 0) <= hw2sw_i.status.rx_frame_error; -- rx_frame_error
+    status_wdata_hw(1 downto 1) <= hw2sw_i.status.rx_parity_error; -- rx_parity_error
+    status_wdata_hw(2 downto 2) <= hw2sw_i.status.rx_break; -- rx_break
+    sw2hw_o.status.rx_frame_error <= status_rdata_hw(0 downto 0); -- rx_frame_error
+    sw2hw_o.status.rx_parity_error <= status_rdata_hw(1 downto 1); -- rx_parity_error
+    sw2hw_o.status.rx_break <= status_rdata_hw(2 downto 2); -- rx_break
+
+    ins_status : csr_ext
+      generic map
+        (WIDTH         => 3
+        )
+      port map
+        (clk_i         => clk_i
+        ,arst_b_i      => arst_b_i
+        ,sw_wd_i       => status_wdata_sw
+        ,sw_rd_o       => status_rdata_sw
+        ,sw_we_i       => status_we
+        ,sw_re_i       => status_re
+        ,sw_rbusy_o    => status_rbusy
+        ,sw_wbusy_o    => status_wbusy
+        ,hw_wd_i       => status_wdata_hw
+        ,hw_rd_o       => status_rdata_hw
+        ,hw_we_i       => hw2sw_i.status.we
+        ,hw_sw_re_o    => sw2hw_o.status.re
+        ,hw_sw_we_o    => sw2hw_o.status.we
+        );
+
+  end generate gen_status;
+
+  gen_status_b: if not (True)
+  generate
+    status_rcs     <= '0';
+    status_rbusy   <= '0';
+    status_rdata   <= (others => '0');
+    status_wcs      <= '0';
+    status_wbusy    <= '0';
+    sw2hw_o.status.rx_frame_error <= "0";
+    sw2hw_o.status.rx_parity_error <= "0";
+    sw2hw_o.status.rx_break <= "0";
+    sw2hw_o.status.re <= '0';
+    sw2hw_o.status.we <= '0';
+  end generate gen_status_b;
 
   gen_ctrl_tx: if (True)
   generate
@@ -816,6 +935,7 @@ begin  -- architecture rtl
     isr_wbusy when isr_wcs = '1' else
     imr_wbusy when imr_wcs = '1' else
     data_wbusy when data_wcs = '1' else
+    status_wbusy when status_wcs = '1' else
     ctrl_tx_wbusy when ctrl_tx_wcs = '1' else
     ctrl_rx_wbusy when ctrl_rx_wcs = '1' else
     baud_tick_cnt_max_lsb_wbusy when baud_tick_cnt_max_lsb_wcs = '1' else
@@ -825,6 +945,7 @@ begin  -- architecture rtl
     isr_rbusy when isr_rcs = '1' else
     imr_rbusy when imr_rcs = '1' else
     data_rbusy when data_rcs = '1' else
+    status_rbusy when status_rcs = '1' else
     ctrl_tx_rbusy when ctrl_tx_rcs = '1' else
     ctrl_rx_rbusy when ctrl_rx_rcs = '1' else
     baud_tick_cnt_max_lsb_rbusy when baud_tick_cnt_max_lsb_rcs = '1' else
@@ -834,6 +955,7 @@ begin  -- architecture rtl
     isr_rdata when isr_rcs = '1' else
     imr_rdata when imr_rcs = '1' else
     data_rdata when data_rcs = '1' else
+    status_rdata when status_rcs = '1' else
     ctrl_tx_rdata when ctrl_tx_rcs = '1' else
     ctrl_rx_rdata when ctrl_rx_rcs = '1' else
     baud_tick_cnt_max_lsb_rdata when baud_tick_cnt_max_lsb_rcs = '1' else

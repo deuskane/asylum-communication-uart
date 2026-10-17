@@ -132,6 +132,12 @@ component uart_rx_axis is
     -- 0 : parity ok or parity disabled, 1 : parity error
     parity_error_o  : out std_logic;
 
+    -- Errors of the received frame : one clock cycle pulse when the frame
+    -- is completed (the byte is still delivered on m_axis)
+    err_parity_o    : out std_logic; -- Parity bit mismatch
+    err_framing_o   : out std_logic; -- Stop bit sampled at 0
+    err_break_o     : out std_logic; -- Break : all bits of the frame at 0
+
     debug_o         : out uart_rx_debug_t
   );
 end component uart_rx_axis;

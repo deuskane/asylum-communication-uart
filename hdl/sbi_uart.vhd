@@ -115,6 +115,12 @@ architecture rtl of sbi_UART is
   signal   rx_baud_tick_en        : std_logic;
   signal   rx_baud_tick           : std_logic;
   signal   rx_baud_tick_half      : std_logic;
+  signal   rx_err_parity          : std_logic;
+  signal   rx_err_framing         : std_logic;
+  signal   rx_err_break           : std_logic;
+  signal   rx_parity_error_r      : std_logic;
+  signal   rx_frame_error_r       : std_logic;
+  signal   rx_break_r             : std_logic;
            
   signal   tx_enable              : std_logic;
   signal   tx_parity_enable       : std_logic;
@@ -133,7 +139,7 @@ architecture rtl of sbi_UART is
 
   signal   baud_tick_cnt_max      : std_logic_vector(16-1 downto 0);
 
-  signal   it                     : std_logic_vector(4-1 downto 0);
+  signal   it                     : std_logic_vector(8-1 downto 0);
   signal   it_rx_full             : std_logic;
   signal   it_rx_empty_b          : std_logic;
   signal   it_tx_full             : std_logic;
@@ -310,6 +316,9 @@ begin  -- architecture rtl
        ,parity_enable_i => rx_parity_enable
        ,parity_odd_i    => rx_parity_odd
        ,parity_error_o  => open -- available on debug_o.uart_rx.parity_error
+       ,err_parity_o    => rx_err_parity
+       ,err_framing_o   => rx_err_framing
+       ,err_break_o     => rx_err_break
        ,debug_o         => debug_o.uart_rx
 
         );
@@ -345,6 +354,9 @@ begin  -- architecture rtl
     hw2sw.data.value               <= (others => '0');
     hw2sw.data.valid               <= '0';
     uart_rts_b                     <= '0';
+    rx_err_parity                  <= '0';
+    rx_err_framing                 <= '0';
+    rx_err_break                   <= '0';
     debug_o.uart_rx.state          <= (others => '0');
     debug_o.uart_rx.bit_cnt        <= (others => '0');
     debug_o.uart_rx.baud_tick_half <= '0';
@@ -359,12 +371,54 @@ begin  -- architecture rtl
   it_rx_empty_b <= not sw2hw.data.hw2sw_empty;
   it_tx_full    <=     sw2hw.data.sw2hw_full ;
   it_tx_empty_b <= not sw2hw.data.sw2hw_empty;
-  it            <= (it_rx_full    &  
+  it            <= (rx_break_r        &
+                    rx_parity_error_r &
+                    rx_frame_error_r  &
+                    '0'           & -- reserved
+                    it_rx_full    &  
                     it_rx_empty_b & 
                     it_tx_full    & 
                     it_tx_empty_b 
                     );
   hw2sw.isr.we  <= '1';
+
+  -- RX errors : sticky flags, cleared by writing 1 in status
+  -- (an error in the same cycle as the clear has the priority)
+  process (clk_i, arst_b_i) is
+  begin
+    if arst_b_i = '0'
+    then
+      rx_frame_error_r  <= '0';
+      rx_parity_error_r <= '0';
+      rx_break_r        <= '0';
+    elsif rising_edge(clk_i)
+    then
+      if sw2hw.status.we = '1'
+      then
+        rx_frame_error_r  <= rx_frame_error_r  and not sw2hw.status.rx_frame_error (0);
+        rx_parity_error_r <= rx_parity_error_r and not sw2hw.status.rx_parity_error(0);
+        rx_break_r        <= rx_break_r        and not sw2hw.status.rx_break       (0);
+      end if;
+
+      if rx_err_framing = '1'
+      then
+        rx_frame_error_r  <= '1';
+      end if;
+      if rx_err_parity  = '1'
+      then
+        rx_parity_error_r <= '1';
+      end if;
+      if rx_err_break   = '1'
+      then
+        rx_break_r        <= '1';
+      end if;
+    end if;
+  end process;
+
+  hw2sw.status.we                 <= '1'; -- unused (external register)
+  hw2sw.status.rx_frame_error (0) <= rx_frame_error_r ;
+  hw2sw.status.rx_parity_error(0) <= rx_parity_error_r;
+  hw2sw.status.rx_break       (0) <= rx_break_r       ;
   
   ins_GIC_core : GIC_core
   port map(

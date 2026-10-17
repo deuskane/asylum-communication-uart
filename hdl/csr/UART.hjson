@@ -40,8 +40,8 @@
             fields: [
                 {
                     name: "value",
-                    bits: "3:0",
-                    desc: "0: interrupt is inactive, 1: interrupt is active"
+                    bits: "7:0",
+                    desc: "0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO not empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full, [4] reserved, [5] RX framing error, [6] RX parity error, [7] RX break (status bits 7:5)"
                 },
             ]
         },
@@ -57,7 +57,7 @@
             fields: [
                 {
                     name: "enable",
-                    bits: "3:0",
+                    bits: "7:0",
 		    init: "x0",
                     desc: "0: interrupt is disable, 1: interrupt is enable"
                 },
@@ -84,6 +84,33 @@
                     name: "value",
                     bits: "7:0",
                     desc: "Data TX or Data RX"
+                },
+            ]
+        },
+
+        {
+            name         : "status",
+            address      : "x3",
+            desc         : "Status Register, same bit mapping as isr and imr. Sticky bits are cleared by writing 1, writes have no effect on the other bits",
+            swaccess     : "rw1c",
+            hwaccess     : "rw",
+            hwtype       : "ext",
+
+            fields: [
+                {
+                    name: "rx_frame_error",
+                    bits: "5",
+                    desc: "Sticky, write 1 to clear. 1 : a byte was received with its stop bit at 0 (framing error)"
+                },
+                {
+                    name: "rx_parity_error",
+                    bits: "6",
+                    desc: "Sticky, write 1 to clear. 1 : a byte was received with a wrong parity bit (rx_parity_enable = 1)"
+                },
+                {
+                    name: "rx_break",
+                    bits: "7",
+                    desc: "Sticky, write 1 to clear. 1 : a break was received (all bits of the frame at 0, a single 0x00 byte is received)"
                 },
             ]
         },
