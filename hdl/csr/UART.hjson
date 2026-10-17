@@ -40,8 +40,8 @@
             fields: [
                 {
                     name: "value",
-                    bits: "3:0",
-                    desc: "0: interrupt is inactive, 1: interrupt is active"
+                    bits: "4:0",
+                    desc: "0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO not empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full, [4] RX overrun (status.rx_overrun)"
                 },
             ]
         },
@@ -57,7 +57,7 @@
             fields: [
                 {
                     name: "enable",
-                    bits: "3:0",
+                    bits: "4:0",
 		    init: "x0",
                     desc: "0: interrupt is disable, 1: interrupt is enable"
                 },
@@ -84,6 +84,23 @@
                     name: "value",
                     bits: "7:0",
                     desc: "Data TX or Data RX"
+                },
+            ]
+        },
+
+        {
+            name         : "status",
+            address      : "x3",
+            desc         : "Status Register, same bit mapping as isr and imr. Sticky bits are cleared by writing 1, writes have no effect on the other bits",
+            swaccess     : "rw1c",
+            hwaccess     : "rw",
+            hwtype       : "ext",
+
+            fields: [
+                {
+                    name: "rx_overrun",
+                    bits: "4",
+                    desc: "Sticky, write 1 to clear. 1 : a byte was received while the RX FIFO was full (DEPTH_RX = 0 : while the previous byte was not read yet), this byte was dropped"
                 },
             ]
         },

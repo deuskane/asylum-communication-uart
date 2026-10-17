@@ -56,6 +56,10 @@ entity uart_rx_axis is
     -- 0 : parity ok or parity disabled, 1 : parity error
     parity_error_o  : out std_logic;
 
+    -- Overrun : one clock cycle pulse when a frame is received while the
+    -- previous byte is still pending on m_axis (the new byte is dropped)
+    err_overrun_o   : out std_logic;
+
     debug_o         : out uart_rx_debug_t
   );
 end uart_rx_axis;
@@ -83,6 +87,8 @@ architecture rtl of uart_rx_axis is
   signal   parity_enable_r                : std_logic;
   signal   parity_odd_r                   : std_logic;
   signal   parity_error_r                 : std_logic;
+  signal   m_axis_tvalid_r                : std_logic;
+  signal   err_overrun_r                  : std_logic;
   
 begin
   
@@ -95,7 +101,8 @@ begin
     then
       uart_rx_data_r    <= (others => '0');
       uart_rx_bit_cnt_r <= (others => '0');
-      m_axis_tvalid_o   <= '0';
+      m_axis_tvalid_r   <= '0';
+      err_overrun_r     <= '0';
       state_r           <= IDLE;
       baud_tick_en_o    <= '0';
       parity_enable_r   <= '0';
@@ -104,11 +111,12 @@ begin
     elsif rising_edge(clk_i)
     then
       baud_tick_en_o    <= '0';
+      err_overrun_r     <= '0';
       
       -- FIFO consume the character
       if m_axis_tready_i = '1'
       then
-        m_axis_tvalid_o <= '0';
+        m_axis_tvalid_r <= '0';
       end if;
 
       case state_r is
@@ -177,8 +185,15 @@ begin
             parity_error_r<= '0';
           end if;
           
-          m_axis_tdata_o  <= v_data;
-          m_axis_tvalid_o <= '1';
+          -- Previous byte still pending : overrun, the new byte is dropped
+          -- (the pending byte is never overwritten)
+          if (m_axis_tvalid_r = '1') and (m_axis_tready_i = '0')
+          then
+            err_overrun_r   <= '1';
+          else
+            m_axis_tdata_o  <= v_data;
+            m_axis_tvalid_r <= '1';
+          end if;
         when others =>
           state_r         <= IDLE;
       end case;
@@ -186,6 +201,8 @@ begin
   end process;
 
   parity_error_o         <= parity_error_r;
+  err_overrun_o          <= err_overrun_r;
+  m_axis_tvalid_o        <= m_axis_tvalid_r;
   
   debug_o.state          <= std_logic_vector(to_unsigned(state_t'pos(state_r), 2));
   debug_o.baud_tick_half <= baud_tick_half_i;

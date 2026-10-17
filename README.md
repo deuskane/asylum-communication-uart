@@ -65,7 +65,8 @@ This IP is the UART of the Asylum project. Software drives it through a small CS
 - Baud rate set at elaboration from `CLOCK_FREQ` / `BAUD_RATE`, optionally software-writable through a 16-bit counter (`USER_DEFINE_BAUD_TICK = true`)
 - Separate TX and RX enables (`ctrl_tx.tx_enable`, `ctrl_rx.rx_enable`), each used as the reset of its path
 - Configurable FIFO depths (`DEPTH_TX`, `DEPTH_RX`, 0 = no FIFO), blocking read / write on the `data` register
-- Hardware flow control: CTS# (synchronized, `ctrl_tx.cts_enable`) and RTS# driven by the RX FIFO full flag (`ctrl_rx.rts_enable`)
+- Hardware flow control: CTS# (synchronized, `ctrl_tx.cts_enable`) and RTS# deasserted when the RX FIFO is almost full (`ctrl_rx.rts_enable`)
+- RX overrun detection: a byte received while the previous one is still pending is dropped (never overwrites it) and sets the sticky `status.rx_overrun` flag (interrupt source)
 - Two loopback modes: serial loopback TX to RX (`rx_use_loopback`) and echo of received bytes on TX (`tx_use_loopback`)
 - 4 interrupt sources (TX FIFO not empty / full, RX FIFO not empty / full) with status and mask registers
 - TX or RX path can be removed at elaboration (`UART_TX_ENABLE`, `UART_RX_ENABLE`)
@@ -125,7 +126,7 @@ Top-level entity: **`sbi_UART`** ([hdl/sbi_uart.vhd](hdl/sbi_uart.vhd)), library
 | `uart_tx_o` | out | std_logic | Serial data output (idle high) |
 | `uart_rx_i` | in | std_logic | Serial data input (not synchronized inside the IP) |
 | `uart_cts_b_i` | in | std_logic | Clear To Send, active low; synchronized by `sync2dffrn`, only used when `ctrl_tx.cts_enable = 1` |
-| `uart_rts_b_o` | out | std_logic | Request To Send, active low: `'0'` when `ctrl_rx.rts_enable = 0`, else the RX FIFO full flag |
+| `uart_rts_b_o` | out | std_logic | Request To Send, active low: `'0'` when `ctrl_rx.rts_enable = 0`, else `'1'` when the RX FIFO holds `max(DEPTH_RX - 2, 1)` bytes or more (`DEPTH_RX = 0`: a received byte is pending) |
 
 #### Interrupts
 
@@ -254,6 +255,7 @@ The CSR bank uses 3 address bits (`UART_ADDR_WIDTH = 3`) and 8-bit data (`UART_D
 | `baud_tick_en_o` | out | std_logic | Enable of the RX baud rate generator (high in START / ACTIVE) |
 | `parity_enable_i` | in | std_logic | 1: a parity bit is expected after the data bits |
 | `parity_odd_i` | in | std_logic | 0: even parity, 1: odd parity (sampled with `parity_enable_i` at the start of each frame) |
+| `err_overrun_o` | out | std_logic | One-cycle pulse when a frame is received while the previous byte is still pending on `m_axis` (`m_axis_tvalid_o = 1` and `m_axis_tready_i = 0`): the new byte is dropped, the pending one is kept |
 | `parity_error_o` | out | std_logic | Parity status of the last received frame, updated with `m_axis_tvalid_o` (0: parity ok or disabled, 1: parity error) |
 | `debug_o` | out | uart_rx_debug_t | FSM state, bit counter, `baud_tick_half`, `parity_error` |
 
@@ -268,7 +270,8 @@ Notes:
 
 - `data` is a FIFO register with blocking read / write: writes go to the TX FIFO (`DEPTH_TX`), reads come from the RX FIFO (`DEPTH_RX`).
 - `baud_tick_cnt_max_lsb` / `baud_tick_cnt_max_msb` only exist when `USER_DEFINE_BAUD_TICK = true`; their reset value is `CLOCK_FREQ / BAUD_RATE - 1` (computed in `sbi_UART`). The value must be written as `f_clk / baud - 1`.
-- The meaning of the 4 `isr` / `imr` bits is set by `sbi_UART`: bit 0 = TX FIFO not empty, bit 1 = TX FIFO full, bit 2 = RX FIFO not empty, bit 3 = RX FIFO full.
+- The meaning of the 5 `isr` / `imr` bits is set by `sbi_UART`: bit 0 = TX FIFO not empty, bit 1 = TX FIFO full, bit 2 = RX FIFO not empty, bit 3 = RX FIFO full, bit 4 = RX overrun (`status.rx_overrun`).
+- `status` (address 0x3, external register, same bit mapping as `isr`): bit 4 `rx_overrun` is a sticky flag set when a received byte is dropped because the RX FIFO is full (`DEPTH_RX = 0`: the previous byte was not read yet); write 1 to clear it (an overrun in the same cycle wins). Since the interrupt source is the sticky flag, clear `status.rx_overrun` before `isr` bit 4.
 
 ## Verification
 
@@ -276,7 +279,7 @@ Notes:
 
 | File | DUT | Description |
 |------|-----|-------------|
-| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (386 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag. CTS / RTS flow control and `tx_use_loopback` are not checked |
+| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (429 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag; (11) RTS# deasserted at 14 bytes in the RX FIFO, 18 bytes received without reading: the 17 first bytes are read back unchanged, the 18th sets `status.rx_overrun` and the overrun interrupt, rw1c clear of both. CTS flow control and `tx_use_loopback` are not checked |
 
 ### Targets
 
@@ -329,7 +332,7 @@ When idle (`s_axis_tready_o = 1`), a byte is accepted if `s_axis_tvalid_i = 1` a
 - **IDLE**: waits for `uart_rx_i = 0` (start bit).
 - **START**: enables the RX baud generator and samples the start bit at mid-bit; a `'1'` is a false start (glitch) and goes back to IDLE.
 - **ACTIVE**: samples one bit per `baud_tick_half` until all bits are received.
-- **STOP**: extracts the data byte and the parity bit, asserts `m_axis_tvalid_o`, back to IDLE.
+- **STOP**: extracts the data byte and the parity bit, asserts `m_axis_tvalid_o`, back to IDLE. If the previous byte is still pending (`m_axis_tvalid_o = 1`, `m_axis_tready_i = 0`), the new byte is dropped and `err_overrun_o` pulses (overrun).
 
 The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 11 with parity) and the data bits are extracted at the position that matches the parity configuration sampled at the start of the frame. With `rx_parity_enable = 1` the received parity bit is checked (even: `xor(data, parity) = 0`, odd: `xor(data, parity) = 1`); the result is available on `parity_error_o` of `uart_rx_axis` and on `debug_o.uart_rx.parity_error` of `sbi_UART` (status of the last received frame). The byte is pushed into the RX FIFO even when its parity is wrong: the CSR map has no parity error flag, so software cannot see the error.
 
@@ -337,7 +340,7 @@ The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 1
 
 - `ctrl_rx.rx_use_loopback = 1`: the receiver input is `uart_tx` instead of `uart_rx_i` (serial loopback).
 - `ctrl_tx.tx_use_loopback = 1`: received bytes are sent directly to the transmitter (echo); the `data` register then always accepts writes and returns no RX data. In this mode, with `cts_enable = 1`, CTS# is taken from the internal RTS#.
-- `ctrl_rx.rts_enable = 1`: `uart_rts_b_o` goes high when the RX FIFO is full.
+- `ctrl_rx.rts_enable = 1`: `uart_rts_b_o` goes high when the RX FIFO holds `DEPTH_RX - 2` bytes or more (at least 1, constant `RX_RTS_MARGIN = 2` in `sbi_UART`), so that the remote transmitter can still send 2 bytes, plus 1 byte pending in `uart_rx_axis`, after RTS# deassertion without overrun. The number of bytes in the RX FIFO is tracked in `sbi_UART` from the FIFO push (`uart_rx_axis` handshake) and pop (read of `data` on the SBI bus) events, because `csr_fifo` does not export it. With `DEPTH_RX = 0`, RTS# goes high while a received byte is pending.
 
 ### Interrupts
 

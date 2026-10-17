@@ -15,10 +15,10 @@
 #define UART_ISR 0x0
 
 // Field       : isr.value
-// Description : 0: interrupt is inactive, 1: interrupt is active
-// Range       : [3:0]
+// Description : 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO not empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full, [4] RX overrun (status.rx_overrun)
+// Range       : [4:0]
 #define UART_ISR_VALUE      0
-#define UART_ISR_VALUE_MASK 15
+#define UART_ISR_VALUE_MASK 31
 
 //==================================
 // Register    : imr
@@ -29,9 +29,9 @@
 
 // Field       : imr.enable
 // Description : 0: interrupt is disable, 1: interrupt is enable
-// Range       : [3:0]
+// Range       : [4:0]
 #define UART_IMR_ENABLE      0
-#define UART_IMR_ENABLE_MASK 15
+#define UART_IMR_ENABLE_MASK 31
 
 //==================================
 // Register    : data
@@ -45,6 +45,19 @@
 // Range       : [7:0]
 #define UART_DATA_VALUE      0
 #define UART_DATA_VALUE_MASK 255
+
+//==================================
+// Register    : status
+// Description : Status Register, same bit mapping as isr and imr. Sticky bits are cleared by writing 1, writes have no effect on the other bits
+// Address     : 0x3
+//==================================
+#define UART_STATUS 0x3
+
+// Field       : status.rx_overrun
+// Description : Sticky, write 1 to clear. 1 : a byte was received while the RX FIFO was full (DEPTH_RX = 0 : while the previous byte was not read yet), this byte was dropped
+// Range       : [4]
+#define UART_STATUS_RX_OVERRUN      4
+#define UART_STATUS_RX_OVERRUN_MASK 1
 
 //==================================
 // Register    : ctrl_tx
@@ -153,7 +166,7 @@ typedef struct {
   uint8_t isr; // 0x0
   uint8_t imr; // 0x1
   uint8_t data; // 0x2
-  uint8_t __dummy_0x3__;
+  uint8_t status; // 0x3
   uint8_t ctrl_tx; // 0x4
   uint8_t ctrl_rx; // 0x5
   uint8_t baud_tick_cnt_max_lsb; // 0x6

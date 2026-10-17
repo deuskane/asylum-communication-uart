@@ -51,6 +51,7 @@ architecture sim of tb_uart is
   constant CTRL_EN_EVEN    : std_logic_vector(7 downto 0) := x"03";
   constant CTRL_EN_ODD     : std_logic_vector(7 downto 0) := x"07";
   constant CTRL_LOOPBACK   : std_logic_vector(7 downto 0) := x"08";
+  constant CTRL_FLOW_CTRL  : std_logic_vector(7 downto 0) := x"10"; -- [4] cts_enable / rts_enable
 
   -- Patterns : data bit 0 at 1 and at 0, all parities
   type     data_array_t is array (natural range <>) of std_logic_vector(7 downto 0);
@@ -368,6 +369,42 @@ begin
     test_loopback(x"01", PARITY_EVEN, exp_error => '1');
     sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN or CTRL_LOOPBACK, "Enable UART RX even parity in loopback", clk_i, sbi_if);
     test_loopback(x"01", PARITY_EVEN, exp_error => '0');
+
+    -- TEST 11: RTS# threshold and RX overrun (DEPTH_RX = 16)
+    -- RTS# is deasserted at DEPTH_RX-2 = 14 bytes; 16 bytes fill the RX FIFO,
+    -- the 17th stays pending in the receiver, the 18th is an overrun (dropped)
+    log(ID_LOG_HDR, "Test 11: RTS# threshold and RX overrun", C_SCOPE);
+    sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN or CTRL_FLOW_CTRL, "Enable UART RX with RTS", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_STATUS), x"00", "Check no RX overrun", clk_i, sbi_if);
+    for i in 0 to 17 loop
+      if i <= 13 then
+        check_value(uart_rts_b, '0', ERROR, "Check RTS# active with " & integer'image(i) & " bytes in the RX FIFO");
+      else
+        check_value(uart_rts_b, '1', ERROR, "Check RTS# inactive with " & integer'image(i) & " bytes received");
+      end if;
+      uart_bfm_send(std_logic_vector(to_unsigned(16#40#+i, 8)), BIT_PERIOD);
+    end loop;
+    wait until rising_edge(clk_i);
+    sbi_check(csr_addr(UART_STATUS), x"10", "Check RX overrun flag", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_IMR), x"10", "Unmask RX overrun interrupt", clk_i, sbi_if);
+    wait until rising_edge(clk_i);
+    wait until rising_edge(clk_i);
+    check_value(it_o, '1', ERROR, "Check RX overrun interrupt");
+    sbi_check(csr_addr(UART_ISR), x"10", "Check RX overrun in isr", clk_i, sbi_if);
+    -- The pending bytes are not overwritten : 0x40 to 0x50, 0x51 is dropped
+    for i in 0 to 16 loop
+      sbi_check(csr_addr(UART_DATA), std_logic_vector(to_unsigned(16#40#+i, 8)), "Check UART RX after overrun", clk_i, sbi_if);
+    end loop;
+    wait until rising_edge(clk_i);
+    check_value(uart_rts_b, '0', ERROR, "Check RTS# active after the RX FIFO is read");
+    sbi_write(csr_addr(UART_STATUS), x"10", "Clear RX overrun flag", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_STATUS), x"00", "Check RX overrun flag cleared", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"10", "Clear RX overrun interrupt", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"00", "Check RX overrun interrupt cleared", clk_i, sbi_if);
+    check_value(it_o, '0', ERROR, "Check interrupt output cleared");
+    sbi_write(csr_addr(UART_IMR), x"00", "Mask RX overrun interrupt", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN, "Enable UART RX without RTS", clk_i, sbi_if);
 
     sbi_write(csr_addr(UART_IMR), x"04", "Unmask RX not empty interrupt", clk_i, sbi_if);
     wait until rising_edge(clk_i);

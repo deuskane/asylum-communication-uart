@@ -132,6 +132,10 @@ component uart_rx_axis is
     -- 0 : parity ok or parity disabled, 1 : parity error
     parity_error_o  : out std_logic;
 
+    -- Overrun : one clock cycle pulse when a frame is received while the
+    -- previous byte is still pending on m_axis (the new byte is dropped)
+    err_overrun_o   : out std_logic;
+
     debug_o         : out uart_rx_debug_t
   );
 end component uart_rx_axis;
