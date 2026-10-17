@@ -125,7 +125,7 @@ Top-level entity: **`sbi_UART`** ([hdl/sbi_uart.vhd](hdl/sbi_uart.vhd)), library
 | `uart_tx_o` | out | std_logic | Serial data output (idle high) |
 | `uart_rx_i` | in | std_logic | Serial data input (not synchronized inside the IP) |
 | `uart_cts_b_i` | in | std_logic | Clear To Send, active low; synchronized by `sync2dffrn`, only used when `ctrl_tx.cts_enable = 1` |
-| `uart_rts_b_o` | out | std_logic | Request To Send, active low: `'0'` when `ctrl_rx.rts_enable = 0`, else the RX FIFO full flag |
+| `uart_rts_b_o` | out | std_logic | Request To Send, active low, registered (reset value `'0'`): `'0'` when `ctrl_rx.rts_enable = 0`, else the RX FIFO full flag |
 
 #### Interrupts
 
@@ -276,7 +276,7 @@ Notes:
 
 | File | DUT | Description |
 |------|-----|-------------|
-| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (386 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag. CTS / RTS flow control and `tx_use_loopback` are not checked |
+| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (407 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag; (14) RTS# active with an empty RX FIFO, inactive with a full RX FIFO, forced active by `rts_enable = 0`, active again after the FIFO is read. CTS flow control and `tx_use_loopback` are not checked |
 
 ### Targets
 
@@ -337,7 +337,7 @@ The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 1
 
 - `ctrl_rx.rx_use_loopback = 1`: the receiver input is `uart_tx` instead of `uart_rx_i` (serial loopback).
 - `ctrl_tx.tx_use_loopback = 1`: received bytes are sent directly to the transmitter (echo); the `data` register then always accepts writes and returns no RX data. In this mode, with `cts_enable = 1`, CTS# is taken from the internal RTS#.
-- `ctrl_rx.rts_enable = 1`: `uart_rts_b_o` goes high when the RX FIFO is full.
+- `ctrl_rx.rts_enable = 1`: `uart_rts_b_o` goes high when the RX FIFO is full. RTS# comes from a flip-flop (one cycle after the FIFO flag), so the pad does not see the glitches of the FIFO pointer comparison.
 
 ### Interrupts
 

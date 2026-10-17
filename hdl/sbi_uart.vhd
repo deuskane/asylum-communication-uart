@@ -276,9 +276,23 @@ begin  -- architecture rtl
     rx_use_loopback      <= sw2hw.ctrl_rx.rx_use_loopback (0);
     rts_enable           <= sw2hw.ctrl_rx.rts_enable      (0);
 
-    uart_rts_b           <= '0' when rts_enable = '0' else
-                            it_rx_full
-                            ;
+    -- RTS# is registered : no glitch on the pad from the combinational
+    -- FIFO full flag (comparison of the FIFO pointers)
+    process (clk_i, arst_b_i) is
+    begin
+      if arst_b_i = '0'
+      then
+        uart_rts_b         <= '0';
+      elsif rising_edge(clk_i)
+      then
+        if rts_enable = '0'
+        then
+          uart_rts_b       <= '0';
+        else
+          uart_rts_b       <= it_rx_full;
+        end if;
+      end if;
+    end process;
     
     ins_uart_rx_baud_rate_gen : uart_baud_rate_gen
       generic map
