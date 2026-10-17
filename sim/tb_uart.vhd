@@ -177,31 +177,32 @@ begin
     -- UART monitor on uart_tx : receive one frame and check every bit
     procedure uart_bfm_expect(data   : std_logic_vector(7 downto 0);
                               parity : parity_t;
-                              msg    : string) is
+                              msg    : string;
+                              period : time := BIT_PERIOD) is
       variable v_data : std_logic_vector(7 downto 0);
     begin
       -- Wait start bit falling edge (it can be already started)
       if uart_tx /= '0' then
-        wait until uart_tx = '0' for 4 * 12 * BIT_PERIOD;
+        wait until uart_tx = '0' for 4 * 12 * period;
         check_value(uart_tx, '0', ERROR, msg & " : start bit detected");
-        wait for BIT_PERIOD/2;
+        wait for period/2;
       else
-        wait for BIT_PERIOD/2 - uart_tx'last_event;
+        wait for period/2 - uart_tx'last_event;
       end if;
       check_value(uart_tx, '0', ERROR, msg & " : start bit");
       for i in 0 to 7 loop
-        wait for BIT_PERIOD;
+        wait for period;
         v_data(i) := uart_tx;
       end loop;
       check_value(v_data, data, ERROR, msg & " : data bits");
       if parity /= PARITY_NONE then
-        wait for BIT_PERIOD;
+        wait for period;
         check_value(uart_tx, parity_bit(data, parity), ERROR, msg & " : parity bit (" & to_string(parity) & ")");
       end if;
-      wait for BIT_PERIOD;
+      wait for period;
       check_value(uart_tx, '1', ERROR, msg & " : stop bit");
       -- Stay in the stop bit
-      wait for BIT_PERIOD/4;
+      wait for period/4;
     end procedure;
 
     -- RX test : BFM send, read data by SBI, check parity error flag
@@ -368,6 +369,22 @@ begin
     test_loopback(x"01", PARITY_EVEN, exp_error => '1');
     sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN or CTRL_LOOPBACK, "Enable UART RX even parity in loopback", clk_i, sbi_if);
     test_loopback(x"01", PARITY_EVEN, exp_error => '0');
+
+    -- TEST 15: the 16-bit baud divisor is applied on the MSB write
+    -- 433 = 0x01B1 (115200 baud), 216 = 0x00D8 (230400 baud)
+    log(ID_LOG_HDR, "Test 15: baud divisor applied atomically on the MSB write", C_SCOPE);
+    sbi_write(csr_addr(UART_CTRL_RX), x"00", "Disable UART RX", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_TX), CTRL_EN, "Enable UART TX without parity", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_BAUD_TICK_CNT_MAX_LSB), x"D8", "Write baud divisor LSB only", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_BAUD_TICK_CNT_MAX_LSB), x"D8", "Read back baud divisor LSB", clk_i, sbi_if);
+    test_tx(x"A5", PARITY_NONE); -- old divisor 433 still used
+    sbi_write(csr_addr(UART_BAUD_TICK_CNT_MAX_MSB), x"00", "Write baud divisor MSB : apply 216", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_DATA), x"5A", "Write UART TX 0x5A", clk_i, sbi_if);
+    uart_bfm_expect(x"5A", PARITY_NONE, "Check UART TX with divisor 216", (216+1) * CLK_PERIOD);
+    sbi_write(csr_addr(UART_BAUD_TICK_CNT_MAX_LSB), x"B1", "Write baud divisor LSB", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_BAUD_TICK_CNT_MAX_MSB), x"01", "Write baud divisor MSB : apply 433", clk_i, sbi_if);
+    test_tx(x"C3", PARITY_NONE);
+    sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
 
     sbi_write(csr_addr(UART_IMR), x"04", "Unmask RX not empty interrupt", clk_i, sbi_if);
     wait until rising_edge(clk_i);

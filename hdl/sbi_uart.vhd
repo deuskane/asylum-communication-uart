@@ -179,8 +179,24 @@ begin  -- architecture rtl
       );
 
   -- Baud Tick on 16b
-  baud_tick_cnt_max    <= (sw2hw.baud_tick_cnt_max_msb.value &
-                           sw2hw.baud_tick_cnt_max_lsb.value);
+  -- The divisor is applied atomically when baud_tick_cnt_max_msb is written
+  -- (write the LSB first, then the MSB) : the baud rate generators never
+  -- use a mix of the old and new bytes
+  process (clk_i, arst_b_i) is
+  begin
+    if arst_b_i = '0'
+    then
+      baud_tick_cnt_max    <= BAUD_TICK_CNT_MAX_SLV;
+    elsif rising_edge(clk_i)
+    then
+      -- we is set the cycle after the write, with the new MSB value
+      if sw2hw.baud_tick_cnt_max_msb.we = '1'
+      then
+        baud_tick_cnt_max  <= (sw2hw.baud_tick_cnt_max_msb.value &
+                               sw2hw.baud_tick_cnt_max_lsb.value);
+      end if;
+    end if;
+  end process;
 
   -----------------------------------------------------------------------------
   -- UART TX
