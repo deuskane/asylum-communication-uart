@@ -59,13 +59,20 @@ architecture rtl of uart_tx_axis is
   signal   uart_tx_data_r                 : std_logic_vector(BIT_MSB downto 0);
   signal   uart_tx_bit_cnt_r              : std_logic_vector(BIT_MSB downto 0); 
   signal   uart_tx_active_r               : std_logic;
+  signal   uart_tx_enable_r               : std_logic;
+  signal   s_axis_tready                  : std_logic;
   signal   uart_tx_r                      : std_logic;
   signal   parity_bit                     : std_logic;
 
 begin
 
   -- Assignation des sorties
-  s_axis_tready_o <= not uart_tx_active_r;
+  -- A byte is accepted only when it is loaded in the shift register :
+  -- transmitter enabled (out of reset), idle and Clear To Send active
+  s_axis_tready   <= uart_tx_enable_r     and
+                     not uart_tx_active_r and
+                     not uart_cts_b_i;
+  s_axis_tready_o <= s_axis_tready;
   uart_tx_o       <=     uart_tx_r;
 
   -- Calcul du bit de parité
@@ -95,9 +102,11 @@ begin
       uart_tx_data_r    <= (others => '0');
       uart_tx_bit_cnt_r <= (others => '0');
       uart_tx_active_r  <= '0';
+      uart_tx_enable_r  <= '0';
       uart_tx_r         <= '1'; -- STOP Bit
     elsif rising_edge(clk_i)
     then
+      uart_tx_enable_r  <= '1';
 
       -- Have transmission ?
       if (uart_tx_active_r = '0')
@@ -106,7 +115,7 @@ begin
         
         -- New Data to transmit ?
         if ((s_axis_tvalid_i = '1') and
-            (uart_cts_b_i    = '0'))
+            (s_axis_tready   = '1'))
         then
           -- Add start, data and parity bit
           uart_tx_data_r      <= parity_bit & s_axis_tdata_i & '0'; 

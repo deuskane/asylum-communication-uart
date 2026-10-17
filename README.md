@@ -63,7 +63,7 @@ This IP is the UART of the Asylum project. Software drives it through a small CS
 
 - 8-bit frames: 1 start bit, 8 data bits LSB first, optional parity bit (even / odd), 1 stop bit
 - Baud rate set at elaboration from `CLOCK_FREQ` / `BAUD_RATE`, optionally software-writable through a 16-bit counter (`USER_DEFINE_BAUD_TICK = true`)
-- Separate TX and RX enables (`ctrl_tx.tx_enable`, `ctrl_rx.rx_enable`), each used as the reset of its path
+- Separate TX and RX enables (`ctrl_tx.tx_enable`, `ctrl_rx.rx_enable`), each used as the reset of its path; bytes written while TX is disabled or CTS# is inactive are kept in the TX FIFO (no silent loss)
 - Configurable FIFO depths (`DEPTH_TX`, `DEPTH_RX`, 0 = no FIFO), blocking read / write on the `data` register
 - Hardware flow control: CTS# (synchronized, `ctrl_tx.cts_enable`) and RTS# driven by the RX FIFO full flag (`ctrl_rx.rts_enable`)
 - Two loopback modes: serial loopback TX to RX (`rx_use_loopback`) and echo of received bytes on TX (`tx_use_loopback`)
@@ -223,7 +223,7 @@ The CSR bank uses 3 address bits (`UART_ADDR_WIDTH = 3`) and 8-bit data (`UART_D
 | `arst_b_i` | in | std_logic | Asynchronous reset, active low (connected to `tx_enable`) |
 | `s_axis_tdata_i` | in | std_logic_vector(WIDTH-1 downto 0) | Byte to transmit |
 | `s_axis_tvalid_i` | in | std_logic | Byte valid |
-| `s_axis_tready_o` | out | std_logic | Ready (high while no frame is being sent) |
+| `s_axis_tready_o` | out | std_logic | Ready: high when the byte is loaded in the shift register, i.e. out of reset (`arst_b_i = 1` for at least one cycle), no frame being sent and `uart_cts_b_i = 0` |
 | `uart_tx_o` | out | std_logic | Serial output (reset value `'1'`) |
 | `uart_cts_b_i` | in | std_logic | A new frame only starts when `'0'` |
 | `baud_tick_i` | in | std_logic | Baud tick: one bit is shifted out per tick |
@@ -276,7 +276,7 @@ Notes:
 
 | File | DUT | Description |
 |------|-----|-------------|
-| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (386 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag. CTS / RTS flow control and `tx_use_loopback` are not checked |
+| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (400 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag; (10) bytes written while TX is disabled or while CTS# is inactive are not sent, then sent after TX enable / CTS# activation. RTS flow control and `tx_use_loopback` are not checked |
 
 ### Targets
 
@@ -322,7 +322,7 @@ No dedicated synthesis target. The HDL sources of the `default` target (`hdl/*.v
 
 ### Transmitter
 
-When idle (`s_axis_tready_o = 1`), a byte is accepted if `s_axis_tvalid_i = 1` and CTS# is low. The frame `start + 8 data bits (LSB first) + [parity] + stop` is shifted out, one bit per `baud_tick`. With `ctrl_tx.cts_enable = 0` CTS# is forced low (always clear to send).
+A byte is accepted (`s_axis_tvalid_i = 1` and `s_axis_tready_o = 1`) only when it is loaded in the shift register: transmitter enabled, idle and CTS# low. While `ctrl_tx.tx_enable = 0` (reset of the transmitter) or CTS# is high, `s_axis_tready_o = 0`: the bytes stay in the TX FIFO, and with `DEPTH_TX = 0` a write to `data` is blocked until the byte is accepted (enable TX before writing). The frame `start + 8 data bits (LSB first) + [parity] + stop` is shifted out, one bit per `baud_tick`. With `ctrl_tx.cts_enable = 0` CTS# is forced low (always clear to send).
 
 ### Receiver FSM
 
