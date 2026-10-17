@@ -149,7 +149,7 @@ architecture rtl of UART_registers is
 
   --==================================
   -- Register    : baud_tick_cnt_max_lsb
-  -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+  -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1. The 16-bit value is applied when baud_tick_cnt_max_msb is written : write the LSB first, then the MSB
   -- Address     : 0x6
   -- Width       : 8
   -- Sw Access   : rw
@@ -165,7 +165,7 @@ architecture rtl of UART_registers is
 
   --==================================
   -- Register    : baud_tick_cnt_max_msb
-  -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+  -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1. Writing this register applies the 16-bit value {msb, lsb} to the baud rate generators
   -- Address     : 0x7
   -- Width       : 8
   -- Sw Access   : rw
@@ -550,7 +550,7 @@ begin  -- architecture rtl
 
   --==================================
   -- Register    : baud_tick_cnt_max_lsb
-  -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+  -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1. The 16-bit value is applied when baud_tick_cnt_max_msb is written : write the LSB first, then the MSB
   -- Address     : 0x6
   -- Width       : 8
   -- Sw Access   : rw
@@ -610,7 +610,7 @@ begin  -- architecture rtl
 
   --==================================
   -- Register    : baud_tick_cnt_max_msb
-  -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+  -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1. Writing this register applies the 16-bit value {msb, lsb} to the baud rate generators
   -- Address     : 0x7
   -- Width       : 8
   -- Sw Access   : rw

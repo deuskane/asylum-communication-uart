@@ -66,13 +66,13 @@ Control Register
 0 : Request To Send Disable, 1 : Request To Send Enable
 
 ## 0x6 baud_tick_cnt_max_lsb
-Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1. The 16-bit value is applied when baud_tick_cnt_max_msb is written : write the LSB first, then the MSB
 
 ### [7:0] value
 Baud Tick Counter Max LSB
 
 ## 0x7 baud_tick_cnt_max_msb
-Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1. Writing this register applies the 16-bit value {msb, lsb} to the baud rate generators
 
 ### [7:0] value
 Baud Tick Counter Max MSB

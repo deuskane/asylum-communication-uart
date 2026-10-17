@@ -122,7 +122,7 @@
 
 //==================================
 // Register    : baud_tick_cnt_max_lsb
-// Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+// Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1. The 16-bit value is applied when baud_tick_cnt_max_msb is written : write the LSB first, then the MSB
 // Address     : 0x6
 //==================================
 #define UART_BAUD_TICK_CNT_MAX_LSB 0x6
@@ -135,7 +135,7 @@
 
 //==================================
 // Register    : baud_tick_cnt_max_msb
-// Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+// Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1. Writing this register applies the 16-bit value {msb, lsb} to the baud rate generators
 // Address     : 0x7
 //==================================
 #define UART_BAUD_TICK_CNT_MAX_MSB 0x7
