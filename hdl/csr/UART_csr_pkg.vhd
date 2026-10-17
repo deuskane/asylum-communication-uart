@@ -37,7 +37,7 @@ package UART_csr_pkg is
     we : std_logic;
   --==================================
   -- Field       : value
-  -- Description : 0: interrupt is inactive, 1: interrupt is active
+  -- Description : 0: interrupt is inactive, 1: interrupt is active. Sources (see status) : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full
   -- Width       : 4
   --==================================
     value : std_logic_vector(4-1 downto 0);
@@ -47,7 +47,7 @@ package UART_csr_pkg is
     we : std_logic;
   --==================================
   -- Field       : value
-  -- Description : 0: interrupt is inactive, 1: interrupt is active
+  -- Description : 0: interrupt is inactive, 1: interrupt is active. Sources (see status) : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full
   -- Width       : 4
   --==================================
     value : std_logic_vector(4-1 downto 0);
@@ -111,6 +111,74 @@ package UART_csr_pkg is
   --==================================
     value : std_logic_vector(8-1 downto 0);
   end record UART_data_hw2sw_t;
+
+  --==================================
+  -- Register    : status
+  -- Description : Status Register, same bit mapping as isr and imr. Sticky bits are cleared by writing 1, writes have no effect on the other bits
+  -- Address     : 0x3
+  -- Width       : 4
+  -- Sw Access   : rw1c
+  -- Hw Access   : rw
+  -- Hw Type     : ext
+  --==================================
+  constant UART_STATUS : unsigned(UART_ADDR_WIDTH-1 downto 0) := to_unsigned(3, UART_ADDR_WIDTH);
+
+  type UART_status_sw2hw_t is record
+    re : std_logic;
+    we : std_logic;
+  --==================================
+  -- Field       : tx_empty
+  -- Description : Read only. 1 : TX FIFO is empty (DEPTH_TX = 0 : the transmitter can accept a byte, a write to data does not block)
+  -- Width       : 1
+  --==================================
+    tx_empty : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : tx_full
+  -- Description : Read only. 1 : TX FIFO is full, a write to data is blocked until a byte is sent
+  -- Width       : 1
+  --==================================
+    tx_full : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_not_empty
+  -- Description : Read only. 1 : RX FIFO is not empty, a read of data returns a byte without blocking
+  -- Width       : 1
+  --==================================
+    rx_not_empty : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_full
+  -- Description : Read only. 1 : RX FIFO is full
+  -- Width       : 1
+  --==================================
+    rx_full : std_logic_vector(1-1 downto 0);
+  end record UART_status_sw2hw_t;
+
+  type UART_status_hw2sw_t is record
+    we : std_logic;
+  --==================================
+  -- Field       : tx_empty
+  -- Description : Read only. 1 : TX FIFO is empty (DEPTH_TX = 0 : the transmitter can accept a byte, a write to data does not block)
+  -- Width       : 1
+  --==================================
+    tx_empty : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : tx_full
+  -- Description : Read only. 1 : TX FIFO is full, a write to data is blocked until a byte is sent
+  -- Width       : 1
+  --==================================
+    tx_full : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_not_empty
+  -- Description : Read only. 1 : RX FIFO is not empty, a read of data returns a byte without blocking
+  -- Width       : 1
+  --==================================
+    rx_not_empty : std_logic_vector(1-1 downto 0);
+  --==================================
+  -- Field       : rx_full
+  -- Description : Read only. 1 : RX FIFO is full
+  -- Width       : 1
+  --==================================
+    rx_full : std_logic_vector(1-1 downto 0);
+  end record UART_status_hw2sw_t;
 
   --==================================
   -- Register    : ctrl_tx
@@ -255,6 +323,7 @@ package UART_csr_pkg is
     isr : UART_isr_sw2hw_t;
     imr : UART_imr_sw2hw_t;
     data : UART_data_sw2hw_t;
+    status : UART_status_sw2hw_t;
     ctrl_tx : UART_ctrl_tx_sw2hw_t;
     ctrl_rx : UART_ctrl_rx_sw2hw_t;
     baud_tick_cnt_max_lsb : UART_baud_tick_cnt_max_lsb_sw2hw_t;
@@ -264,6 +333,7 @@ package UART_csr_pkg is
   type UART_hw2sw_t is record
     isr : UART_isr_hw2sw_t;
     data : UART_data_hw2sw_t;
+    status : UART_status_hw2sw_t;
   end record UART_hw2sw_t;
 
   ------------------------------------

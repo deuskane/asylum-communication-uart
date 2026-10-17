@@ -15,7 +15,7 @@
 #define UART_ISR 0x0
 
 // Field       : isr.value
-// Description : 0: interrupt is inactive, 1: interrupt is active
+// Description : 0: interrupt is inactive, 1: interrupt is active. Sources (see status) : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full
 // Range       : [3:0]
 #define UART_ISR_VALUE      0
 #define UART_ISR_VALUE_MASK 15
@@ -45,6 +45,37 @@
 // Range       : [7:0]
 #define UART_DATA_VALUE      0
 #define UART_DATA_VALUE_MASK 255
+
+//==================================
+// Register    : status
+// Description : Status Register, same bit mapping as isr and imr. Sticky bits are cleared by writing 1, writes have no effect on the other bits
+// Address     : 0x3
+//==================================
+#define UART_STATUS 0x3
+
+// Field       : status.tx_empty
+// Description : Read only. 1 : TX FIFO is empty (DEPTH_TX = 0 : the transmitter can accept a byte, a write to data does not block)
+// Range       : [0]
+#define UART_STATUS_TX_EMPTY      0
+#define UART_STATUS_TX_EMPTY_MASK 1
+
+// Field       : status.tx_full
+// Description : Read only. 1 : TX FIFO is full, a write to data is blocked until a byte is sent
+// Range       : [1]
+#define UART_STATUS_TX_FULL      1
+#define UART_STATUS_TX_FULL_MASK 1
+
+// Field       : status.rx_not_empty
+// Description : Read only. 1 : RX FIFO is not empty, a read of data returns a byte without blocking
+// Range       : [2]
+#define UART_STATUS_RX_NOT_EMPTY      2
+#define UART_STATUS_RX_NOT_EMPTY_MASK 1
+
+// Field       : status.rx_full
+// Description : Read only. 1 : RX FIFO is full
+// Range       : [3]
+#define UART_STATUS_RX_FULL      3
+#define UART_STATUS_RX_FULL_MASK 1
 
 //==================================
 // Register    : ctrl_tx
@@ -153,7 +184,7 @@ typedef struct {
   uint8_t isr; // 0x0
   uint8_t imr; // 0x1
   uint8_t data; // 0x2
-  uint8_t __dummy_0x3__;
+  uint8_t status; // 0x3
   uint8_t ctrl_tx; // 0x4
   uint8_t ctrl_rx; // 0x5
   uint8_t baud_tick_cnt_max_lsb; // 0x6

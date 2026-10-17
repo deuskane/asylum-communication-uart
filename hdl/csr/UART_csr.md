@@ -6,6 +6,7 @@ CSR for UART
 |0x0|isr|
 |0x1|imr|
 |0x2|data|
+|0x3|status|
 |0x4|ctrl_tx|
 |0x5|ctrl_rx|
 |0x6|baud_tick_cnt_max_lsb|
@@ -15,7 +16,7 @@ CSR for UART
 Interruption Status Register
 
 ### [3:0] value
-0: interrupt is inactive, 1: interrupt is active
+0: interrupt is inactive, 1: interrupt is active. Sources (see status) : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full
 
 ## 0x1 imr
 Interruption Mask Register
@@ -28,6 +29,21 @@ Write : data to tansmit, Read : data to receive
 
 ### [7:0] value
 Data TX or Data RX
+
+## 0x3 status
+Status Register, same bit mapping as isr and imr. Sticky bits are cleared by writing 1, writes have no effect on the other bits
+
+### [0:0] tx_empty
+Read only. 1 : TX FIFO is empty (DEPTH_TX = 0 : the transmitter can accept a byte, a write to data does not block)
+
+### [1:1] tx_full
+Read only. 1 : TX FIFO is full, a write to data is blocked until a byte is sent
+
+### [2:2] rx_not_empty
+Read only. 1 : RX FIFO is not empty, a read of data returns a byte without blocking
+
+### [3:3] rx_full
+Read only. 1 : RX FIFO is full
 
 ## 0x4 ctrl_tx
 Control Register

@@ -41,7 +41,7 @@
                 {
                     name: "value",
                     bits: "3:0",
-                    desc: "0: interrupt is inactive, 1: interrupt is active"
+                    desc: "0: interrupt is inactive, 1: interrupt is active. Sources (see status) : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full"
                 },
             ]
         },
@@ -84,6 +84,38 @@
                     name: "value",
                     bits: "7:0",
                     desc: "Data TX or Data RX"
+                },
+            ]
+        },
+
+        {
+            name         : "status",
+            address      : "x3",
+            desc         : "Status Register, same bit mapping as isr and imr. Sticky bits are cleared by writing 1, writes have no effect on the other bits",
+            swaccess     : "rw1c",
+            hwaccess     : "rw",
+            hwtype       : "ext",
+
+            fields: [
+                {
+                    name: "tx_empty",
+                    bits: "0",
+                    desc: "Read only. 1 : TX FIFO is empty (DEPTH_TX = 0 : the transmitter can accept a byte, a write to data does not block)"
+                },
+                {
+                    name: "tx_full",
+                    bits: "1",
+                    desc: "Read only. 1 : TX FIFO is full, a write to data is blocked until a byte is sent"
+                },
+                {
+                    name: "rx_not_empty",
+                    bits: "2",
+                    desc: "Read only. 1 : RX FIFO is not empty, a read of data returns a byte without blocking"
+                },
+                {
+                    name: "rx_full",
+                    bits: "3",
+                    desc: "Read only. 1 : RX FIFO is full"
                 },
             ]
         },

@@ -369,6 +369,56 @@ begin
     sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN or CTRL_LOOPBACK, "Enable UART RX even parity in loopback", clk_i, sbi_if);
     test_loopback(x"01", PARITY_EVEN, exp_error => '0');
 
+    -- TEST 13: status register and TX FIFO empty interrupt
+    -- status : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full
+    log(ID_LOG_HDR, "Test 13: status register and TX FIFO empty interrupt", C_SCOPE);
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN, "Enable UART RX without loopback", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_TX), CTRL_EN, "Enable UART TX without parity", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_STATUS), x"01", "Check status : TX empty, RX empty", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_IMR), x"01", "Unmask TX FIFO empty interrupt", clk_i, sbi_if);
+    wait until rising_edge(clk_i);
+    wait until rising_edge(clk_i);
+    check_value(it_o, '1', ERROR, "Check TX FIFO empty interrupt when idle");
+    sbi_write(csr_addr(UART_IMR), x"00", "Mask TX FIFO empty interrupt", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"01", "Clear TX FIFO empty interrupt", clk_i, sbi_if);
+    -- 1 byte in the shift register + 16 bytes in the TX FIFO
+    for i in 0 to 16 loop
+      sbi_write(csr_addr(UART_DATA), std_logic_vector(to_unsigned(16#30#+i, 8)), "Write UART TX", clk_i, sbi_if);
+    end loop;
+    sbi_check(csr_addr(UART_STATUS), x"02", "Check status : TX full", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_IMR), x"01", "Unmask TX FIFO empty interrupt", clk_i, sbi_if);
+    wait until rising_edge(clk_i);
+    wait until rising_edge(clk_i);
+    check_value(it_o, '0', ERROR, "Check no TX FIFO empty interrupt while the TX FIFO is full");
+    for i in 0 to 16 loop
+      uart_bfm_expect(std_logic_vector(to_unsigned(16#30#+i, 8)), PARITY_NONE, "Check UART TX from full FIFO");
+    end loop;
+    check_value(it_o, '1', ERROR, "Check TX FIFO empty interrupt after the TX FIFO is drained");
+    sbi_check(csr_addr(UART_ISR), x"01", "Check TX FIFO empty interrupt", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_STATUS), x"01", "Check status : TX empty", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_IMR), x"00", "Mask TX FIFO empty interrupt", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"01", "Clear TX FIFO empty interrupt", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"00", "Check interrupt cleared", clk_i, sbi_if);
+
+    -- RX : not empty after one byte, full after 16 bytes
+    uart_bfm_send(x"E7", BIT_PERIOD);
+    wait until rising_edge(clk_i);
+    sbi_check(csr_addr(UART_STATUS), x"05", "Check status : RX not empty", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_DATA), x"E7", "Check UART RX 0xE7", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_STATUS), x"01", "Check status : RX empty after read", clk_i, sbi_if);
+    for i in 0 to 15 loop
+      uart_bfm_send(std_logic_vector(to_unsigned(16#60#+i, 8)), BIT_PERIOD);
+    end loop;
+    wait until rising_edge(clk_i);
+    sbi_check(csr_addr(UART_STATUS), x"0D", "Check status : RX full", clk_i, sbi_if);
+    for i in 0 to 15 loop
+      sbi_check(csr_addr(UART_DATA), std_logic_vector(to_unsigned(16#60#+i, 8)), "Check UART RX from full FIFO", clk_i, sbi_if);
+    end loop;
+    sbi_check(csr_addr(UART_STATUS), x"01", "Check status : RX empty", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_STATUS), x"FF", "Write status (no effect on bits 3:0)", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_STATUS), x"01", "Check status unchanged by a write", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
+
     sbi_write(csr_addr(UART_IMR), x"04", "Unmask RX not empty interrupt", clk_i, sbi_if);
     wait until rising_edge(clk_i);
     sbi_check(csr_addr(UART_ISR), x"00", "Check RX FIFO is empty at end of test", clk_i, sbi_if);

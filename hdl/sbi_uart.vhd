@@ -137,7 +137,7 @@ architecture rtl of sbi_UART is
   signal   it_rx_full             : std_logic;
   signal   it_rx_empty_b          : std_logic;
   signal   it_tx_full             : std_logic;
-  signal   it_tx_empty_b          : std_logic;
+  signal   it_tx_empty            : std_logic;
   
 begin  -- architecture rtl
 
@@ -358,13 +358,20 @@ begin  -- architecture rtl
   it_rx_full    <=     sw2hw.data.hw2sw_full ;
   it_rx_empty_b <= not sw2hw.data.hw2sw_empty;
   it_tx_full    <=     sw2hw.data.sw2hw_full ;
-  it_tx_empty_b <= not sw2hw.data.sw2hw_empty;
+  it_tx_empty   <=     sw2hw.data.sw2hw_empty;
   it            <= (it_rx_full    &  
                     it_rx_empty_b & 
                     it_tx_full    & 
-                    it_tx_empty_b 
+                    it_tx_empty   
                     );
   hw2sw.isr.we  <= '1';
+
+  -- Status : current (unmasked) state of the interrupt sources
+  hw2sw.status.we              <= '1'; -- unused (external register)
+  hw2sw.status.tx_empty    (0) <= it_tx_empty  ;
+  hw2sw.status.tx_full     (0) <= it_tx_full   ;
+  hw2sw.status.rx_not_empty(0) <= it_rx_empty_b;
+  hw2sw.status.rx_full     (0) <= it_rx_full   ;
   
   ins_GIC_core : GIC_core
   port map(
