@@ -284,6 +284,8 @@ Notes:
 |--------|----------|-------------|
 | `default` | `sbi_UART` | RTL fileset + CSR generation (not a simulation) |
 | `sim_basic` | `tb_uart` | Simulation of basic unit tests (GHDL) |
+| `lint_ghdl` | `sbi_UART_synth_top` | Lint: GHDL `-Wall` analysis and elaboration (empty simulation) of `sbi_UART` in a wrapper with flat SBI ports (`syn/ghdl/sbi_UART_synth_top.vhd`) |
+| `lint_ghdl_synth` | `sbi_UART_synth_top` | Synthesis check: `lint_ghdl`, then `ghdl --synth -Wall` of 5 configurations (`syn/ghdl/ghdl_synth.sh`: defaults (`DEPTH_TX = DEPTH_RX = 0`, PicoSoC), `DEPTH_TX = DEPTH_RX = 16` (`tb_uart`), TX only, RX only, `USER_DEFINE_BAUD_TICK = false`), fails on a synthesis error or an inferred latch |
 
 ### How to Run
 
@@ -293,6 +295,8 @@ The default tool is GHDL (`mk/defs.mk`: `TOOL ?= ghdl`, `TARGET ?= sim_basic`).
 make help                 # variables, rules and target list (mk/targets.txt)
 make sim_basic            # run one target (log in log/)
 make nonreg_sim           # run every sim_* target
+make lint_ghdl            # GHDL -Wall lint (make nonreg_lint: every lint_* target)
+make lint_ghdl_synth      # GHDL -Wall lint + ghdl --synth -Wall check
 make clean                # remove build/ and log/
 ```
 
@@ -312,7 +316,7 @@ The `sim_basic` target runs GHDL with `--fst=dut.fst --ieee-asserts=disable`. CI
 
 ## Synthesis
 
-No dedicated synthesis target. The HDL sources of the `default` target (`hdl/*.vhd` + generated CSR) are synthesizable: the file dumps and reports of `sbi_UART` are enclosed in `synthesis translate_off / translate_on` (only the `textio` `use` clauses remain outside). Resource usage mainly depends on `DEPTH_TX` / `DEPTH_RX` (FIFOs in the CSR bank), `UART_TX_ENABLE` / `UART_RX_ENABLE` and `USER_DEFINE_BAUD_TICK`. `uart_rx_i` is not synchronized inside the IP (only `uart_cts_b_i` goes through `sync2dffrn`); synchronize it at the chip / FPGA top level if it comes from a pad.
+No vendor synthesis target (`lint_ghdl_synth` checks the RTL with `ghdl --synth`, see [Targets](#targets)). The HDL sources of the `default` target (`hdl/*.vhd` + generated CSR) are synthesizable: the file dumps and reports of `sbi_UART` are enclosed in `synthesis translate_off / translate_on` (only the `textio` `use` clauses remain outside). Resource usage mainly depends on `DEPTH_TX` / `DEPTH_RX` (FIFOs in the CSR bank), `UART_TX_ENABLE` / `UART_RX_ENABLE` and `USER_DEFINE_BAUD_TICK`. `uart_rx_i` is not synchronized inside the IP (only `uart_cts_b_i` goes through `sync2dffrn`); synchronize it at the chip / FPGA top level if it comes from a pad.
 
 ## Design Notes
 
@@ -368,8 +372,11 @@ asylum-communication-uart/
 │       ├── UART_csr_pkg.vhd # Generated
 │       ├── UART_csr.md      # Generated
 │       └── UART_csr.h       # Generated
-└── sim/
-    └── tb_uart.vhd         # UVVM testbench
+├── sim/
+│   └── tb_uart.vhd         # UVVM testbench
+└── syn/ghdl/
+    ├── sbi_UART_synth_top.vhd  # Lint / synthesis check top (sbi_UART, flat SBI ports)
+    └── ghdl_synth.sh       # ghdl --synth check (post_run hook of lint_ghdl_synth)
 ```
 
 ## Dependencies

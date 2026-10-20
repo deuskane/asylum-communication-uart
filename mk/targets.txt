@@ -1,3 +1,5 @@
-default   : Default Target
-sim_basic : Simulation of basic unit tests
+default         : Default Target
+lint_ghdl       : Lint with GHDL (-Wall analysis and elaboration of sbi_UART_synth_top)
+lint_ghdl_synth : Synthesis check, ghdl --synth -Wall of sbi_UART_synth_top (5 configurations)
+sim_basic       : Simulation of basic unit tests
 
