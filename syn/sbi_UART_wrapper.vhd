@@ -1,12 +1,12 @@
 -------------------------------------------------------------------------------
--- Title      : sbi_UART_synth_top
+-- Title      : sbi_UART_wrapper
 -- Project    : Asylum
 -------------------------------------------------------------------------------
--- File       : sbi_UART_synth_top.vhd
+-- File       : sbi_UART_wrapper.vhd
 -- Author     : Mathieu Rosiere
 -------------------------------------------------------------------------------
 -- Description:
--- Synthesis check top (lint_ghdl, lint_ghdl_synth) : sbi_UART with flat and
+-- Wrapper (lint_ghdl, lint_ghdl_synth_*) : sbi_UART with flat and
 -- constrained SBI ports (sbi_UART has unconstrained SBI ports and cannot be
 -- a synthesis top). SBI address / data width : SBI_ADDR_WIDTH /
 -- SBI_DATA_WIDTH. The synthesizable generics are forwarded with the defaults
@@ -18,6 +18,7 @@
 -- Revisions  :
 -- Date        Version  Author   Description
 -- 2026-10-20  1.0      mrosiere Created
+-- 2026-10-24  1.1      mrosiere Was sbi_UART_synth_top, library asylum
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -26,7 +27,7 @@ library asylum;
 use     asylum.sbi_pkg.all;
 use     asylum.uart_pkg.all;
 
-entity sbi_UART_synth_top is
+entity sbi_UART_wrapper is
   generic (
     BAUD_RATE             : integer := 115200;
     CLOCK_FREQ            : integer := 50000000;
@@ -62,9 +63,9 @@ entity sbi_UART_synth_top is
     -- Debug
     debug_o       : out uart_debug_t
   );
-end entity sbi_UART_synth_top;
+end entity sbi_UART_wrapper;
 
-architecture rtl of sbi_UART_synth_top is
+architecture rtl of sbi_UART_wrapper is
 
   signal sbi_ini       : sbi_ini_t(addr (SBI_ADDR_WIDTH-1 downto 0),
                                    wdata(SBI_DATA_WIDTH-1 downto 0));
