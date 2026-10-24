@@ -88,7 +88,6 @@ architecture rtl of UART_registers is
   signal   imr_we        : std_logic;
   signal   imr_wdata     : std_logic_vector(8-1 downto 0);
   signal   imr_wdata_sw  : std_logic_vector(4-1 downto 0);
-  signal   imr_wdata_hw  : std_logic_vector(4-1 downto 0);
   signal   imr_wbusy     : std_logic;
 
   signal   imr_rcs       : std_logic;
@@ -97,14 +96,6 @@ architecture rtl of UART_registers is
   signal   imr_rdata_sw  : std_logic_vector(4-1 downto 0);
   signal   imr_rdata_hw  : std_logic_vector(4-1 downto 0);
   signal   imr_rbusy     : std_logic;
-
-  function INIT_data
-    return std_logic_vector is
-    variable tmp : std_logic_vector(8-1 downto 0);
-  begin  -- function INIT_data
-    tmp(7 downto 0) := "00000000"; -- value
-    return tmp;
-  end function INIT_data;
 
   signal   data_wcs       : std_logic;
   signal   data_we        : std_logic;
@@ -136,7 +127,6 @@ architecture rtl of UART_registers is
   signal   ctrl_tx_we        : std_logic;
   signal   ctrl_tx_wdata     : std_logic_vector(8-1 downto 0);
   signal   ctrl_tx_wdata_sw  : std_logic_vector(5-1 downto 0);
-  signal   ctrl_tx_wdata_hw  : std_logic_vector(5-1 downto 0);
   signal   ctrl_tx_wbusy     : std_logic;
 
   signal   ctrl_tx_rcs       : std_logic;
@@ -162,7 +152,6 @@ architecture rtl of UART_registers is
   signal   ctrl_rx_we        : std_logic;
   signal   ctrl_rx_wdata     : std_logic_vector(8-1 downto 0);
   signal   ctrl_rx_wdata_sw  : std_logic_vector(5-1 downto 0);
-  signal   ctrl_rx_wdata_hw  : std_logic_vector(5-1 downto 0);
   signal   ctrl_rx_wbusy     : std_logic;
 
   signal   ctrl_rx_rcs       : std_logic;
@@ -184,7 +173,6 @@ architecture rtl of UART_registers is
   signal   baud_tick_cnt_max_lsb_we        : std_logic;
   signal   baud_tick_cnt_max_lsb_wdata     : std_logic_vector(8-1 downto 0);
   signal   baud_tick_cnt_max_lsb_wdata_sw  : std_logic_vector(8-1 downto 0);
-  signal   baud_tick_cnt_max_lsb_wdata_hw  : std_logic_vector(8-1 downto 0);
   signal   baud_tick_cnt_max_lsb_wbusy     : std_logic;
 
   signal   baud_tick_cnt_max_lsb_rcs       : std_logic;
@@ -206,7 +194,6 @@ architecture rtl of UART_registers is
   signal   baud_tick_cnt_max_msb_we        : std_logic;
   signal   baud_tick_cnt_max_msb_wdata     : std_logic_vector(8-1 downto 0);
   signal   baud_tick_cnt_max_msb_wdata_sw  : std_logic_vector(8-1 downto 0);
-  signal   baud_tick_cnt_max_msb_wdata_hw  : std_logic_vector(8-1 downto 0);
   signal   baud_tick_cnt_max_msb_wbusy     : std_logic;
 
   signal   baud_tick_cnt_max_msb_rcs       : std_logic;
@@ -255,11 +242,12 @@ begin  -- architecture rtl
     isr_rcs     <= '1' when (sig_raddr = UART_ISR) else '0';
     isr_re      <= sig_rcs and sig_re and isr_rcs;
     isr_rdata   <= (
-      0 => isr_rdata_sw(0), -- value(0)
-      1 => isr_rdata_sw(1), -- value(1)
-      2 => isr_rdata_sw(2), -- value(2)
-      3 => isr_rdata_sw(3), -- value(3)
-      others => '0');
+       0 => isr_rdata_sw(0) -- value(0)
+      ,1 => isr_rdata_sw(1) -- value(1)
+      ,2 => isr_rdata_sw(2) -- value(2)
+      ,3 => isr_rdata_sw(3) -- value(3)
+      ,others => '0'
+      );
 
     isr_wcs     <= '1' when       (sig_waddr = UART_ISR)   else '0';
     isr_we      <= sig_wcs and sig_we and isr_wcs;
@@ -325,11 +313,12 @@ begin  -- architecture rtl
     imr_rcs     <= '1' when (sig_raddr = UART_IMR) else '0';
     imr_re      <= sig_rcs and sig_re and imr_rcs;
     imr_rdata   <= (
-      0 => imr_rdata_sw(0), -- enable(0)
-      1 => imr_rdata_sw(1), -- enable(1)
-      2 => imr_rdata_sw(2), -- enable(2)
-      3 => imr_rdata_sw(3), -- enable(3)
-      others => '0');
+       0 => imr_rdata_sw(0) -- enable(0)
+      ,1 => imr_rdata_sw(1) -- enable(1)
+      ,2 => imr_rdata_sw(2) -- enable(2)
+      ,3 => imr_rdata_sw(3) -- enable(3)
+      ,others => '0'
+      );
 
     imr_wcs     <= '1' when       (sig_waddr = UART_IMR)   else '0';
     imr_we      <= sig_wcs and sig_we and imr_wcs;
@@ -394,15 +383,15 @@ begin  -- architecture rtl
     data_rcs     <= '1' when (sig_raddr = UART_DATA) else '0';
     data_re      <= sig_rcs and sig_re and data_rcs;
     data_rdata   <= (
-      0 => data_rdata_sw(0), -- value(0)
-      1 => data_rdata_sw(1), -- value(1)
-      2 => data_rdata_sw(2), -- value(2)
-      3 => data_rdata_sw(3), -- value(3)
-      4 => data_rdata_sw(4), -- value(4)
-      5 => data_rdata_sw(5), -- value(5)
-      6 => data_rdata_sw(6), -- value(6)
-      7 => data_rdata_sw(7), -- value(7)
-      others => '0');
+       0 => data_rdata_sw(0) -- value(0)
+      ,1 => data_rdata_sw(1) -- value(1)
+      ,2 => data_rdata_sw(2) -- value(2)
+      ,3 => data_rdata_sw(3) -- value(3)
+      ,4 => data_rdata_sw(4) -- value(4)
+      ,5 => data_rdata_sw(5) -- value(5)
+      ,6 => data_rdata_sw(6) -- value(6)
+      ,7 => data_rdata_sw(7) -- value(7)
+      );
 
     data_wcs     <= '1' when       (sig_waddr = UART_DATA)   else '0';
     data_we      <= sig_wcs and sig_we and data_wcs;
@@ -499,12 +488,13 @@ begin  -- architecture rtl
     ctrl_tx_rcs     <= '1' when (sig_raddr = UART_CTRL_TX) else '0';
     ctrl_tx_re      <= sig_rcs and sig_re and ctrl_tx_rcs;
     ctrl_tx_rdata   <= (
-      0 => ctrl_tx_rdata_sw(0), -- tx_enable(0)
-      1 => ctrl_tx_rdata_sw(1), -- tx_parity_enable(0)
-      2 => ctrl_tx_rdata_sw(2), -- tx_parity_odd(0)
-      3 => ctrl_tx_rdata_sw(3), -- tx_use_loopback(0)
-      4 => ctrl_tx_rdata_sw(4), -- cts_enable(0)
-      others => '0');
+       0 => ctrl_tx_rdata_sw(0) -- tx_enable(0)
+      ,1 => ctrl_tx_rdata_sw(1) -- tx_parity_enable(0)
+      ,2 => ctrl_tx_rdata_sw(2) -- tx_parity_odd(0)
+      ,3 => ctrl_tx_rdata_sw(3) -- tx_use_loopback(0)
+      ,4 => ctrl_tx_rdata_sw(4) -- cts_enable(0)
+      ,others => '0'
+      );
 
     ctrl_tx_wcs     <= '1' when       (sig_waddr = UART_CTRL_TX)   else '0';
     ctrl_tx_we      <= sig_wcs and sig_we and ctrl_tx_wcs;
@@ -605,12 +595,13 @@ begin  -- architecture rtl
     ctrl_rx_rcs     <= '1' when (sig_raddr = UART_CTRL_RX) else '0';
     ctrl_rx_re      <= sig_rcs and sig_re and ctrl_rx_rcs;
     ctrl_rx_rdata   <= (
-      0 => ctrl_rx_rdata_sw(0), -- rx_enable(0)
-      1 => ctrl_rx_rdata_sw(1), -- rx_parity_enable(0)
-      2 => ctrl_rx_rdata_sw(2), -- rx_parity_odd(0)
-      3 => ctrl_rx_rdata_sw(3), -- rx_use_loopback(0)
-      4 => ctrl_rx_rdata_sw(4), -- rts_enable(0)
-      others => '0');
+       0 => ctrl_rx_rdata_sw(0) -- rx_enable(0)
+      ,1 => ctrl_rx_rdata_sw(1) -- rx_parity_enable(0)
+      ,2 => ctrl_rx_rdata_sw(2) -- rx_parity_odd(0)
+      ,3 => ctrl_rx_rdata_sw(3) -- rx_use_loopback(0)
+      ,4 => ctrl_rx_rdata_sw(4) -- rts_enable(0)
+      ,others => '0'
+      );
 
     ctrl_rx_wcs     <= '1' when       (sig_waddr = UART_CTRL_RX)   else '0';
     ctrl_rx_we      <= sig_wcs and sig_we and ctrl_rx_wcs;
@@ -687,15 +678,15 @@ begin  -- architecture rtl
     baud_tick_cnt_max_lsb_rcs     <= '1' when (sig_raddr = UART_BAUD_TICK_CNT_MAX_LSB) else '0';
     baud_tick_cnt_max_lsb_re      <= sig_rcs and sig_re and baud_tick_cnt_max_lsb_rcs;
     baud_tick_cnt_max_lsb_rdata   <= (
-      0 => baud_tick_cnt_max_lsb_rdata_sw(0), -- value(0)
-      1 => baud_tick_cnt_max_lsb_rdata_sw(1), -- value(1)
-      2 => baud_tick_cnt_max_lsb_rdata_sw(2), -- value(2)
-      3 => baud_tick_cnt_max_lsb_rdata_sw(3), -- value(3)
-      4 => baud_tick_cnt_max_lsb_rdata_sw(4), -- value(4)
-      5 => baud_tick_cnt_max_lsb_rdata_sw(5), -- value(5)
-      6 => baud_tick_cnt_max_lsb_rdata_sw(6), -- value(6)
-      7 => baud_tick_cnt_max_lsb_rdata_sw(7), -- value(7)
-      others => '0');
+       0 => baud_tick_cnt_max_lsb_rdata_sw(0) -- value(0)
+      ,1 => baud_tick_cnt_max_lsb_rdata_sw(1) -- value(1)
+      ,2 => baud_tick_cnt_max_lsb_rdata_sw(2) -- value(2)
+      ,3 => baud_tick_cnt_max_lsb_rdata_sw(3) -- value(3)
+      ,4 => baud_tick_cnt_max_lsb_rdata_sw(4) -- value(4)
+      ,5 => baud_tick_cnt_max_lsb_rdata_sw(5) -- value(5)
+      ,6 => baud_tick_cnt_max_lsb_rdata_sw(6) -- value(6)
+      ,7 => baud_tick_cnt_max_lsb_rdata_sw(7) -- value(7)
+      );
 
     baud_tick_cnt_max_lsb_wcs     <= '1' when       (sig_waddr = UART_BAUD_TICK_CNT_MAX_LSB)   else '0';
     baud_tick_cnt_max_lsb_we      <= sig_wcs and sig_we and baud_tick_cnt_max_lsb_wcs;
@@ -760,15 +751,15 @@ begin  -- architecture rtl
     baud_tick_cnt_max_msb_rcs     <= '1' when (sig_raddr = UART_BAUD_TICK_CNT_MAX_MSB) else '0';
     baud_tick_cnt_max_msb_re      <= sig_rcs and sig_re and baud_tick_cnt_max_msb_rcs;
     baud_tick_cnt_max_msb_rdata   <= (
-      0 => baud_tick_cnt_max_msb_rdata_sw(0), -- value(0)
-      1 => baud_tick_cnt_max_msb_rdata_sw(1), -- value(1)
-      2 => baud_tick_cnt_max_msb_rdata_sw(2), -- value(2)
-      3 => baud_tick_cnt_max_msb_rdata_sw(3), -- value(3)
-      4 => baud_tick_cnt_max_msb_rdata_sw(4), -- value(4)
-      5 => baud_tick_cnt_max_msb_rdata_sw(5), -- value(5)
-      6 => baud_tick_cnt_max_msb_rdata_sw(6), -- value(6)
-      7 => baud_tick_cnt_max_msb_rdata_sw(7), -- value(7)
-      others => '0');
+       0 => baud_tick_cnt_max_msb_rdata_sw(0) -- value(0)
+      ,1 => baud_tick_cnt_max_msb_rdata_sw(1) -- value(1)
+      ,2 => baud_tick_cnt_max_msb_rdata_sw(2) -- value(2)
+      ,3 => baud_tick_cnt_max_msb_rdata_sw(3) -- value(3)
+      ,4 => baud_tick_cnt_max_msb_rdata_sw(4) -- value(4)
+      ,5 => baud_tick_cnt_max_msb_rdata_sw(5) -- value(5)
+      ,6 => baud_tick_cnt_max_msb_rdata_sw(6) -- value(6)
+      ,7 => baud_tick_cnt_max_msb_rdata_sw(7) -- value(7)
+      );
 
     baud_tick_cnt_max_msb_wcs     <= '1' when       (sig_waddr = UART_BAUD_TICK_CNT_MAX_MSB)   else '0';
     baud_tick_cnt_max_msb_we      <= sig_wcs and sig_we and baud_tick_cnt_max_msb_wcs;
