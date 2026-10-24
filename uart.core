@@ -74,7 +74,7 @@ filesets:
       - asylum:component:fifo
       - asylum:system:GIC
       - asylum:target:techmap
-      - asylum:utils:generators
+      - ">=asylum:utils:generators:2.8.0"
 
   #---------------------------------------
   sim_basic:
@@ -87,13 +87,12 @@ filesets:
       - bitvis:verification:uvvm      
 
   #---------------------------------------
-  # Lint Files (post_run hook of lint_ghdl_synth)
+  syn:
   #---------------------------------------
-  files_lint:
-    files:
-      - syn/ghdl/sbi_UART_synth_top.vhd
-      - syn/ghdl/ghdl_synth.sh : {file_type : user, copyto : ghdl_synth.sh}
-    file_type : vhdlSource-2008
+    files        :
+      - syn/sbi_UART_wrapper.vhd
+    file_type    : vhdlSource-2008
+    logical_name : asylum
 
 #=========================================
 targets:
@@ -112,31 +111,66 @@ targets:
   #---------------------------------------
   # Lint : -Wall analysis and elaboration (empty simulation)
   #---------------------------------------
-  lint_ghdl :
+  lint_ghdl : &lint_ghdl
     << : *default
-    description     : Lint with GHDL (-Wall analysis and elaboration of sbi_UART_synth_top)
-    toplevel        : sbi_UART_synth_top
-    filesets_append : [files_lint]
+    description     : Lint with GHDL (-Wall analysis and elaboration of sbi_UART_wrapper)
+    toplevel        : asylum.sbi_UART_wrapper
+    filesets_append : [syn]
     default_tool    : ghdl
     tools :
       ghdl :
         analyze_options : ["-Wall"]
 
   #---------------------------------------
-  # Synthesis check : lint_ghdl, then ghdl --synth -Wall of sbi_UART_synth_top
-  # for each configuration of syn/ghdl/ghdl_synth.sh (post_run hook)
+  # Synthesis check : -Wall analysis, ghdl --synth -Wall and elaboration
+  # (no simulation) of sbi_UART_wrapper with the generics of the target.
+  # The pre_run hook (ghdl_synth.sh of asylum:utils:generators) adds
+  # ghdl_synth.mk to the edalize Makefile.
+  # FuseSoC merges tools in depth : analyze_options comes from lint_ghdl.
   #---------------------------------------
-  lint_ghdl_synth :
-    << : *default
-    description     : Synthesis check, ghdl --synth -Wall of sbi_UART_synth_top (5 configurations)
-    toplevel        : sbi_UART_synth_top
-    filesets_append : [files_lint]
-    default_tool    : ghdl
+  lint_ghdl_synth_default : &lint_ghdl_synth
+    << : *lint_ghdl
+    description     : Synthesis check of sbi_UART_wrapper, default generics (PicoSoC)
     tools :
       ghdl :
-        analyze_options : ["-Wall"]
+        run_options     : ["--no-run"]
     hooks :
-      post_run : [ghdl_synth]
+      pre_run : [ghdl_synth]
+
+  #---------------------------------------
+  lint_ghdl_synth_fifo16 :
+  #---------------------------------------
+    << : *lint_ghdl_synth
+    description     : Synthesis check of sbi_UART_wrapper, FIFO depths 16 (tb_uart)
+    parameters      :
+      - DEPTH_TX=16
+      - DEPTH_RX=16
+
+  #---------------------------------------
+  lint_ghdl_synth_tx_only :
+  #---------------------------------------
+    << : *lint_ghdl_synth
+    description     : Synthesis check of sbi_UART_wrapper, TX only
+    parameters      :
+      - UART_RX_ENABLE=false
+      - DEPTH_TX=4
+
+  #---------------------------------------
+  lint_ghdl_synth_rx_only :
+  #---------------------------------------
+    << : *lint_ghdl_synth
+    description     : Synthesis check of sbi_UART_wrapper, RX only
+    parameters      :
+      - UART_TX_ENABLE=false
+      - DEPTH_RX=4
+
+  #---------------------------------------
+  lint_ghdl_synth_fixed_baud :
+  #---------------------------------------
+    << : *lint_ghdl_synth
+    description     : Synthesis check of sbi_UART_wrapper, fixed baud tick
+    parameters      :
+      - USER_DEFINE_BAUD_TICK=false
 
   #---------------------------------------
   sim_basic:
@@ -157,7 +191,44 @@ scripts:
 #=========================================
 
   #---------------------------------------
-  # Hook of lint_ghdl_synth (cwd = work_root)
+  # pre_run hook of lint_ghdl_synth_* (cwd = work_root)
   #---------------------------------------
   ghdl_synth :
     cmd : [bash, ghdl_synth.sh]
+
+#=========================================
+parameters :
+#=========================================
+
+  #---------------------------------------
+  # Generics of sbi_UART_wrapper (lint_ghdl_synth_*)
+  #---------------------------------------
+  UART_TX_ENABLE :
+    description : true, UART TX instantiated
+    datatype    : bool
+    default     : true
+    paramtype   : generic
+
+  UART_RX_ENABLE :
+    description : true, UART RX instantiated
+    datatype    : bool
+    default     : true
+    paramtype   : generic
+
+  USER_DEFINE_BAUD_TICK :
+    description : true, baud tick register writable by software ; false, fixed baud tick
+    datatype    : bool
+    default     : true
+    paramtype   : generic
+
+  DEPTH_TX :
+    description : Depth of the TX FIFO (0 = no FIFO)
+    datatype    : int
+    default     : 0
+    paramtype   : generic
+
+  DEPTH_RX :
+    description : Depth of the RX FIFO (0 = no FIFO)
+    datatype    : int
+    default     : 0
+    paramtype   : generic

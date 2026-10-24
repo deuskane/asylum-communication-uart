@@ -1,5 +1,9 @@
-default         : Default Target
-lint_ghdl       : Lint with GHDL (-Wall analysis and elaboration of sbi_UART_synth_top)
-lint_ghdl_synth : Synthesis check, ghdl --synth -Wall of sbi_UART_synth_top (5 configurations)
-sim_basic       : Simulation of basic unit tests
+default                    : Default Target
+lint_ghdl                  : Lint with GHDL (-Wall analysis and elaboration of sbi_UART_wrapper)
+lint_ghdl_synth_default    : Synthesis check of sbi_UART_wrapper, default generics (PicoSoC)
+lint_ghdl_synth_fifo16     : Synthesis check of sbi_UART_wrapper, FIFO depths 16 (tb_uart)
+lint_ghdl_synth_fixed_baud : Synthesis check of sbi_UART_wrapper, fixed baud tick
+lint_ghdl_synth_rx_only    : Synthesis check of sbi_UART_wrapper, RX only
+lint_ghdl_synth_tx_only    : Synthesis check of sbi_UART_wrapper, TX only
+sim_basic                  : Simulation of basic unit tests
 
