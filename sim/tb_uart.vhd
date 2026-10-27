@@ -51,6 +51,7 @@ architecture sim of tb_uart is
   constant CTRL_EN_EVEN    : std_logic_vector(7 downto 0) := x"03";
   constant CTRL_EN_ODD     : std_logic_vector(7 downto 0) := x"07";
   constant CTRL_LOOPBACK   : std_logic_vector(7 downto 0) := x"08";
+  constant CTRL_FLOW_CTRL  : std_logic_vector(7 downto 0) := x"10"; -- [4] cts_enable / rts_enable
 
   -- Patterns : data bit 0 at 1 and at 0, all parities
   type     data_array_t is array (natural range <>) of std_logic_vector(7 downto 0);
@@ -368,6 +369,28 @@ begin
     test_loopback(x"01", PARITY_EVEN, exp_error => '1');
     sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN or CTRL_LOOPBACK, "Enable UART RX even parity in loopback", clk_i, sbi_if);
     test_loopback(x"01", PARITY_EVEN, exp_error => '0');
+
+    -- TEST 10: TX backpressure : a byte written while TX is disabled or
+    -- while CTS# is inactive is kept in the TX FIFO and sent later
+    log(ID_LOG_HDR, "Test 10: TX disabled and CTS# inactive keep the TX bytes", C_SCOPE);
+    sbi_write(csr_addr(UART_CTRL_RX), x"00", "Disable UART RX", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_DATA), x"4B", "Write UART TX 0x4B while TX is disabled", clk_i, sbi_if);
+    wait for 2 * 12 * BIT_PERIOD;
+    check_stable(uart_tx, 2 * 12 * BIT_PERIOD, ERROR, "Check no frame while TX is disabled", C_SCOPE);
+    sbi_write(csr_addr(UART_CTRL_TX), CTRL_EN, "Enable UART TX", clk_i, sbi_if);
+    uart_bfm_expect(x"4B", PARITY_NONE, "Check byte written while TX was disabled");
+
+    uart_cts_b <= '1';
+    sbi_write(csr_addr(UART_CTRL_TX), CTRL_EN or CTRL_FLOW_CTRL, "Enable UART TX with CTS", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_DATA), x"D2", "Write UART TX 0xD2 while CTS# is inactive", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_DATA), x"2D", "Write UART TX 0x2D while CTS# is inactive", clk_i, sbi_if);
+    wait for 3 * 12 * BIT_PERIOD;
+    check_stable(uart_tx, 3 * 12 * BIT_PERIOD, ERROR, "Check no frame while CTS# is inactive", C_SCOPE);
+    uart_cts_b <= '0';
+    uart_bfm_expect(x"D2", PARITY_NONE, "Check UART TX 0xD2 after CTS# activation");
+    uart_bfm_expect(x"2D", PARITY_NONE, "Check UART TX 0x2D after CTS# activation");
+    sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
 
     sbi_write(csr_addr(UART_IMR), x"04", "Unmask RX not empty interrupt", clk_i, sbi_if);
     wait until rising_edge(clk_i);
