@@ -72,7 +72,7 @@ filesets:
     depend :
       - asylum:utils:pkg
       - asylum:component:fifo
-      - asylum:system:GIC
+      - ">=asylum:system:GIC:2.0.0"
       - asylum:target:techmap
       - asylum:utils:generators
 
