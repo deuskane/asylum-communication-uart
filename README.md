@@ -40,7 +40,7 @@
 
 **UART transmitter / receiver with CSR access over the SBI bus, TX / RX FIFOs, CTS / RTS flow control, loopback modes and an interrupt output.**
 
-VLNV: `asylum:communication:uart:1.11.0`
+VLNV: `asylum:communication:uart:2.0.0`
 
 ## Table of Contents
 
@@ -131,7 +131,7 @@ Top-level entity: **`sbi_UART`** ([hdl/sbi_uart.vhd](hdl/sbi_uart.vhd)), library
 
 | Name | Direction | Type | Description |
 |------|-----------|------|-------------|
-| `it_o` | out | std_logic | Interrupt request: OR of the `isr` bits |
+| `it_o` | out | std_logic | Interrupt request: OR of the `isr` bits enabled in `imr` |
 
 #### Debug
 
@@ -276,7 +276,7 @@ Notes:
 
 | File | DUT | Description |
 |------|-----|-------------|
-| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (400 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag; (10) bytes written while TX is disabled or while CTS# is inactive are not sent, then sent after TX enable / CTS# activation. RTS flow control and `tx_use_loopback` are not checked |
+| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (405 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, the RX-not-empty event of tests 1-3 recorded while masked and cleared before unmasking, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag; (10) bytes written while TX is disabled or while CTS# is inactive are not sent, then sent after TX enable / CTS# activation; at the end the RX and TX not-empty events of the masked sources are recorded in `isr` without interrupt. RTS flow control and `tx_use_loopback` are not checked |
 
 ### Targets
 
@@ -299,7 +299,7 @@ make clean                # remove build/ and log/
 Equivalent FuseSoC command:
 
 ```bash
-fusesoc --cores-root . run --build-root build --target sim_basic asylum:communication:uart:1.11.0
+fusesoc --cores-root . run --build-root build --target sim_basic asylum:communication:uart:2.0.0
 ```
 
 The `sim_basic` target runs GHDL with `--fst=dut.fst --ieee-asserts=disable`. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `sim_basic`.
@@ -341,7 +341,7 @@ The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 1
 
 ### Interrupts
 
-`GIC_core` computes `isr_next = (imr and status) or isr` every cycle and `it_o = or(isr)`: only unmasked events are latched; software clears them by writing 1 into `isr` (rw1c).
+`GIC_core` (`asylum:system:GIC` >= 2.0.0) computes `isr_next = status or isr` every cycle, whatever `imr`, and `it_o = or(isr and imr)`: the masked sources are latched too (they can be polled) and `imr` only masks `it_o`. Software clears the events by writing 1 into `isr` (rw1c), and clears the old events it wants to ignore before unmasking a source (e.g. the RX not-empty event of bytes already read).
 
 ## Directory Structure
 
@@ -378,7 +378,7 @@ asylum-communication-uart/
 |------|-------------------|---------|
 | `asylum:utils:pkg` | `rtl` | Common packages (`sbi_pkg`, `math_pkg`, `convert_pkg`, ...) |
 | `asylum:component:fifo` | `rtl` | FIFO used by the `csr_fifo` of the `data` register |
-| `asylum:system:GIC` | `rtl` | `GIC_core` (interrupt status / mask / merge) |
+| `asylum:system:GIC` (`>=2.0.0`) | `rtl` | `GIC_core` (interrupt status / mask / merge; raw `isr`, `imr` masks `it_o`) |
 | `asylum:target:techmap` | `rtl` | `sync2dffrn` synchronizers of `uart_rx_i` and `uart_cts_b_i` (`techmap_pkg`) |
 | `asylum:utils:generators` | `rtl` | regtool generator (`gen_csr`) and CSR building blocks |
 | `bitvis:verification:uvvm` | `sim_basic` | UVVM utility library and SBI VIP |
