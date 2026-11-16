@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2026-10-05
+-- Last update: 2026-11-16
 -- Platform   : 
 -- Standard   : VHDL'87
 -------------------------------------------------------------------------------
@@ -25,6 +25,8 @@
 -- 2025-11-22  1.3     mrosiere Use sbi instead pbi
 -- 2026-09-21  1.4     mrosiere cts_b use sync2dff from top to sbi_uart
 -- 2026-10-05  1.5     mrosiere Connect RX parity error (debug only, no CSR)
+-- 2026-11-16  1.6     mrosiere isr / imr source 0 : TX FIFO empty (was TX FIFO
+--                              not empty)
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -140,7 +142,7 @@ architecture rtl of sbi_UART is
   signal   it_rx_full             : std_logic;
   signal   it_rx_empty_b          : std_logic;
   signal   it_tx_full             : std_logic;
-  signal   it_tx_empty_b          : std_logic;
+  signal   it_tx_empty            : std_logic;
   
 begin  -- architecture rtl
 
@@ -387,14 +389,18 @@ begin  -- architecture rtl
   -----------------------------------------------------------------------------
   -- Interruptions
   -----------------------------------------------------------------------------
+  -- Sources (levels) : [0] TX FIFO empty, [1] TX FIFO full,
+  --                    [2] RX FIFO not empty, [3] RX FIFO full
+  -- GIC_core sets the isr bit of an active source every cycle : software polls
+  -- the FIFO state by clearing the bits, then reading isr (read wait state)
   it_rx_full    <=     sw2hw.data.hw2sw_full ;
   it_rx_empty_b <= not sw2hw.data.hw2sw_empty;
   it_tx_full    <=     sw2hw.data.sw2hw_full ;
-  it_tx_empty_b <= not sw2hw.data.sw2hw_empty;
+  it_tx_empty   <=     sw2hw.data.sw2hw_empty;
   it            <= (it_rx_full    &  
                     it_rx_empty_b & 
                     it_tx_full    & 
-                    it_tx_empty_b 
+                    it_tx_empty   
                     );
   hw2sw.isr.we  <= '1';
   

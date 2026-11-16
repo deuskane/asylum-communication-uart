@@ -76,7 +76,7 @@ filesets:
       - asylum:component:fifo
       - ">=asylum:system:GIC:2.0.0"
       - asylum:target:techmap
-      - ">=asylum:utils:generators:2.8.0"
+      - ">=asylum:utils:generators:2.10.0"
 
   #---------------------------------------
   sim_basic:

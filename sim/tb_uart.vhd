@@ -12,6 +12,8 @@
 -- Date        Version  Author   Description
 -- 2026-10-05  1.1      mrosiere Add parity tests (RX BFM, TX monitor,
 --                               internal loopback) and parity error check
+-- 2026-11-16  1.2      mrosiere isr source 0 = TX FIFO empty, isr polling
+--                               (clear then read back to back)
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -282,24 +284,25 @@ begin
     wait for 10 * BIT_PERIOD;
     -- isr[2] is the "RX FIFO not empty" interrupt. The isr also records the
     -- events of the masked sources : the bytes of tests 1 to 3 left isr[2] set
-    -- while imr = 0, without interrupt. The RX FIFO is empty again : clear
-    -- this old event before unmasking
-    sbi_check(csr_addr(UART_ISR), x"04", "Check RX not empty recorded while masked", clk_i, sbi_if);
+    -- while imr = 0, without interrupt, and isr[0] (TX FIFO empty) is set by
+    -- the empty TX FIFO. The RX FIFO is empty again : clear this old event
+    -- before unmasking
+    sbi_check(csr_addr(UART_ISR), x"05", "Check RX not empty and TX FIFO empty recorded while masked", clk_i, sbi_if);
     check_value(it_o, '0', ERROR, "Check no interrupt while masked");
     sbi_write(csr_addr(UART_ISR), x"04", "Clear the old RX not empty event", clk_i, sbi_if);
     sbi_write(csr_addr(UART_IMR), x"04", "Unmask RX not empty interrupt", clk_i, sbi_if);
     wait until rising_edge(clk_i);
-    sbi_check(csr_addr(UART_ISR), x"00", "Check RX FIFO is still empty", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check RX FIFO is still empty", clk_i, sbi_if);
     check_value(it_o, '0', ERROR, "Check no interrupt after glitch");
     uart_bfm_send(x"C6", BIT_PERIOD);
     wait until rising_edge(clk_i);
     wait until rising_edge(clk_i);
-    sbi_check(csr_addr(UART_ISR), x"04", "Check RX not empty interrupt", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"05", "Check RX not empty interrupt", clk_i, sbi_if);
     check_value(it_o, '1', ERROR, "Check interrupt output after reception");
     sbi_check(csr_addr(UART_DATA), x"C6", "Check UART RX after glitch", clk_i, sbi_if);
     sbi_write(csr_addr(UART_IMR), x"00", "Mask RX not empty interrupt", clk_i, sbi_if);
     sbi_write(csr_addr(UART_ISR), x"04", "Clear RX not empty interrupt", clk_i, sbi_if);
-    sbi_check(csr_addr(UART_ISR), x"00", "Check interrupt cleared", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check interrupt cleared", clk_i, sbi_if);
     check_value(it_o, '0', ERROR, "Check interrupt output cleared");
 
     -- TEST 5: RX with parity (even / odd), good and corrupted parity
@@ -399,6 +402,51 @@ begin
     uart_bfm_expect(x"2D", PARITY_NONE, "Check UART TX 0x2D after CTS# activation");
     sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
 
+    -- TEST 13: TX FIFO empty interrupt and polling of the FIFO state in isr
+    -- isr / imr sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not
+    -- empty, [3] RX FIFO full. Polling : write 1 to clear the bits, then read
+    -- isr. A bit cleared while its source is still active is set again one
+    -- cycle after the clear : the read wait state of isr lets the read issued
+    -- right after the clear (back to back SBI accesses) see it
+    log(ID_LOG_HDR, "Test 13: TX FIFO empty interrupt and isr polling", C_SCOPE);
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear isr (polling)", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check isr read right after the clear : TX FIFO empty", clk_i, sbi_if);
+    -- Fill the TX FIFO while TX is disabled : not empty, then full
+    sbi_write(csr_addr(UART_DATA), x"80", "Write UART TX 0x80 while TX is disabled", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear isr (polling)", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"00", "Check isr read right after the clear : TX FIFO neither empty nor full", clk_i, sbi_if);
+    for i in 1 to 15 loop
+      sbi_write(csr_addr(UART_DATA), std_logic_vector(to_unsigned(16#80#+i, 8)), "Write UART TX while TX is disabled", clk_i, sbi_if);
+    end loop;
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear isr (polling)", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"02", "Check isr read right after the clear : TX FIFO full", clk_i, sbi_if);
+    -- TX FIFO empty interrupt : raised when the last byte leaves the TX FIFO
+    -- (loaded in the transmitter at the stop bit of the previous frame), so
+    -- that software can write the next bytes before the line goes idle
+    sbi_write(csr_addr(UART_IMR), x"01", "Unmask TX FIFO empty interrupt", clk_i, sbi_if);
+    wait until rising_edge(clk_i);
+    check_value(it_o, '0', ERROR, "Check no TX FIFO empty interrupt with a full TX FIFO");
+    sbi_write(csr_addr(UART_CTRL_TX), CTRL_EN, "Enable UART TX", clk_i, sbi_if);
+    for i in 0 to 13 loop
+      uart_bfm_expect(std_logic_vector(to_unsigned(16#80#+i, 8)), PARITY_NONE, "Check UART TX 0x" & to_hstring(std_logic_vector(to_unsigned(16#80#+i, 8))) & " from the TX FIFO");
+    end loop;
+    check_value(it_o, '0', ERROR, "Check no TX FIFO empty interrupt while a byte is in the TX FIFO");
+    uart_bfm_expect(x"8E", PARITY_NONE, "Check UART TX 0x8E, the last byte leaves the TX FIFO");
+    check_value(it_o, '1', ERROR, "Check TX FIFO empty interrupt");
+    uart_bfm_expect(x"8F", PARITY_NONE, "Check UART TX 0x8F, last byte of the TX FIFO");
+    sbi_check(csr_addr(UART_ISR), x"03", "Check TX FIFO empty in isr (TX FIFO full event kept)", clk_i, sbi_if);
+    -- Level source : clearing isr[0] while the TX FIFO is empty does not
+    -- drop the interrupt, masking it does (no more byte to send)
+    sbi_write(csr_addr(UART_ISR), x"01", "Clear TX FIFO empty interrupt", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"03", "Check TX FIFO empty set again right after the clear", clk_i, sbi_if);
+    check_value(it_o, '1', ERROR, "Check TX FIFO empty interrupt kept while the TX FIFO is empty");
+    sbi_write(csr_addr(UART_IMR), x"00", "Mask TX FIFO empty interrupt", clk_i, sbi_if);
+    wait until rising_edge(clk_i);
+    check_value(it_o, '0', ERROR, "Check no interrupt when TX FIFO empty is masked");
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear the old events", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check isr read right after the clear : TX FIFO empty", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
+
     -- TEST 14: RTS# (registered output) with a full RX FIFO
     log(ID_LOG_HDR, "Test 14: RTS# with a full RX FIFO", C_SCOPE);
     sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
@@ -427,17 +475,17 @@ begin
     check_value(uart_rts_b, '0', ERROR, "Check RTS# active after the RX FIFO is read");
     sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN, "Enable UART RX without RTS", clk_i, sbi_if);
 
-    -- The masked sources were recorded (polling) : RX not empty (tests 5, 7
-    -- and 8) and TX not empty (tests 6, 7 and 10), without interrupt. Both
-    -- FIFOs are empty : clear the old events before unmasking
+    -- The masked sources were recorded (polling) : RX not empty (test 14) and
+    -- TX FIFO empty (empty TX FIFO), without interrupt. Clear the old events
+    -- before unmasking : only the TX FIFO empty level remains
     sbi_read(csr_addr(UART_ISR), v_isr, "Read isr (masked sources)", clk_i, sbi_if);
     check_value(v_isr(2), '1', ERROR, "Check RX not empty recorded while masked");
-    check_value(v_isr(0), '1', ERROR, "Check TX not empty recorded while masked");
+    check_value(v_isr(0), '1', ERROR, "Check TX FIFO empty recorded while masked");
     check_value(it_o, '0', ERROR, "Check no interrupt while masked");
-    sbi_write(csr_addr(UART_ISR), x"0F", "Clear the old events", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear the old events", clk_i, sbi_if);
     sbi_write(csr_addr(UART_IMR), x"04", "Unmask RX not empty interrupt", clk_i, sbi_if);
     wait until rising_edge(clk_i);
-    sbi_check(csr_addr(UART_ISR), x"00", "Check RX FIFO is empty at end of test", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check RX FIFO is empty at end of test", clk_i, sbi_if);
     check_value(it_o, '0', ERROR, "Check no pending interrupt at end of test");
 
     log(ID_LOG_HDR, "Simulation Finished.", C_SCOPE);

@@ -67,7 +67,7 @@ This IP is the UART of the Asylum project. Software drives it through a small CS
 - Configurable FIFO depths (`DEPTH_TX`, `DEPTH_RX`, 0 = no FIFO), blocking read / write on the `data` register
 - Hardware flow control: CTS# (synchronized, `ctrl_tx.cts_enable`) and RTS# driven by the RX FIFO full flag (`ctrl_rx.rts_enable`)
 - Two loopback modes: serial loopback TX to RX (`rx_use_loopback`) and echo of received bytes on TX (`tx_use_loopback`)
-- 4 interrupt sources (TX FIFO not empty / full, RX FIFO not empty / full) with status and mask registers
+- 4 interrupt sources (TX FIFO empty / full, RX FIFO not empty / full) with status and mask registers; the FIFO state is polled in `isr` (write 1 to clear, then read)
 - TX or RX path can be removed at elaboration (`UART_TX_ENABLE`, `UART_RX_ENABLE`)
 - Debug port with the TX / RX FSM states and the parity error flag of the last received frame
 - Simulation-only dump of TX / RX bytes into raw and annotated text files
@@ -80,7 +80,7 @@ Diagram: [doc/uart.drawio](doc/uart.drawio) (open with diagrams.net or the VS Co
 - The `data` register is a bidirectional `csr_fifo`: writes fill the TX FIFO, reads drain the RX FIFO.
 - `uart_tx_axis` and `uart_rx_axis` exchange bytes with the FIFOs as AXI-Stream-like valid/ready channels; each one has its own `uart_baud_rate_gen` (the RX one also provides the mid-bit `baud_tick_half` used for sampling).
 - `uart_cts_b_i` and `uart_rx_i` go through a `sync2dffrn` synchronizer (techmap) before reaching the transmitter / receiver (`uart_rx_i` is synchronized inverted, so that its idle level `'1'` is kept during reset).
-- The FIFO full / not-empty flags feed `GIC_core`, which updates the `isr` register and drives `it_o`.
+- The FIFO empty / full / not-empty flags feed `GIC_core`, which updates the `isr` register and drives `it_o`.
 
 ## Top-Level
 
@@ -268,7 +268,8 @@ Notes:
 
 - `data` is a FIFO register with blocking read / write: writes go to the TX FIFO (`DEPTH_TX`), reads come from the RX FIFO (`DEPTH_RX`).
 - `baud_tick_cnt_max_lsb` / `baud_tick_cnt_max_msb` only exist when `USER_DEFINE_BAUD_TICK = true`; their reset value is `CLOCK_FREQ / BAUD_RATE - 1` (computed in `sbi_UART`). The value must be written as `f_clk / baud - 1`. Write it at setup time, with `ctrl_tx.tx_enable = 0` and `ctrl_rx.rx_enable = 0`: these bits are the reset of the TX / RX baud rate generators and state machines, so the intermediate value `{old MSB, new LSB}` between the two writes is never used. Changing the baud rate while TX or RX is enabled is not supported.
-- The meaning of the 4 `isr` / `imr` bits is set by `sbi_UART`: bit 0 = TX FIFO not empty, bit 1 = TX FIFO full, bit 2 = RX FIFO not empty, bit 3 = RX FIFO full.
+- The meaning of the 4 `isr` / `imr` bits is set by `sbi_UART`: bit 0 = TX FIFO empty (`DEPTH_TX = 0`: the transmitter can accept a byte; up to version 2.0.0 this bit was TX FIFO not empty), bit 1 = TX FIFO full, bit 2 = RX FIFO not empty, bit 3 = RX FIFO full.
+- `isr` has one read wait state (`rd_wait_state: 1`, a read lasts 2 cycles), so that the FIFO state can be polled in `isr`, see [Interrupts](#interrupts).
 
 ## Verification
 
@@ -276,7 +277,7 @@ Notes:
 
 | File | DUT | Description |
 |------|-----|-------------|
-| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (426 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, the RX-not-empty event of tests 1-3 recorded while masked and cleared before unmasking, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag; (10) bytes written while TX is disabled or while CTS# is inactive are not sent, then sent after TX enable / CTS# activation; (14) RTS# (registered) active with an empty RX FIFO, inactive with a full RX FIFO, forced active by `rts_enable = 0`, active again after the FIFO is read; at the end the RX and TX not-empty events of the masked sources are recorded in `isr` without interrupt. `tx_use_loopback` is not checked |
+| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (501 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, the RX-not-empty event of tests 1-3 and the TX FIFO empty level recorded while masked, the RX-not-empty event cleared before unmasking, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag; (10) bytes written while TX is disabled or while CTS# is inactive are not sent, then sent after TX enable / CTS# activation; (13) polling of the FIFO state in `isr`, written 1 to clear then read in the next SBI access (TX FIFO empty, neither empty nor full, full), TX FIFO empty interrupt raised when the last byte leaves the TX FIFO, kept by a clear while the TX FIFO is empty, dropped by `imr`; (14) RTS# (registered) active with an empty RX FIFO, inactive with a full RX FIFO, forced active by `rts_enable = 0`, active again after the FIFO is read; at the end the RX not-empty event and the TX FIFO empty level of the masked sources are recorded in `isr` without interrupt. `tx_use_loopback` is not checked |
 
 ### Targets
 
@@ -358,6 +359,16 @@ The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 1
 
 `GIC_core` (`asylum:system:GIC` >= 2.0.0) computes `isr_next = status or isr` every cycle, whatever `imr`, and `it_o = or(isr and imr)`: the masked sources are latched too (they can be polled) and `imr` only masks `it_o`. Software clears the events by writing 1 into `isr` (rw1c), and clears the old events it wants to ignore before unmasking a source (e.g. the RX not-empty event of bytes already read).
 
+The sources are levels: bit 0 TX FIFO empty, bit 1 TX FIFO full, bit 2 RX FIFO not empty, bit 3 RX FIFO full. TX FIFO empty rises when the last byte of the TX FIFO is loaded into the transmitter, while this byte is still being sent: an interrupt-driven TX driver writes its next bytes, and masks bit 0 in `imr` when it has nothing more to send (clearing the bit has no effect while the TX FIFO is empty).
+
+Polling of the FIFO state: there is no status register, software reads the level sources in `isr`. It writes 1 to the bits 3:0 to clear them, then reads `isr`: the bit of a source still active is set again. `isr` is a `csr_reg` `rw1c` written by the hardware every cycle, and the software clear wins in the cycle of the write, so the bit comes back one cycle after the clear. The read wait state of `isr` (`rd_wait_state: 1`, `asylum:utils:generators` >= 2.10.0) returns the value of the second cycle of the read: a read issued right after the clear (back-to-back accesses) sees the bit set again.
+
+```c
+PORT_WR(UART, UART_ISR, 0x0F);   // clear the FIFO state bits (3:0)
+isr = PORT_RD(UART, UART_ISR);   // the bits of the active sources are set again
+if (isr & 0x02) { /* TX FIFO full : do not write data */ }
+```
+
 ## Directory Structure
 
 ```
@@ -397,6 +408,6 @@ asylum-communication-uart/
 | `asylum:component:fifo` | `rtl` | FIFO used by the `csr_fifo` of the `data` register |
 | `asylum:system:GIC` (`>=2.0.0`) | `rtl` | `GIC_core` (interrupt status / mask / merge; raw `isr`, `imr` masks `it_o`) |
 | `asylum:target:techmap` | `rtl` | `sync2dffrn` synchronizers of `uart_rx_i` and `uart_cts_b_i` (`techmap_pkg`) |
-| `asylum:utils:generators` (`>=2.8.0`) | `rtl` | regtool generator (`gen_csr`) and CSR building blocks |
+| `asylum:utils:generators` (`>=2.10.0`) | `rtl` | regtool generator (`gen_csr`) and CSR building blocks (read wait state of `isr`) |
 | `asylum:utils:ghdl_synth` | `syn` | `ghdl_synth.sh` / `ghdl_synth.mk` (`pre_run` hook of `lint_ghdl_synth_*`) |
 | `bitvis:verification:uvvm` | `sim_basic` | UVVM utility library and SBI VIP |
