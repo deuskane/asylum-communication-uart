@@ -31,6 +31,9 @@
 --                              at DEPTH_RX-2 bytes in the RX FIFO
 -- 2026-11-16  1.8     mrosiere RX framing error, parity error and break :
 --                              isr / imr sources 5, 6 and 7
+-- 2026-11-16  1.9     mrosiere RX_STORE_PARITY_ERROR = false : a byte with a
+--                              parity error is dropped (not in the RX FIFO,
+--                              not echoed)
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -58,6 +61,10 @@ entity sbi_UART is
     USER_DEFINE_BAUD_TICK : boolean := true;
     DEPTH_TX              : natural := 0;
     DEPTH_RX              : natural := 0;
+    -- true  : a byte received with a parity error is stored in the RX FIFO
+    --         (or echoed), false : it is dropped. The parity error event
+    --         (isr / imr source 6) is raised in both cases
+    RX_STORE_PARITY_ERROR : boolean := true;
     
     FILENAME_TX           : string  := "dump_uart_tx.txt";
     FILENAME_RX           : string  := "dump_uart_rx.txt"
@@ -388,7 +395,8 @@ begin  -- architecture rtl
 
     ins_uart_rx_axis : uart_rx_axis
       generic map
-      ( WIDTH           => 8
+      ( WIDTH              => 8
+       ,STORE_PARITY_ERROR => RX_STORE_PARITY_ERROR
         )
       port map
       ( clk_i           => clk_i

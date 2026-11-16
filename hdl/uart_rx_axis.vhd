@@ -27,6 +27,8 @@
 --                               (err_framing_o, err_break_o), wait for the
 --                               line at 1 after a framing error, parity
 --                               error pulse (err_parity_o)
+-- 2026-11-16  1.4      mrosiere STORE_PARITY_ERROR = false : a byte with a
+--                               parity error is dropped
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -40,7 +42,11 @@ use     asylum.uart_pkg.ALL;
 
 entity uart_rx_axis is
   generic (
-    WIDTH           : natural := 8
+    WIDTH              : natural := 8;
+    -- true  : a byte with a parity error is delivered on m_axis
+    -- false : a byte with a parity error is dropped
+    -- (err_parity_o is raised in both cases)
+    STORE_PARITY_ERROR : boolean := true
     );
   port (
     clk_i           : in  std_logic;
@@ -68,7 +74,8 @@ entity uart_rx_axis is
     err_overrun_o   : out std_logic;
 
     -- Errors of the received frame : one clock cycle pulse at the end of the
-    -- frame (the byte is still delivered on m_axis)
+    -- frame. The byte is delivered on m_axis, except a byte with a parity
+    -- error when STORE_PARITY_ERROR = false
     err_parity_o    : out std_logic; -- Parity bit mismatch
     err_framing_o   : out std_logic; -- Stop bit sampled at 0
     err_break_o     : out std_logic; -- Break : all bits of the frame at 0
@@ -230,12 +237,15 @@ begin
           wait_idle_r       <= v_framing_error;
           
           -- Previous byte still pending : overrun, the new byte is dropped
-          -- (the pending byte is never overwritten)
+          -- (the pending byte is never overwritten). Parity error with
+          -- STORE_PARITY_ERROR = false : the byte is dropped (err_parity_o only)
           if (m_axis_tvalid_r = '1') and
              (m_axis_tready_i = '0')
           then
             err_overrun_r   <= '1';
-          else
+          elsif (v_parity_error     = '0') or
+                (STORE_PARITY_ERROR = true)
+          then
             m_axis_tdata_o  <= v_data;
             m_axis_tvalid_r <= '1';
           end if;

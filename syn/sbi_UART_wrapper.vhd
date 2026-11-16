@@ -19,6 +19,7 @@
 -- Date        Version  Author   Description
 -- 2026-10-20  1.0      mrosiere Created
 -- 2026-10-24  1.1      mrosiere Was sbi_UART_synth_top, library asylum
+-- 2026-11-16  1.2      mrosiere Add RX_STORE_PARITY_ERROR
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -36,7 +37,8 @@ entity sbi_UART_wrapper is
     UART_RX_ENABLE        : boolean := true;
     USER_DEFINE_BAUD_TICK : boolean := true;
     DEPTH_TX              : natural := 0;
-    DEPTH_RX              : natural := 0
+    DEPTH_RX              : natural := 0;
+    RX_STORE_PARITY_ERROR : boolean := true
   );
   port (
     clk_i         : in  std_logic;
@@ -90,7 +92,8 @@ begin
       UART_RX_ENABLE        => UART_RX_ENABLE,
       USER_DEFINE_BAUD_TICK => USER_DEFINE_BAUD_TICK,
       DEPTH_TX              => DEPTH_TX,
-      DEPTH_RX              => DEPTH_RX
+      DEPTH_RX              => DEPTH_RX,
+      RX_STORE_PARITY_ERROR => RX_STORE_PARITY_ERROR
     )
     port map (
       clk_i                 => clk_i,
