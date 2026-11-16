@@ -16,13 +16,13 @@ Interruption Status Register. Each source sets its bit, masked or not (imr only 
 
 Wait states: read 1, write 0
 
-### [4:0] value
-0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (event : a received byte was dropped)
+### [7:0] value
+0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (a received byte was dropped), [5] RX framing error (stop bit at 0), [6] RX parity error, [7] RX break (all bits of a frame at 0) (events)
 
 ## 0x1 imr
 Interruption Mask Register
 
-### [4:0] enable
+### [7:0] enable
 0: interrupt is disable, 1: interrupt is enable. Same bit mapping as isr
 
 ## 0x2 data

@@ -12,6 +12,8 @@
 -- 2026-10-05  1.1      mrosiere Add parity_error in uart_rx_debug_t and
 --                               parity_error_o in uart_rx_axis
 -- 2026-11-16  1.2      mrosiere Add err_overrun_o in uart_rx_axis
+-- 2026-11-16  1.3      mrosiere Add err_parity_o, err_framing_o and
+--                               err_break_o in uart_rx_axis
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -136,6 +138,12 @@ component uart_rx_axis is
     -- Overrun : one clock cycle pulse when a frame is received while the
     -- previous byte is still pending on m_axis (the new byte is dropped)
     err_overrun_o   : out std_logic;
+
+    -- Errors of the received frame : one clock cycle pulse at the end of the
+    -- frame (the byte is still delivered on m_axis)
+    err_parity_o    : out std_logic; -- Parity bit mismatch
+    err_framing_o   : out std_logic; -- Stop bit sampled at 0
+    err_break_o     : out std_logic; -- Break : all bits of the frame at 0
 
     debug_o         : out uart_rx_debug_t
   );

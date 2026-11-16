@@ -15,6 +15,8 @@
 -- 2026-11-16  1.2      mrosiere isr source 0 = TX FIFO empty, isr polling
 --                               (clear then read back to back)
 -- 2026-11-16  1.3      mrosiere RX overrun interrupt and RTS# threshold
+-- 2026-11-16  1.4      mrosiere RX framing error, break and parity error
+--                               interrupts
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -154,10 +156,12 @@ begin
   process
     -- Simplified UART BFM procedure (Transmission to FPGA)
     -- corrupt_parity : send the inverted parity bit
+    -- stop_bit       : level of the stop bit ('0' : framing error)
     procedure uart_bfm_send(data           : std_logic_vector(7 downto 0);
                             period         : time;
-                            parity         : parity_t := PARITY_NONE;
-                            corrupt_parity : boolean  := false) is
+                            parity         : parity_t  := PARITY_NONE;
+                            corrupt_parity : boolean   := false;
+                            stop_bit       : std_logic := '1') is
     begin
       log(ID_SEQUENCER, "BFM UART: Sending 0x" & to_hstring(data) & " (parity " & to_string(parity) & ")", C_SCOPE);
       uart_rx <= '0'; -- Start bit
@@ -174,7 +178,7 @@ begin
         end if;
         wait for period;
       end if;
-      uart_rx <= '1'; -- Stop bit
+      uart_rx <= stop_bit; -- Stop bit
       wait for period;
     end procedure;
 
@@ -451,6 +455,51 @@ begin
     sbi_check(csr_addr(UART_ISR), x"0D", "Check RX overrun cleared (RX FIFO events kept)", clk_i, sbi_if);
     check_value(it_o, '0', ERROR, "Check interrupt output cleared");
     sbi_write(csr_addr(UART_IMR), x"00", "Mask RX overrun interrupt", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear the old events", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check isr : TX FIFO empty only", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_RX), x"00", "Disable UART RX", clk_i, sbi_if);
+
+    -- TEST 12: RX framing error, break and parity error
+    -- isr / imr events : [5] framing error, [6] parity error, [7] break
+    log(ID_LOG_HDR, "Test 12: RX framing error, break and parity error", C_SCOPE);
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN, "Enable UART RX without parity", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear isr (polling)", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check isr : TX FIFO empty only, no RX error", clk_i, sbi_if);
+    -- Stop bit at 0 : framing error, the byte is still delivered
+    uart_bfm_send(x"A5", BIT_PERIOD, PARITY_NONE, false, stop_bit => '0');
+    uart_rx <= '1';
+    wait for 2 * BIT_PERIOD;
+    sbi_check(csr_addr(UART_ISR), x"25", "Check RX framing error in isr (TX FIFO empty, RX FIFO not empty)", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_DATA), x"A5", "Check UART RX 0xA5 with a framing error", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"24", "Clear RX framing error and RX not empty", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check RX framing error cleared", clk_i, sbi_if);
+    -- Break (line at 0 during 25 bit periods) : one 0x00 byte with a framing
+    -- error and a break, then the receiver waits for the line back to 1
+    uart_rx <= '0';
+    wait for 25 * BIT_PERIOD;
+    uart_rx <= '1';
+    wait for 2 * BIT_PERIOD;
+    sbi_check(csr_addr(UART_ISR), x"A5", "Check RX break and framing error in isr", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_DATA), x"00", "Check UART RX 0x00 of the break", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"A4", "Clear RX break, framing error and RX not empty", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check only one byte received during the break (RX FIFO empty)", clk_i, sbi_if);
+    uart_bfm_send(x"3C", BIT_PERIOD);
+    sbi_check(csr_addr(UART_DATA), x"3C", "Check UART RX 0x3C after the break", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"04", "Clear RX not empty", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check no RX error after the break", clk_i, sbi_if);
+    -- Parity error : event and interrupt
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN, "Enable UART RX with even parity", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_IMR), x"E0", "Unmask RX error interrupts", clk_i, sbi_if);
+    test_rx(x"A5", PARITY_EVEN, corrupt_parity => true);
+    check_value(it_o, '1', ERROR, "Check RX parity error interrupt");
+    sbi_check(csr_addr(UART_ISR), x"45", "Check RX parity error in isr", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"44", "Clear RX parity error and RX not empty", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check RX parity error cleared", clk_i, sbi_if);
+    check_value(it_o, '0', ERROR, "Check interrupt output cleared");
+    test_rx(x"5A", PARITY_EVEN);
+    sbi_check(csr_addr(UART_ISR), x"05", "Check no RX error with a good parity", clk_i, sbi_if);
+    check_value(it_o, '0', ERROR, "Check no interrupt with a good parity");
+    sbi_write(csr_addr(UART_IMR), x"00", "Mask RX error interrupts", clk_i, sbi_if);
     sbi_write(csr_addr(UART_ISR), x"FF", "Clear the old events", clk_i, sbi_if);
     sbi_check(csr_addr(UART_ISR), x"01", "Check isr : TX FIFO empty only", clk_i, sbi_if);
     sbi_write(csr_addr(UART_CTRL_RX), x"00", "Disable UART RX", clk_i, sbi_if);

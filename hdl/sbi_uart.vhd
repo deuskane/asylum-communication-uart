@@ -29,6 +29,8 @@
 --                              not empty)
 -- 2026-11-16  1.7     mrosiere RX overrun : isr / imr source 4, RTS# deasserted
 --                              at DEPTH_RX-2 bytes in the RX FIFO
+-- 2026-11-16  1.8     mrosiere RX framing error, parity error and break :
+--                              isr / imr sources 5, 6 and 7
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -130,6 +132,9 @@ architecture rtl of sbi_UART is
   signal   rx_baud_tick           : std_logic;
   signal   rx_baud_tick_half      : std_logic;
   signal   rx_err_overrun         : std_logic;
+  signal   rx_err_framing         : std_logic;
+  signal   rx_err_parity          : std_logic;
+  signal   rx_err_break           : std_logic;
   signal   rx_fifo_push           : std_logic;
   signal   rx_fifo_pop            : std_logic;
   signal   rx_fifo_nb_elt_r       : natural range 0 to DEPTH_RX;
@@ -152,7 +157,7 @@ architecture rtl of sbi_UART is
 
   signal   baud_tick_cnt_max      : std_logic_vector(16-1 downto 0);
 
-  signal   it                     : std_logic_vector(5-1 downto 0);
+  signal   it                     : std_logic_vector(8-1 downto 0);
   signal   it_rx_full             : std_logic;
   signal   it_rx_empty_b          : std_logic;
   signal   it_tx_full             : std_logic;
@@ -399,6 +404,9 @@ begin  -- architecture rtl
        ,parity_odd_i    => rx_parity_odd
        ,parity_error_o  => open -- available on debug_o.uart_rx.parity_error
        ,err_overrun_o   => rx_err_overrun
+       ,err_parity_o    => rx_err_parity
+       ,err_framing_o   => rx_err_framing
+       ,err_break_o     => rx_err_break
        ,debug_o         => debug_o.uart_rx
 
         );
@@ -435,6 +443,9 @@ begin  -- architecture rtl
     hw2sw.data.valid               <= '0';
     uart_rts_b                     <= '0';
     rx_err_overrun                 <= '0';
+    rx_err_framing                 <= '0';
+    rx_err_parity                  <= '0';
+    rx_err_break                   <= '0';
     debug_o.uart_rx.state          <= (others => '0');
     debug_o.uart_rx.bit_cnt        <= (others => '0');
     debug_o.uart_rx.baud_tick_half <= '0';
@@ -447,7 +458,8 @@ begin  -- architecture rtl
   -----------------------------------------------------------------------------
   -- Sources : levels [0] TX FIFO empty, [1] TX FIFO full,
   --                  [2] RX FIFO not empty, [3] RX FIFO full,
-  --           event (one cycle pulse) [4] RX overrun
+  --           events (one cycle pulses) [4] RX overrun, [5] RX framing error,
+  --                  [6] RX parity error, [7] RX break
   -- GIC_core sets the isr bit of an active source every cycle, and the bit
   -- stays set until software writes 1 to it : no local sticky flag for the
   -- events. Software polls the FIFO state by clearing the bits 3:0, then
@@ -456,7 +468,10 @@ begin  -- architecture rtl
   it_rx_empty_b <= not sw2hw.data.hw2sw_empty;
   it_tx_full    <=     sw2hw.data.sw2hw_full ;
   it_tx_empty   <=     sw2hw.data.sw2hw_empty;
-  it            <= (rx_err_overrun &
+  it            <= (rx_err_break   &
+                    rx_err_parity  &
+                    rx_err_framing &
+                    rx_err_overrun &
                     it_rx_full     &  
                     it_rx_empty_b  & 
                     it_tx_full     & 

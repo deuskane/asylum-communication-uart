@@ -15,10 +15,10 @@
 #define UART_ISR 0x0
 
 // Field       : isr.value
-// Description : 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (event : a received byte was dropped)
-// Range       : [4:0]
+// Description : 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (a received byte was dropped), [5] RX framing error (stop bit at 0), [6] RX parity error, [7] RX break (all bits of a frame at 0) (events)
+// Range       : [7:0]
 #define UART_ISR_VALUE      0
-#define UART_ISR_VALUE_MASK 31
+#define UART_ISR_VALUE_MASK 255
 
 //==================================
 // Register    : imr
@@ -29,9 +29,9 @@
 
 // Field       : imr.enable
 // Description : 0: interrupt is disable, 1: interrupt is enable. Same bit mapping as isr
-// Range       : [4:0]
+// Range       : [7:0]
 #define UART_IMR_ENABLE      0
-#define UART_IMR_ENABLE_MASK 31
+#define UART_IMR_ENABLE_MASK 255
 
 //==================================
 // Register    : data
