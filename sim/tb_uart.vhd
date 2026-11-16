@@ -399,6 +399,34 @@ begin
     uart_bfm_expect(x"2D", PARITY_NONE, "Check UART TX 0x2D after CTS# activation");
     sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
 
+    -- TEST 14: RTS# (registered output) with a full RX FIFO
+    log(ID_LOG_HDR, "Test 14: RTS# with a full RX FIFO", C_SCOPE);
+    sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN or CTRL_FLOW_CTRL, "Enable UART RX with RTS", clk_i, sbi_if);
+    wait until rising_edge(clk_i);
+    wait until rising_edge(clk_i);
+    check_value(uart_rts_b, '0', ERROR, "Check RTS# active with an empty RX FIFO");
+    for i in 0 to 15 loop
+      uart_bfm_send(std_logic_vector(to_unsigned(16#70#+i, 8)), BIT_PERIOD);
+    end loop;
+    wait until rising_edge(clk_i);
+    check_value(uart_rts_b, '1', ERROR, "Check RTS# inactive with a full RX FIFO");
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN, "Disable RTS", clk_i, sbi_if);
+    wait until rising_edge(clk_i);
+    wait until rising_edge(clk_i);
+    check_value(uart_rts_b, '0', ERROR, "Check RTS# forced active when rts_enable = 0");
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN or CTRL_FLOW_CTRL, "Enable RTS", clk_i, sbi_if);
+    wait until rising_edge(clk_i);
+    wait until rising_edge(clk_i);
+    check_value(uart_rts_b, '1', ERROR, "Check RTS# inactive again with a full RX FIFO");
+    for i in 0 to 15 loop
+      sbi_check(csr_addr(UART_DATA), std_logic_vector(to_unsigned(16#70#+i, 8)), "Check UART RX from full FIFO", clk_i, sbi_if);
+    end loop;
+    wait until rising_edge(clk_i);
+    wait until rising_edge(clk_i);
+    check_value(uart_rts_b, '0', ERROR, "Check RTS# active after the RX FIFO is read");
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN, "Enable UART RX without RTS", clk_i, sbi_if);
+
     -- The masked sources were recorded (polling) : RX not empty (tests 5, 7
     -- and 8) and TX not empty (tests 6, 7 and 10), without interrupt. Both
     -- FIFOs are empty : clear the old events before unmasking
