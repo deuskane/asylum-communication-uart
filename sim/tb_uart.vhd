@@ -14,6 +14,7 @@
 --                               internal loopback) and parity error check
 -- 2026-11-16  1.2      mrosiere isr source 0 = TX FIFO empty, isr polling
 --                               (clear then read back to back)
+-- 2026-11-16  1.3      mrosiere RX overrun interrupt and RTS# threshold
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -242,9 +243,13 @@ begin
     variable v_parity : parity_t;
     variable v_ctrl   : std_logic_vector(7 downto 0);
     variable v_isr    : std_logic_vector(SBI_DATA_WIDTH-1 downto 0);
+    -- SBI BFM configuration of a blocking read of data, waiting for a
+    -- received byte (a frame lasts 10 or 11 bit periods)
+    variable v_sbi_config_blocking : t_sbi_bfm_config := C_SBI_BFM_CONFIG_DEFAULT;
   begin
     -- Initialisation
     sbi_if <= init_sbi_if_signals(SBI_ADDR_WIDTH, SBI_DATA_WIDTH);
+    v_sbi_config_blocking.max_wait_cycles := 16 * (CLOCK_FREQ / BAUD_RATE);
     wait until arst_b_i = '1';
     wait until rising_edge(clk_i);
     log(ID_SEQUENCER, "Reset released, starting simulation", C_SCOPE);
@@ -401,6 +406,54 @@ begin
     uart_bfm_expect(x"D2", PARITY_NONE, "Check UART TX 0xD2 after CTS# activation");
     uart_bfm_expect(x"2D", PARITY_NONE, "Check UART TX 0x2D after CTS# activation");
     sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
+
+    -- TEST 11: RX overrun and RTS# threshold (DEPTH_RX = 16)
+    log(ID_LOG_HDR, "Test 11: RX overrun and RTS# threshold", C_SCOPE);
+    -- Blocking read of data (an SBI access of several cycles, waiting for the
+    -- byte in serial loopback) : one pop of the RX FIFO level that sbi_UART
+    -- tracks for RTS#
+    sbi_write(csr_addr(UART_CTRL_TX), CTRL_EN, "Enable UART TX", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN or CTRL_LOOPBACK, "Enable UART RX in loopback", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_DATA), x"5B", "Write UART TX 0x5B", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_DATA), x"5B", "Check blocking read of UART RX 0x5B (loopback)", clk_i, sbi_if, config => v_sbi_config_blocking);
+    sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
+    -- RTS# is deasserted at DEPTH_RX-2 = 14 bytes in the RX FIFO. 16 bytes
+    -- fill the RX FIFO, the 17th stays pending in uart_rx_axis, the 18th is
+    -- an overrun : dropped, the pending byte is not overwritten
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN or CTRL_FLOW_CTRL, "Enable UART RX with RTS", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear isr (polling)", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check isr : TX FIFO empty only, no RX overrun", clk_i, sbi_if);
+    for i in 0 to 17 loop
+      if i <= 13 then
+        check_value(uart_rts_b, '0', ERROR, "Check RTS# active with " & integer'image(i) & " bytes in the RX FIFO");
+      else
+        check_value(uart_rts_b, '1', ERROR, "Check RTS# inactive with " & integer'image(i) & " bytes received");
+      end if;
+      uart_bfm_send(std_logic_vector(to_unsigned(16#40#+i, 8)), BIT_PERIOD);
+    end loop;
+    wait until rising_edge(clk_i);
+    check_value(uart_rts_b, '1', ERROR, "Check RTS# inactive after the overrun");
+    -- The overrun is an event recorded in isr, masked or not
+    sbi_check(csr_addr(UART_ISR), x"1D", "Check RX overrun in isr (TX FIFO empty, RX FIFO not empty and full)", clk_i, sbi_if);
+    check_value(it_o, '0', ERROR, "Check no interrupt while masked");
+    sbi_write(csr_addr(UART_IMR), x"10", "Unmask RX overrun interrupt", clk_i, sbi_if);
+    wait until rising_edge(clk_i);
+    check_value(it_o, '1', ERROR, "Check RX overrun interrupt");
+    -- 0x40 to 0x50 read back unchanged, 0x51 dropped
+    for i in 0 to 16 loop
+      sbi_check(csr_addr(UART_DATA), std_logic_vector(to_unsigned(16#40#+i, 8)), "Check UART RX 0x" & to_hstring(std_logic_vector(to_unsigned(16#40#+i, 8))) & " after the overrun", clk_i, sbi_if);
+    end loop;
+    wait until rising_edge(clk_i);
+    wait until rising_edge(clk_i);
+    check_value(uart_rts_b, '0', ERROR, "Check RTS# active after the RX FIFO is read");
+    -- Event : cleared by writing 1, not set again (unlike a level)
+    sbi_write(csr_addr(UART_ISR), x"10", "Clear RX overrun interrupt", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"0D", "Check RX overrun cleared (RX FIFO events kept)", clk_i, sbi_if);
+    check_value(it_o, '0', ERROR, "Check interrupt output cleared");
+    sbi_write(csr_addr(UART_IMR), x"00", "Mask RX overrun interrupt", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear the old events", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check isr : TX FIFO empty only", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_RX), x"00", "Disable UART RX", clk_i, sbi_if);
 
     -- TEST 13: TX FIFO empty interrupt and polling of the FIFO state in isr
     -- isr / imr sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not

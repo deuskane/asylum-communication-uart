@@ -61,14 +61,14 @@ architecture rtl of UART_registers is
 
   --==================================
   -- Register    : isr
-  -- Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
+  -- Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits 3:0, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
   -- Address     : 0x0
-  -- Width       : 4
+  -- Width       : 5
   -- Sw Access   : rw1c
   -- Hw Access   : rw
   -- Hw Type     : reg
   --==================================
-  constant INIT_isr_value : std_logic_vector(3 downto 0) := "0000";
+  constant INIT_isr_value : std_logic_vector(4 downto 0) := "00000";
   signal   isr_wcs        : std_logic;
   signal   isr_wbusy      : std_logic;
   signal   isr_rcs        : std_logic;
@@ -79,12 +79,12 @@ architecture rtl of UART_registers is
   -- Register    : imr
   -- Description : Interruption Mask Register
   -- Address     : 0x1
-  -- Width       : 4
+  -- Width       : 5
   -- Sw Access   : rw
   -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
-  constant INIT_imr_enable : std_logic_vector(3 downto 0) := "0000";
+  constant INIT_imr_enable : std_logic_vector(4 downto 0) := "00000";
   signal   imr_wcs         : std_logic;
   signal   imr_wbusy       : std_logic;
   signal   imr_rcs         : std_logic;
@@ -220,35 +220,35 @@ begin  -- architecture rtl
 
   --==================================
   -- Register    : isr
-  -- Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
+  -- Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits 3:0, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
   -- Address     : 0x0
-  -- Width       : 4
+  -- Width       : 5
   -- Sw Access   : rw1c
   -- Hw Access   : rw
   -- Hw Type     : reg
   --==================================
   gen_isr: if (true) generate
-    constant INIT_isr     : std_logic_vector(3 downto 0) := INIT_isr_value;
+    constant INIT_isr     : std_logic_vector(4 downto 0) := INIT_isr_value;
     signal   isr_re       : std_logic;
     signal   isr_we       : std_logic;
-    signal   isr_wdata_sw : std_logic_vector(3 downto 0);
-    signal   isr_wdata_hw : std_logic_vector(3 downto 0);
-    signal   isr_rdata_sw : std_logic_vector(3 downto 0);
-    signal   isr_rdata_hw : std_logic_vector(3 downto 0);
+    signal   isr_wdata_sw : std_logic_vector(4 downto 0);
+    signal   isr_wdata_hw : std_logic_vector(4 downto 0);
+    signal   isr_rdata_sw : std_logic_vector(4 downto 0);
+    signal   isr_rdata_hw : std_logic_vector(4 downto 0);
   begin
     isr_rcs <= '1' when sig_raddr = UART_ISR else
                '0';
     isr_re    <= sig_rcs and sig_re and isr_rcs;
-    isr_rdata <= "0000" & isr_rdata_sw(3 downto 0);
+    isr_rdata <= "000" & isr_rdata_sw(4 downto 0);
     isr_wcs <= '1' when sig_waddr = UART_ISR else
                '0';
     isr_we            <= sig_wcs and sig_we and isr_wcs;
-    isr_wdata_sw      <= sig_wdata(3 downto 0);
+    isr_wdata_sw      <= sig_wdata(4 downto 0);
     isr_wdata_hw      <= hw2sw_i.isr.value;
-    sw2hw_o.isr.value <= isr_rdata_hw(3 downto 0);
+    sw2hw_o.isr.value <= isr_rdata_hw(4 downto 0);
     ins_isr : csr_reg
       generic map
-        (WIDTH         => 4
+        (WIDTH         => 5
         ,INIT          => INIT_isr
         ,MODEL         => "rw1c"
         ,RD_WAIT_STATE => 1
@@ -285,31 +285,31 @@ begin  -- architecture rtl
   -- Register    : imr
   -- Description : Interruption Mask Register
   -- Address     : 0x1
-  -- Width       : 4
+  -- Width       : 5
   -- Sw Access   : rw
   -- Hw Access   : ro
   -- Hw Type     : reg
   --==================================
   gen_imr: if (true) generate
-    constant INIT_imr     : std_logic_vector(3 downto 0) := INIT_imr_enable;
+    constant INIT_imr     : std_logic_vector(4 downto 0) := INIT_imr_enable;
     signal   imr_re       : std_logic;
     signal   imr_we       : std_logic;
-    signal   imr_wdata_sw : std_logic_vector(3 downto 0);
-    signal   imr_rdata_sw : std_logic_vector(3 downto 0);
-    signal   imr_rdata_hw : std_logic_vector(3 downto 0);
+    signal   imr_wdata_sw : std_logic_vector(4 downto 0);
+    signal   imr_rdata_sw : std_logic_vector(4 downto 0);
+    signal   imr_rdata_hw : std_logic_vector(4 downto 0);
   begin
     imr_rcs <= '1' when sig_raddr = UART_IMR else
                '0';
     imr_re    <= sig_rcs and sig_re and imr_rcs;
-    imr_rdata <= "0000" & imr_rdata_sw(3 downto 0);
+    imr_rdata <= "000" & imr_rdata_sw(4 downto 0);
     imr_wcs <= '1' when sig_waddr = UART_IMR else
                '0';
     imr_we             <= sig_wcs and sig_we and imr_wcs;
-    imr_wdata_sw       <= sig_wdata(3 downto 0);
-    sw2hw_o.imr.enable <= imr_rdata_hw(3 downto 0);
+    imr_wdata_sw       <= sig_wdata(4 downto 0);
+    sw2hw_o.imr.enable <= imr_rdata_hw(4 downto 0);
     ins_imr : csr_reg
       generic map
-        (WIDTH => 4
+        (WIDTH => 5
         ,INIT  => INIT_imr
         ,MODEL => "rw"
         )

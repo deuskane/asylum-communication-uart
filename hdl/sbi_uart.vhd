@@ -27,6 +27,8 @@
 -- 2026-10-05  1.5     mrosiere Connect RX parity error (debug only, no CSR)
 -- 2026-11-16  1.6     mrosiere isr / imr source 0 : TX FIFO empty (was TX FIFO
 --                              not empty)
+-- 2026-11-16  1.7     mrosiere RX overrun : isr / imr source 4, RTS# deasserted
+--                              at DEPTH_RX-2 bytes in the RX FIFO
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -36,6 +38,7 @@ use     ieee.std_logic_textio.all;
 use     std.textio.all;
 
 library asylum;
+use     asylum.math_pkg.ALL;
 use     asylum.uart_pkg.ALL;
 use     asylum.GIC_pkg.ALL;
 use     asylum.UART_csr_pkg.ALL;
@@ -94,6 +97,12 @@ architecture rtl of sbi_UART is
   -- Compute Max baud tick counter
   constant BAUD_TICK_CNT_MAX_INT  : integer := (CLOCK_FREQ / BAUD_RATE) - 1;
   constant BAUD_TICK_CNT_MAX_SLV  : std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) := std_logic_vector(to_unsigned(BAUD_TICK_CNT_MAX_INT, BAUD_TICK_CNT_WIDTH));
+
+  -- RTS# is deasserted when the RX FIFO holds RX_RTS_LEVEL bytes or more :
+  -- the remote transmitter can still send RX_RTS_MARGIN bytes (+1 byte
+  -- pending in uart_rx_axis) after RTS# deassertion without overrun
+  constant RX_RTS_MARGIN          : natural := 2;
+  constant RX_RTS_LEVEL           : natural := max(DEPTH_RX - RX_RTS_MARGIN, 1);
   
   signal   uart_tx                : std_logic;
   signal   uart_rx                : std_logic;
@@ -120,6 +129,11 @@ architecture rtl of sbi_UART is
   signal   rx_baud_tick_en        : std_logic;
   signal   rx_baud_tick           : std_logic;
   signal   rx_baud_tick_half      : std_logic;
+  signal   rx_err_overrun         : std_logic;
+  signal   rx_fifo_push           : std_logic;
+  signal   rx_fifo_pop            : std_logic;
+  signal   rx_fifo_nb_elt_r       : natural range 0 to DEPTH_RX;
+  signal   rx_fifo_almost_full    : std_logic;
            
   signal   tx_enable              : std_logic;
   signal   tx_parity_enable       : std_logic;
@@ -138,7 +152,7 @@ architecture rtl of sbi_UART is
 
   signal   baud_tick_cnt_max      : std_logic_vector(16-1 downto 0);
 
-  signal   it                     : std_logic_vector(4-1 downto 0);
+  signal   it                     : std_logic_vector(5-1 downto 0);
   signal   it_rx_full             : std_logic;
   signal   it_rx_empty_b          : std_logic;
   signal   it_tx_full             : std_logic;
@@ -297,7 +311,7 @@ begin  -- architecture rtl
     rts_enable           <= sw2hw.ctrl_rx.rts_enable      (0);
 
     -- RTS# is registered : no glitch on the pad from the combinational
-    -- FIFO full flag (comparison of the FIFO pointers)
+    -- comparison of the RX FIFO level
     process (clk_i, arst_b_i) is
     begin
       if arst_b_i = '0'
@@ -309,10 +323,50 @@ begin  -- architecture rtl
         then
           uart_rts_b       <= '0';
         else
-          uart_rts_b       <= it_rx_full;
+          uart_rts_b       <= rx_fifo_almost_full;
         end if;
       end if;
     end process;
+
+    -- Number of bytes in the RX FIFO, tracked with the FIFO handshakes
+    -- (csr_fifo does not export its number of elements nor its pop) :
+    -- push = byte written by uart_rx_axis, pop = read of data by software.
+    -- csr_fifo pops on the cycle where the read of data is not blocked
+    -- (RX FIFO not empty) : the cycle where the SBI access completes, so a
+    -- blocking read lasting several cycles is one pop
+    gen_rx_fifo: if DEPTH_RX > 0
+    generate
+      rx_fifo_push <= hw2sw.data.valid and sw2hw.data.ready;
+      rx_fifo_pop  <= sbi_ini_i.cs and sbi_ini_i.re and not sw2hw.data.hw2sw_empty
+                      when unsigned(sbi_ini_i.addr(UART_ADDR_WIDTH-1 downto 0)) = UART_DATA else
+                      '0';
+
+      process (clk_i, arst_b_i) is
+      begin
+        if arst_b_i = '0'
+        then
+          rx_fifo_nb_elt_r <= 0;
+        elsif rising_edge(clk_i)
+        then
+          if    (rx_fifo_push = '1') and (rx_fifo_pop = '0')
+          then
+            rx_fifo_nb_elt_r <= rx_fifo_nb_elt_r + 1;
+          elsif (rx_fifo_push = '0') and (rx_fifo_pop = '1')
+          then
+            rx_fifo_nb_elt_r <= rx_fifo_nb_elt_r - 1;
+          end if;
+        end if;
+      end process;
+
+      rx_fifo_almost_full <= '1' when rx_fifo_nb_elt_r >= RX_RTS_LEVEL else
+                             '0';
+    end generate gen_rx_fifo;
+
+    gen_rx_fifo_b: if DEPTH_RX = 0
+    generate
+      -- No FIFO : RTS# deasserted while a received byte is pending
+      rx_fifo_almost_full <= it_rx_full;
+    end generate gen_rx_fifo_b;
     
     ins_uart_rx_baud_rate_gen : uart_baud_rate_gen
       generic map
@@ -344,6 +398,7 @@ begin  -- architecture rtl
        ,parity_enable_i => rx_parity_enable
        ,parity_odd_i    => rx_parity_odd
        ,parity_error_o  => open -- available on debug_o.uart_rx.parity_error
+       ,err_overrun_o   => rx_err_overrun
        ,debug_o         => debug_o.uart_rx
 
         );
@@ -379,6 +434,7 @@ begin  -- architecture rtl
     hw2sw.data.value               <= (others => '0');
     hw2sw.data.valid               <= '0';
     uart_rts_b                     <= '0';
+    rx_err_overrun                 <= '0';
     debug_o.uart_rx.state          <= (others => '0');
     debug_o.uart_rx.bit_cnt        <= (others => '0');
     debug_o.uart_rx.baud_tick_half <= '0';
@@ -389,18 +445,22 @@ begin  -- architecture rtl
   -----------------------------------------------------------------------------
   -- Interruptions
   -----------------------------------------------------------------------------
-  -- Sources (levels) : [0] TX FIFO empty, [1] TX FIFO full,
-  --                    [2] RX FIFO not empty, [3] RX FIFO full
-  -- GIC_core sets the isr bit of an active source every cycle : software polls
-  -- the FIFO state by clearing the bits, then reading isr (read wait state)
+  -- Sources : levels [0] TX FIFO empty, [1] TX FIFO full,
+  --                  [2] RX FIFO not empty, [3] RX FIFO full,
+  --           event (one cycle pulse) [4] RX overrun
+  -- GIC_core sets the isr bit of an active source every cycle, and the bit
+  -- stays set until software writes 1 to it : no local sticky flag for the
+  -- events. Software polls the FIFO state by clearing the bits 3:0, then
+  -- reading isr (read wait state)
   it_rx_full    <=     sw2hw.data.hw2sw_full ;
   it_rx_empty_b <= not sw2hw.data.hw2sw_empty;
   it_tx_full    <=     sw2hw.data.sw2hw_full ;
   it_tx_empty   <=     sw2hw.data.sw2hw_empty;
-  it            <= (it_rx_full    &  
-                    it_rx_empty_b & 
-                    it_tx_full    & 
-                    it_tx_empty   
+  it            <= (rx_err_overrun &
+                    it_rx_full     &  
+                    it_rx_empty_b  & 
+                    it_tx_full     & 
+                    it_tx_empty    
                     );
   hw2sw.isr.we  <= '1';
   

@@ -9,16 +9,16 @@
 
 //==================================
 // Register    : isr
-// Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
+// Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits 3:0, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
 // Address     : 0x0
 //==================================
 #define UART_ISR 0x0
 
 // Field       : isr.value
-// Description : 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full
-// Range       : [3:0]
+// Description : 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (event : a received byte was dropped)
+// Range       : [4:0]
 #define UART_ISR_VALUE      0
-#define UART_ISR_VALUE_MASK 15
+#define UART_ISR_VALUE_MASK 31
 
 //==================================
 // Register    : imr
@@ -29,9 +29,9 @@
 
 // Field       : imr.enable
 // Description : 0: interrupt is disable, 1: interrupt is enable. Same bit mapping as isr
-// Range       : [3:0]
+// Range       : [4:0]
 #define UART_IMR_ENABLE      0
-#define UART_IMR_ENABLE_MASK 15
+#define UART_IMR_ENABLE_MASK 31
 
 //==================================
 // Register    : data
