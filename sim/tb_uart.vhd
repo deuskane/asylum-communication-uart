@@ -19,6 +19,7 @@
 --                               interrupts
 -- 2026-11-16  1.5      mrosiere Generic RX_STORE_PARITY_ERROR : with false, a
 --                               byte with a parity error is checked dropped
+-- 2026-11-16  1.6      mrosiere Echo mode (ctrl_tx.tx_use_loopback)
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -62,7 +63,7 @@ architecture sim of tb_uart is
   constant CTRL_EN         : std_logic_vector(7 downto 0) := x"01";
   constant CTRL_EN_EVEN    : std_logic_vector(7 downto 0) := x"03";
   constant CTRL_EN_ODD     : std_logic_vector(7 downto 0) := x"07";
-  constant CTRL_LOOPBACK   : std_logic_vector(7 downto 0) := x"08";
+  constant CTRL_LOOPBACK   : std_logic_vector(7 downto 0) := x"08"; -- [3] tx_use_loopback / rx_use_loopback
   constant CTRL_FLOW_CTRL  : std_logic_vector(7 downto 0) := x"10"; -- [4] cts_enable / rts_enable
 
   -- Patterns : data bit 0 at 1 and at 0, all parities
@@ -619,7 +620,76 @@ begin
     check_value(uart_rts_b, '0', ERROR, "Check RTS# active after the RX FIFO is read");
     sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN, "Enable UART RX without RTS", clk_i, sbi_if);
 
-    -- The masked sources were recorded (polling) : RX not empty (test 14) and
+    -- TEST 15: echo mode (ctrl_tx.tx_use_loopback = 1) : the received bytes
+    -- are sent back on uart_tx, nothing reaches the RX FIFO, the writes to
+    -- data are accepted and dropped, a byte with a parity error is echoed
+    -- only with RX_STORE_PARITY_ERROR = true. With cts_enable = 1, CTS# is
+    -- the internal RTS# (the uart_cts_b_i pin is ignored)
+    log(ID_LOG_HDR, "Test 15: echo mode (tx_use_loopback)", C_SCOPE);
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN, "Enable UART RX with even parity", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_TX), CTRL_EN_EVEN or CTRL_LOOPBACK, "Enable UART TX with even parity in echo mode", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear isr (polling)", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check isr : TX FIFO empty only", clk_i, sbi_if);
+    -- Echoed frames, every bit checked
+    for i in PATTERNS'range loop
+      uart_bfm_send(PATTERNS(i), BIT_PERIOD, PARITY_EVEN);
+      uart_bfm_expect(PATTERNS(i), PARITY_EVEN, "Check echo of 0x" & to_hstring(PATTERNS(i)));
+    end loop;
+    sbi_check(csr_addr(UART_ISR), x"01", "Check RX not empty never set in echo mode (RX FIFO empty)", clk_i, sbi_if);
+    -- Writes to data : accepted (more than the TX FIFO depth, none blocks),
+    -- dropped, not transmitted
+    for i in 0 to 19 loop
+      sbi_write(csr_addr(UART_DATA), std_logic_vector(to_unsigned(16#E0#+i, 8)), "Write data in echo mode", clk_i, sbi_if);
+    end loop;
+    wait for 2 * 12 * BIT_PERIOD;
+    check_stable(uart_tx, 2 * 12 * BIT_PERIOD, ERROR, "Check the bytes written to data are not transmitted in echo mode", C_SCOPE);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check TX FIFO never full in echo mode", clk_i, sbi_if);
+    -- Byte with a parity error : echoed (the transmitter computes its own
+    -- parity bit) with RX_STORE_PARITY_ERROR = true, not echoed with false.
+    -- Not stored, event recorded. The good byte sent right after is echoed
+    uart_bfm_send(x"A5", BIT_PERIOD, PARITY_EVEN, corrupt_parity => true);
+    if RX_STORE_PARITY_ERROR then
+      uart_bfm_expect(x"A5", PARITY_EVEN, "Check echo of 0xA5 with a parity error");
+    else
+      wait for 2 * 12 * BIT_PERIOD;
+      check_stable(uart_tx, 2 * 12 * BIT_PERIOD, ERROR, "Check no echo of 0xA5 with a parity error", C_SCOPE);
+    end if;
+    sbi_check(csr_addr(UART_ISR), x"41", "Check RX parity error event, RX not empty never set", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"40", "Clear RX parity error", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check RX parity error cleared", clk_i, sbi_if);
+    uart_bfm_send(x"5A", BIT_PERIOD, PARITY_EVEN);
+    uart_bfm_expect(x"5A", PARITY_EVEN, "Check echo of 0x5A after a parity error");
+    -- cts_enable = 1 : CTS# is the internal RTS#, active with rts_enable = 0,
+    -- the inactive uart_cts_b_i pin does not block the echo
+    uart_cts_b <= '1';
+    sbi_write(csr_addr(UART_CTRL_TX), CTRL_EN_EVEN or CTRL_LOOPBACK or CTRL_FLOW_CTRL, "Enable CTS in echo mode", clk_i, sbi_if);
+    uart_bfm_send(x"C3", BIT_PERIOD, PARITY_EVEN);
+    uart_bfm_expect(x"C3", PARITY_EVEN, "Check echo of 0xC3 with the CTS# pin inactive");
+    -- RTS# deasserted (14 bytes in the RX FIFO, received out of echo mode)
+    -- blocks the echo, until a read of data lowers the RX FIFO level
+    sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX (end of echo mode)", clk_i, sbi_if);
+    for i in 0 to 13 loop
+      uart_bfm_send(std_logic_vector(to_unsigned(16#20#+i, 8)), BIT_PERIOD, PARITY_EVEN);
+    end loop;
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN or CTRL_FLOW_CTRL, "Enable RTS", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_TX), CTRL_EN_EVEN or CTRL_LOOPBACK or CTRL_FLOW_CTRL, "Enable UART TX in echo mode with CTS", clk_i, sbi_if);
+    wait until rising_edge(clk_i);
+    check_value(uart_rts_b, '1', ERROR, "Check RTS# inactive with 14 bytes in the RX FIFO");
+    uart_bfm_send(x"96", BIT_PERIOD, PARITY_EVEN);
+    wait for 2 * 12 * BIT_PERIOD;
+    check_stable(uart_tx, 2 * 12 * BIT_PERIOD, ERROR, "Check no echo of 0x96 while RTS# (CTS#) is inactive", C_SCOPE);
+    sbi_check(csr_addr(UART_DATA), x"20", "Check UART RX 0x20 (RX FIFO level 13)", clk_i, sbi_if);
+    uart_bfm_expect(x"96", PARITY_EVEN, "Check echo of 0x96 after RTS# (CTS#) activation");
+    for i in 1 to 13 loop
+      sbi_check(csr_addr(UART_DATA), std_logic_vector(to_unsigned(16#20#+i, 8)), "Check UART RX 0x" & to_hstring(std_logic_vector(to_unsigned(16#20#+i, 8))) & " received out of echo mode", clk_i, sbi_if);
+    end loop;
+    -- End : the RX events of the masked sources stay recorded for the final
+    -- check
+    uart_cts_b <= '0';
+    sbi_write(csr_addr(UART_CTRL_TX), x"00", "Disable UART TX", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN, "Enable UART RX without parity and RTS", clk_i, sbi_if);
+
+    -- The masked sources were recorded (polling) : RX not empty (test 15) and
     -- TX FIFO empty (empty TX FIFO), without interrupt. Clear the old events
     -- before unmasking : only the TX FIFO empty level remains
     sbi_read(csr_addr(UART_ISR), v_isr, "Read isr (masked sources)", clk_i, sbi_if);
