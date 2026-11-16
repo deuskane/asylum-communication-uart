@@ -129,7 +129,7 @@ package UART_csr_pkg is
 
   --==================================
   -- Register    : baud_tick_cnt_max_lsb
-  -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+  -- Description : Baud Tick Counter Max LSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1. Write it at setup time, with ctrl_tx.tx_enable = ctrl_rx.rx_enable = 0 (baud rate generators held in reset)
   -- Address     : 0x6
   -- Width       : 8
   -- Sw Access   : rw
@@ -146,7 +146,7 @@ package UART_csr_pkg is
 
   --==================================
   -- Register    : baud_tick_cnt_max_msb
-  -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1
+  -- Description : Baud Tick Counter Max MSB. Must be equal to (Clock Frequency (Hz) / Baud Rate)-1. Write it at setup time, with ctrl_tx.tx_enable = ctrl_rx.rx_enable = 0 (baud rate generators held in reset)
   -- Address     : 0x7
   -- Width       : 8
   -- Sw Access   : rw
