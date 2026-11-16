@@ -37,9 +37,21 @@ CAPI=2:
 #                               parity tests in tb_uart
 # 2026-11-15  2.0.0    mrosiere asylum:system:GIC >= 2.0.0 : isr records the masked
 #                               sources too (polling), imr only masks it_o
+# 2026-11-16  3.0.0    mrosiere isr / imr source 0 : TX FIFO empty (was TX FIFO
+#                               not empty), isr read wait state (polling,
+#                               generators >= 2.10.0), new sources : RX
+#                               overrun (4), framing error (5), parity
+#                               error (6), break (7), RTS# at DEPTH_RX-2,
+#                               generic RX_PARITY_ERROR (byte with a parity
+#                               error : "keep", "drop", or "halt" : stored,
+#                               then RX halted until isr bit 6 is cleared),
+#                               targets sim_rx_parity_drop,
+#                               sim_rx_parity_halt,
+#                               lint_ghdl_synth_parity_drop and
+#                               lint_ghdl_synth_parity_halt
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:2.0.0
+name        : asylum:communication:uart:3.0.0
 description : UART TX and RX
 
 #=========================================

@@ -40,7 +40,7 @@
 
 **UART transmitter / receiver with CSR access over the SBI bus, TX / RX FIFOs, CTS / RTS flow control, loopback modes and an interrupt output.**
 
-VLNV: `asylum:communication:uart:2.0.0`
+VLNV: `asylum:communication:uart:3.0.0`
 
 ## Table of Contents
 
@@ -328,7 +328,7 @@ make clean                # remove build/ and log/
 Equivalent FuseSoC command:
 
 ```bash
-fusesoc --cores-root . run --build-root build --target sim_basic asylum:communication:uart:2.0.0
+fusesoc --cores-root . run --build-root build --target sim_basic asylum:communication:uart:3.0.0
 ```
 
 The `sim_basic` target runs GHDL with `--fst=dut.fst --ieee-asserts=disable`. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `sim_basic`, `sim_rx_parity_drop` and `sim_rx_parity_halt`.
