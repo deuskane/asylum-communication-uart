@@ -17,9 +17,14 @@
 -- 2026-11-16  1.3      mrosiere RX overrun interrupt and RTS# threshold
 -- 2026-11-16  1.4      mrosiere RX framing error, break and parity error
 --                               interrupts
--- 2026-11-16  1.5      mrosiere Generic RX_PARITY_ERROR : with "drop", a
---                               byte with a parity error is checked dropped
+-- 2026-11-16  1.5      mrosiere Generic RX_PARITY_ERROR : a byte with a
+--                               parity error is checked stored ("keep"),
+--                               dropped ("drop"), or stored with RX halted
+--                               until isr[6] is cleared ("halt")
 -- 2026-11-16  1.6      mrosiere Echo mode (ctrl_tx.tx_use_loopback)
+-- 2026-11-17  1.7      mrosiere Test 16 : parity error policy (RTS#, overrun
+--                               of a frame with a parity error, byte with a
+--                               parity error waiting for a full RX FIFO)
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -40,7 +45,9 @@ use     asylum.UART_csr_pkg.all;
 entity tb_uart is
   generic (
     -- RX_PARITY_ERROR of the DUT : "keep", a byte with a parity error is
-    -- read from data ; "drop", it is checked dropped (sim_rx_parity_drop)
+    -- read from data ; "drop", it is checked dropped (sim_rx_parity_drop) ;
+    -- "halt", it is read from data, then RX resumes when isr[6] is cleared
+    -- (sim_rx_parity_halt)
     RX_PARITY_ERROR       : string  := "keep"
     );
 end tb_uart;
@@ -69,6 +76,8 @@ architecture sim of tb_uart is
   -- Patterns : data bit 0 at 1 and at 0, all parities
   type     data_array_t is array (natural range <>) of std_logic_vector(7 downto 0);
   constant PATTERNS        : data_array_t := (x"A5", x"5A", x"01", x"80", x"FF", x"00", x"3C", x"C3");
+  -- Test 16 : good byte A, byte B with a parity error, good bytes C and D
+  constant POLICY_BYTES    : data_array_t := (x"A1", x"B2", x"C3", x"D4");
 
   -- Signals
   signal clk_i             : std_logic := '0';
@@ -235,9 +244,25 @@ begin
       check_value(v_isr(2), '0', ERROR, "Check 0x" & to_hstring(data) & " with a parity error dropped (RX FIFO empty)");
     end procedure;
 
+    -- Byte received with a parity error and RX_PARITY_ERROR = "halt" : it
+    -- was read from data and RX is halted. It is the last byte of the RX
+    -- FIFO : isr[2] (RX FIFO not empty) is cleared, then read right after
+    -- the clear (polling) at 0, with the parity error event set. Writing 1
+    -- to isr[6] resumes RX
+    procedure check_rx_halted(data : std_logic_vector(7 downto 0)) is
+      variable v_isr : std_logic_vector(SBI_DATA_WIDTH-1 downto 0);
+    begin
+      sbi_write(csr_addr(UART_ISR), x"04", "Clear RX not empty (polling)", clk_i, sbi_if);
+      sbi_read(csr_addr(UART_ISR), v_isr, "Read isr right after the clear", clk_i, sbi_if);
+      check_value(v_isr(6), '1', ERROR, "Check RX parity error event (RX halted) for 0x" & to_hstring(data));
+      check_value(v_isr(2), '0', ERROR, "Check 0x" & to_hstring(data) & " with a parity error is the last byte of the RX FIFO (RX FIFO empty)");
+      sbi_write(csr_addr(UART_ISR), x"40", "Clear RX parity error : RX resumes", clk_i, sbi_if);
+    end procedure;
+
     -- RX test : BFM send, read data by SBI, check parity error flag
     -- (corrupted parity with RX_PARITY_ERROR = "drop" : the byte is
-    -- dropped, nothing to read)
+    -- dropped, nothing to read ; with "halt" : the byte is read, then RX
+    -- is resumed)
     procedure test_rx(data           : std_logic_vector(7 downto 0);
                       parity         : parity_t;
                       corrupt_parity : boolean := false) is
@@ -251,6 +276,9 @@ begin
         check_rx_dropped(data);
       else
         sbi_check(csr_addr(UART_DATA), data, "Check UART RX 0x" & to_hstring(data) & " (parity " & to_string(parity) & ")", clk_i, sbi_if);
+        if corrupt_parity and RX_PARITY_ERROR = "halt" then
+          check_rx_halted(data);
+        end if;
       end if;
     end procedure;
 
@@ -264,7 +292,8 @@ begin
 
     -- Loopback test : write data by SBI, check frame on uart_tx and read it back
     -- (parity error with RX_PARITY_ERROR = "drop" : the byte is
-    -- dropped, nothing to read)
+    -- dropped, nothing to read ; with "halt" : the byte is read, then RX
+    -- is resumed)
     procedure test_loopback(data       : std_logic_vector(7 downto 0);
                             parity     : parity_t;
                             exp_error  : std_logic := '0') is
@@ -276,6 +305,9 @@ begin
         check_rx_dropped(data);
       else
         sbi_check(csr_addr(UART_DATA), data, "Check loopback RX 0x" & to_hstring(data), clk_i, sbi_if);
+        if (exp_error = '1') and RX_PARITY_ERROR = "halt" then
+          check_rx_halted(data);
+        end if;
       end if;
     end procedure;
 
@@ -523,14 +555,15 @@ begin
     sbi_write(csr_addr(UART_ISR), x"04", "Clear RX not empty", clk_i, sbi_if);
     sbi_check(csr_addr(UART_ISR), x"01", "Check no RX error after the break", clk_i, sbi_if);
     -- Parity error : event and interrupt. The byte is stored (read back), or
-    -- dropped with RX_PARITY_ERROR = "drop" (RX not empty never set)
+    -- dropped with RX_PARITY_ERROR = "drop" (RX not empty never set). With
+    -- "halt", the clear of isr[6] resumes RX
     sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN, "Enable UART RX with even parity", clk_i, sbi_if);
     sbi_write(csr_addr(UART_IMR), x"E0", "Unmask RX error interrupts", clk_i, sbi_if);
     uart_bfm_send(x"A5", BIT_PERIOD, PARITY_EVEN, corrupt_parity => true);
     wait until rising_edge(clk_i);
     check_value(debug.uart_rx.parity_error, '1', ERROR, "Check RX parity error flag for 0xA5");
     check_value(it_o, '1', ERROR, "Check RX parity error interrupt");
-    if RX_PARITY_ERROR = "keep" then
+    if RX_PARITY_ERROR /= "drop" then
       sbi_check(csr_addr(UART_ISR), x"45", "Check RX parity error in isr, byte stored (RX not empty)", clk_i, sbi_if);
       sbi_check(csr_addr(UART_DATA), x"A5", "Check UART RX 0xA5 with a parity error (stored)", clk_i, sbi_if);
     else
@@ -623,7 +656,8 @@ begin
     -- TEST 15: echo mode (ctrl_tx.tx_use_loopback = 1) : the received bytes
     -- are sent back on uart_tx, nothing reaches the RX FIFO, the writes to
     -- data are accepted and dropped, a byte with a parity error is echoed
-    -- only with RX_PARITY_ERROR = "keep". With cts_enable = 1, CTS# is
+    -- with RX_PARITY_ERROR = "keep" and "halt" (then the echo stops until
+    -- isr[6] is cleared), not with "drop". With cts_enable = 1, CTS# is
     -- the internal RTS# (the uart_cts_b_i pin is ignored)
     log(ID_LOG_HDR, "Test 15: echo mode (tx_use_loopback)", C_SCOPE);
     sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN, "Enable UART RX with even parity", clk_i, sbi_if);
@@ -645,20 +679,31 @@ begin
     check_stable(uart_tx, 2 * 12 * BIT_PERIOD, ERROR, "Check the bytes written to data are not transmitted in echo mode", C_SCOPE);
     sbi_check(csr_addr(UART_ISR), x"01", "Check TX FIFO never full in echo mode", clk_i, sbi_if);
     -- Byte with a parity error : echoed (the transmitter computes its own
-    -- parity bit) with RX_PARITY_ERROR = "keep", not echoed with "drop".
-    -- Not stored, event recorded. The good byte sent right after is echoed
+    -- parity bit) with RX_PARITY_ERROR = "keep" and "halt", not echoed
+    -- with "drop". Not stored, event recorded. The good byte sent right
+    -- after is echoed ; with "halt", only after the clear of isr[6]
     uart_bfm_send(x"A5", BIT_PERIOD, PARITY_EVEN, corrupt_parity => true);
-    if RX_PARITY_ERROR = "keep" then
+    if RX_PARITY_ERROR /= "drop" then
       uart_bfm_expect(x"A5", PARITY_EVEN, "Check echo of 0xA5 with a parity error");
     else
       wait for 2 * 12 * BIT_PERIOD;
       check_stable(uart_tx, 2 * 12 * BIT_PERIOD, ERROR, "Check no echo of 0xA5 with a parity error", C_SCOPE);
     end if;
+    if RX_PARITY_ERROR = "halt" then
+      uart_bfm_send(x"5A", BIT_PERIOD, PARITY_EVEN);
+      wait for 2 * 12 * BIT_PERIOD;
+      check_stable(uart_tx, 2 * 12 * BIT_PERIOD, ERROR, "Check no echo of 0x5A while RX is halted", C_SCOPE);
+    end if;
     sbi_check(csr_addr(UART_ISR), x"41", "Check RX parity error event, RX not empty never set", clk_i, sbi_if);
     sbi_write(csr_addr(UART_ISR), x"40", "Clear RX parity error", clk_i, sbi_if);
-    sbi_check(csr_addr(UART_ISR), x"01", "Check RX parity error cleared", clk_i, sbi_if);
-    uart_bfm_send(x"5A", BIT_PERIOD, PARITY_EVEN);
-    uart_bfm_expect(x"5A", PARITY_EVEN, "Check echo of 0x5A after a parity error");
+    if RX_PARITY_ERROR = "halt" then
+      uart_bfm_expect(x"5A", PARITY_EVEN, "Check echo of 0x5A after the clear of isr[6] (RX resumes)");
+      sbi_check(csr_addr(UART_ISR), x"01", "Check RX parity error cleared", clk_i, sbi_if);
+    else
+      sbi_check(csr_addr(UART_ISR), x"01", "Check RX parity error cleared", clk_i, sbi_if);
+      uart_bfm_send(x"5A", BIT_PERIOD, PARITY_EVEN);
+      uart_bfm_expect(x"5A", PARITY_EVEN, "Check echo of 0x5A after a parity error");
+    end if;
     -- cts_enable = 1 : CTS# is the internal RTS#, active with rts_enable = 0,
     -- the inactive uart_cts_b_i pin does not block the echo
     uart_cts_b <= '1';
@@ -701,6 +746,120 @@ begin
     wait until rising_edge(clk_i);
     sbi_check(csr_addr(UART_ISR), x"01", "Check RX FIFO is empty at end of test", clk_i, sbi_if);
     check_value(it_o, '0', ERROR, "Check no pending interrupt at end of test");
+
+    -- TEST 16: parity error policy (RX_PARITY_ERROR), RTS# enabled, RX FIFO
+    -- empty : good byte A, byte B with a parity error, then C and D back to
+    -- back.
+    --   "keep" : A, B, C and D stored, RTS# stays active
+    --   "drop" : B dropped, A, C and D stored
+    --   "halt" : B stored, RX halted and RTS# inactive : the RX FIFO holds
+    --            A and B, C waits in uart_rx_axis, D is an overrun. The
+    --            clear of isr[6] resumes RX : C stored, RTS# active
+    -- The RX FIFO state is polled in isr (never a blocking read of an empty
+    -- RX FIFO while RX is halted)
+    log(ID_LOG_HDR, "Test 16: parity error policy (RX_PARITY_ERROR = " & RX_PARITY_ERROR & ")", C_SCOPE);
+    sbi_write(csr_addr(UART_IMR), x"00", "Mask the interrupts", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN or CTRL_FLOW_CTRL, "Enable UART RX with even parity and RTS", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear isr (polling)", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check isr : TX FIFO empty only (RX FIFO empty)", clk_i, sbi_if);
+    check_value(uart_rts_b, '0', ERROR, "Check RTS# active with an empty RX FIFO");
+    for i in POLICY_BYTES'range loop
+      uart_bfm_send(POLICY_BYTES(i), BIT_PERIOD, PARITY_EVEN, corrupt_parity => (i = 1));
+      if (RX_PARITY_ERROR = "halt") and (i >= 1) then
+        check_value(uart_rts_b, '1', ERROR, "Check RTS# inactive while RX is halted, after 0x" & to_hstring(POLICY_BYTES(i)));
+      else
+        check_value(uart_rts_b, '0', ERROR, "Check RTS# active after 0x" & to_hstring(POLICY_BYTES(i)));
+      end if;
+    end loop;
+    wait until rising_edge(clk_i);
+    if RX_PARITY_ERROR = "halt" then
+      sbi_check(csr_addr(UART_ISR), x"55", "Check RX parity error event (0xB2) and RX overrun (0xD4) in isr, RX FIFO not empty", clk_i, sbi_if);
+      sbi_check(csr_addr(UART_DATA), POLICY_BYTES(0), "Check UART RX 0x" & to_hstring(POLICY_BYTES(0)), clk_i, sbi_if);
+      sbi_check(csr_addr(UART_DATA), POLICY_BYTES(1), "Check UART RX 0x" & to_hstring(POLICY_BYTES(1)) & " with a parity error", clk_i, sbi_if);
+      sbi_write(csr_addr(UART_ISR), x"0F", "Clear the FIFO state bits (polling)", clk_i, sbi_if);
+      sbi_check(csr_addr(UART_ISR), x"51", "Check RX FIFO empty after 0x" & to_hstring(POLICY_BYTES(1)) & " (0x" & to_hstring(POLICY_BYTES(2)) & " waits), RX halted", clk_i, sbi_if);
+      check_value(uart_rts_b, '1', ERROR, "Check RTS# inactive while RX is halted with an empty RX FIFO");
+      sbi_write(csr_addr(UART_ISR), x"40", "Clear RX parity error : RX resumes", clk_i, sbi_if);
+      wait until rising_edge(clk_i);
+      wait until rising_edge(clk_i);
+      check_value(uart_rts_b, '0', ERROR, "Check RTS# active after the clear of isr[6]");
+      sbi_check(csr_addr(UART_DATA), POLICY_BYTES(2), "Check UART RX 0x" & to_hstring(POLICY_BYTES(2)) & " waiting while RX was halted", clk_i, sbi_if);
+      sbi_write(csr_addr(UART_ISR), x"0F", "Clear the FIFO state bits (polling)", clk_i, sbi_if);
+      sbi_check(csr_addr(UART_ISR), x"11", "Check RX FIFO empty : 0x" & to_hstring(POLICY_BYTES(3)) & " dropped (overrun), no parity error event", clk_i, sbi_if);
+    else
+      sbi_check(csr_addr(UART_ISR), x"45", "Check RX parity error event (0xB2) in isr, RX FIFO not empty, no overrun", clk_i, sbi_if);
+      for i in POLICY_BYTES'range loop
+        if (i /= 1) or (RX_PARITY_ERROR = "keep") then
+          sbi_check(csr_addr(UART_DATA), POLICY_BYTES(i), "Check UART RX 0x" & to_hstring(POLICY_BYTES(i)), clk_i, sbi_if);
+        end if;
+      end loop;
+      sbi_write(csr_addr(UART_ISR), x"0F", "Clear the FIFO state bits (polling)", clk_i, sbi_if);
+      sbi_check(csr_addr(UART_ISR), x"41", "Check RX FIFO empty after 0x" & to_hstring(POLICY_BYTES(3)), clk_i, sbi_if);
+    end if;
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear the old events", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check isr : TX FIFO empty only", clk_i, sbi_if);
+
+    -- Overrun of a frame with a parity error while a good byte waits for
+    -- room in the full RX FIFO (RTS# disabled) : the waiting byte is not
+    -- marked with the parity error of the dropped frame (stored in the
+    -- three modes). Parity error event of the dropped frame : raised with
+    -- "keep" and "drop" (end of the frame), not with "halt" (it never
+    -- enters the RX FIFO)
+    log(ID_LOG_HDR, "Test 16.1: overrun of a frame with a parity error", C_SCOPE);
+    sbi_write(csr_addr(UART_CTRL_RX), CTRL_EN_EVEN, "Enable UART RX with even parity, without RTS", clk_i, sbi_if);
+    for i in 0 to 15 loop
+      uart_bfm_send(std_logic_vector(to_unsigned(16#60#+i, 8)), BIT_PERIOD, PARITY_EVEN);
+    end loop;
+    uart_bfm_send(x"76", BIT_PERIOD, PARITY_EVEN);
+    uart_bfm_send(x"F5", BIT_PERIOD, PARITY_EVEN, corrupt_parity => true);
+    wait until rising_edge(clk_i);
+    if RX_PARITY_ERROR = "halt" then
+      sbi_check(csr_addr(UART_ISR), x"1D", "Check RX overrun (0xF5), no parity error event (RX FIFO full, 0x76 waits)", clk_i, sbi_if);
+    else
+      sbi_check(csr_addr(UART_ISR), x"5D", "Check RX overrun and parity error event (0xF5) (RX FIFO full, 0x76 waits)", clk_i, sbi_if);
+    end if;
+    for i in 0 to 15 loop
+      sbi_check(csr_addr(UART_DATA), std_logic_vector(to_unsigned(16#60#+i, 8)), "Check UART RX 0x" & to_hstring(std_logic_vector(to_unsigned(16#60#+i, 8))) & " from the full RX FIFO", clk_i, sbi_if);
+    end loop;
+    sbi_write(csr_addr(UART_ISR), x"0F", "Clear the FIFO state bits (polling)", clk_i, sbi_if);
+    if RX_PARITY_ERROR = "halt" then
+      sbi_check(csr_addr(UART_ISR), x"15", "Check 0x76 in the RX FIFO, no parity error event", clk_i, sbi_if);
+    else
+      sbi_check(csr_addr(UART_ISR), x"55", "Check 0x76 in the RX FIFO", clk_i, sbi_if);
+    end if;
+    sbi_check(csr_addr(UART_DATA), x"76", "Check UART RX 0x76, waiting during the overrun of 0xF5 with a parity error", clk_i, sbi_if);
+    sbi_write(csr_addr(UART_ISR), x"0F", "Clear the FIFO state bits (polling)", clk_i, sbi_if);
+    if RX_PARITY_ERROR = "halt" then
+      sbi_check(csr_addr(UART_ISR), x"11", "Check RX FIFO empty after 0x76, RX not halted", clk_i, sbi_if);
+    else
+      sbi_check(csr_addr(UART_ISR), x"51", "Check RX FIFO empty after 0x76", clk_i, sbi_if);
+    end if;
+    sbi_write(csr_addr(UART_ISR), x"FF", "Clear the old events", clk_i, sbi_if);
+    sbi_check(csr_addr(UART_ISR), x"01", "Check isr : TX FIFO empty only", clk_i, sbi_if);
+
+    -- "halt" : a byte with a parity error waiting for room in the full RX
+    -- FIFO raises the parity error event (and halts RX) only when it enters
+    -- the RX FIFO : it is the last byte of the RX FIFO
+    if RX_PARITY_ERROR = "halt" then
+      log(ID_LOG_HDR, "Test 16.2: byte with a parity error waiting for room in the full RX FIFO", C_SCOPE);
+      for i in 0 to 15 loop
+        uart_bfm_send(std_logic_vector(to_unsigned(16#80#+i, 8)), BIT_PERIOD, PARITY_EVEN);
+      end loop;
+      uart_bfm_send(x"E5", BIT_PERIOD, PARITY_EVEN, corrupt_parity => true);
+      wait until rising_edge(clk_i);
+      sbi_check(csr_addr(UART_ISR), x"0D", "Check no parity error event while 0xE5 waits (RX FIFO full)", clk_i, sbi_if);
+      sbi_check(csr_addr(UART_DATA), x"80", "Check UART RX 0x80 : room for 0xE5", clk_i, sbi_if);
+      sbi_check(csr_addr(UART_ISR), x"4D", "Check parity error event when 0xE5 enters the RX FIFO (RX halted)", clk_i, sbi_if);
+      for i in 1 to 15 loop
+        sbi_check(csr_addr(UART_DATA), std_logic_vector(to_unsigned(16#80#+i, 8)), "Check UART RX 0x" & to_hstring(std_logic_vector(to_unsigned(16#80#+i, 8))) & " from the full RX FIFO", clk_i, sbi_if);
+      end loop;
+      sbi_check(csr_addr(UART_DATA), x"E5", "Check UART RX 0xE5 with a parity error, last byte of the RX FIFO", clk_i, sbi_if);
+      sbi_write(csr_addr(UART_ISR), x"0F", "Clear the FIFO state bits (polling)", clk_i, sbi_if);
+      sbi_check(csr_addr(UART_ISR), x"41", "Check RX FIFO empty after 0xE5, RX halted", clk_i, sbi_if);
+      sbi_write(csr_addr(UART_ISR), x"40", "Clear RX parity error : RX resumes", clk_i, sbi_if);
+      sbi_check(csr_addr(UART_ISR), x"01", "Check RX parity error cleared, RX FIFO empty", clk_i, sbi_if);
+    end if;
+    sbi_write(csr_addr(UART_CTRL_RX), x"00", "Disable UART RX", clk_i, sbi_if);
 
     log(ID_LOG_HDR, "Simulation Finished.", C_SCOPE);
     report_alert_counters(FINAL);

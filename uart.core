@@ -186,6 +186,14 @@ targets:
       - RX_PARITY_ERROR=drop
 
   #---------------------------------------
+  lint_ghdl_synth_parity_halt :
+  #---------------------------------------
+    << : *lint_ghdl_synth
+    description     : Synthesis check of sbi_UART_wrapper, RX halted after a byte with a parity error
+    parameters      :
+      - RX_PARITY_ERROR=halt
+
+  #---------------------------------------
   sim_basic: &sim_basic
   #---------------------------------------
     << : *default
@@ -208,6 +216,17 @@ targets:
     description     : Simulation of basic unit tests, bytes with a parity error dropped
     parameters      :
       - RX_PARITY_ERROR=drop
+
+  #---------------------------------------
+  # Same scenario, RX halted after a byte received with a parity error
+  # until isr bit 6 is cleared (RX_PARITY_ERROR generic of tb_uart, set at
+  # run time)
+  #---------------------------------------
+  sim_rx_parity_halt:
+    << : *sim_basic
+    description     : Simulation of basic unit tests, RX halted after a byte with a parity error
+    parameters      :
+      - RX_PARITY_ERROR=halt
 
 #=========================================
 scripts:
@@ -260,7 +279,7 @@ parameters :
   # Generic of sbi_UART_wrapper (lint_ghdl_synth_*) and tb_uart (sim_*)
   #---------------------------------------
   RX_PARITY_ERROR :
-    description : byte received with a parity error, keep (stored in the RX FIFO) or drop
+    description : byte received with a parity error, keep (stored in the RX FIFO), drop, or halt (stored, then RX halted until isr bit 6 is cleared)
     datatype    : str
     default     : keep
     paramtype   : generic

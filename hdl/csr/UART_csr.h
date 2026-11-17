@@ -15,7 +15,7 @@
 #define UART_ISR 0x0
 
 // Field       : isr.value
-// Description : 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (a received byte was dropped), [5] RX framing error (stop bit at 0), [6] RX parity error (byte kept, or dropped if RX_PARITY_ERROR = drop), [7] RX break (all bits of a frame at 0) (events)
+// Description : 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (a received byte was dropped), [5] RX framing error (stop bit at 0), [6] RX parity error (RX_PARITY_ERROR = keep : the byte is stored, drop : the byte is dropped, halt : the byte is stored, last byte of the RX FIFO, and RX is halted until this bit is cleared), [7] RX break (all bits of a frame at 0) (events)
 // Range       : [7:0]
 #define UART_ISR_VALUE      0
 #define UART_ISR_VALUE_MASK 255

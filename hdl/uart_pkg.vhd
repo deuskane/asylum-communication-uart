@@ -69,7 +69,7 @@ component sbi_UART is
     USER_DEFINE_BAUD_TICK : boolean := true;
     DEPTH_TX              : natural := 0;
     DEPTH_RX              : natural := 0;
-    RX_PARITY_ERROR       : string  := "keep"; -- "keep" / "drop"
+    RX_PARITY_ERROR       : string  := "keep"; -- "keep" / "drop" / "halt"
     
     FILENAME_TX           : string  := "dump_uart_tx.txt";
     FILENAME_RX           : string  := "dump_uart_rx.txt"

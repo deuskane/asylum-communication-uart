@@ -38,7 +38,7 @@ entity sbi_UART_wrapper is
     USER_DEFINE_BAUD_TICK : boolean := true;
     DEPTH_TX              : natural := 0;
     DEPTH_RX              : natural := 0;
-    RX_PARITY_ERROR       : string  := "keep" -- "keep" / "drop"
+    RX_PARITY_ERROR       : string  := "keep" -- "keep" / "drop" / "halt"
   );
   port (
     clk_i         : in  std_logic;
