@@ -32,8 +32,9 @@
 -- 2026-11-16  1.8     mrosiere RX framing error, parity error and break :
 --                              isr / imr sources 5, 6 and 7
 -- 2026-11-16  1.9     mrosiere RX_PARITY_ERROR = "drop" : a byte with a
---                              parity error is dropped (not in the RX FIFO,
---                              not echoed)
+--                              parity error (m_axis_parity_error_o of
+--                              uart_rx_axis) is dropped (not in the RX
+--                              FIFO, not echoed)
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -112,7 +113,10 @@ architecture rtl of sbi_UART is
   -- pending in uart_rx_axis) after RTS# deassertion without overrun
   constant RX_RTS_MARGIN          : natural := 2;
   constant RX_RTS_LEVEL           : natural := max(DEPTH_RX - RX_RTS_MARGIN, 1);
-  
+
+  -- Policy on a byte received with a parity error
+  constant RX_PARITY_ERROR_DROP   : boolean := RX_PARITY_ERROR = "drop";
+
   signal   uart_tx                : std_logic;
   signal   uart_rx                : std_logic;
   signal   uart_rx_b              : std_logic;
@@ -132,8 +136,12 @@ architecture rtl of sbi_UART is
   signal   tx_tready              : std_logic;
            
   signal   rx_tdata               : std_logic_vector(8-1 downto 0);
+  signal   rx_data_parity_error   : std_logic;
   signal   rx_tvalid              : std_logic;
   signal   rx_tready              : std_logic;
+  signal   rx_drop                : std_logic;
+  signal   rx_sink_tvalid         : std_logic;
+  signal   rx_sink_tready         : std_logic;
            
   signal   rx_baud_tick_en        : std_logic;
   signal   rx_baud_tick           : std_logic;
@@ -171,6 +179,14 @@ architecture rtl of sbi_UART is
   signal   it_tx_empty            : std_logic;
   
 begin  -- architecture rtl
+
+  -----------------------------------------------------------------------------
+  -- Parameters checks
+  -----------------------------------------------------------------------------
+  -- RX_PARITY_ERROR : "keep" or "drop"
+  assert (RX_PARITY_ERROR = "keep") or (RX_PARITY_ERROR = "drop")
+    report "sbi_UART : RX_PARITY_ERROR must be ""keep"" or ""drop"" (""" & RX_PARITY_ERROR & """)"
+    severity failure;
 
   -----------------------------------------------------------------------------
   -- Input of UART
@@ -280,7 +296,7 @@ begin  -- architecture rtl
       tx_tdata         <= sw2hw.data.value when tx_use_loopback = '0' else
                           rx_tdata ;
       tx_tvalid        <= sw2hw.data.valid when tx_use_loopback = '0' else
-                          rx_tvalid;
+                          rx_sink_tvalid;
       hw2sw.data.ready <= tx_tready        when tx_use_loopback = '0' else
                           '1';-- Always accept 
       uart_cts_b       <= '0'              when cts_enable      = '0' else -- Always Active
@@ -396,12 +412,12 @@ begin  -- architecture rtl
     ins_uart_rx_axis : uart_rx_axis
       generic map
       ( WIDTH              => 8
-       ,PARITY_ERROR       => RX_PARITY_ERROR
         )
       port map
       ( clk_i           => clk_i
        ,arst_b_i        => rx_enable
        ,m_axis_tdata_o  => rx_tdata 
+       ,m_axis_parity_error_o => rx_data_parity_error -- Parity error of rx_tdata
        ,m_axis_tvalid_o => rx_tvalid
        ,m_axis_tready_i => rx_tready
        ,uart_rx_i       => uart_rx
@@ -410,7 +426,7 @@ begin  -- architecture rtl
        ,baud_tick_half_i=> rx_baud_tick_half
        ,parity_enable_i => rx_parity_enable
        ,parity_odd_i    => rx_parity_odd
-       ,parity_error_o  => open -- available on debug_o.uart_rx.parity_error
+       ,last_parity_error_o => open -- available on debug_o.uart_rx.parity_error
        ,err_overrun_o   => rx_err_overrun
        ,err_parity_o    => rx_err_parity
        ,err_framing_o   => rx_err_framing
@@ -419,14 +435,23 @@ begin  -- architecture rtl
 
         );
 
+    -- Policy on a byte received with a parity error (rx_data_parity_error = 1) :
+    -- "drop" : the byte is consumed (rx_tready forced to 1) and not given
+    -- to the sinks. rx_sink_tvalid is the valid of every sink : RX FIFO
+    -- (hw2sw.data, RX FIFO level), TX in echo mode, simulation dump
+    rx_drop            <= rx_data_parity_error when RX_PARITY_ERROR_DROP else
+                          '0';
+    rx_sink_tvalid     <= rx_tvalid and not rx_drop;
+    rx_tready          <= rx_sink_tready or rx_drop;
+
     gen_uart_tx: if UART_TX_ENABLE = true
     generate
       uart_rx          <= uart_tx when rx_use_loopback = '1' else
                           uart_rx_sync;
 
       hw2sw.data.value <= rx_tdata         when tx_use_loopback = '0' else (others => '0');
-      hw2sw.data.valid <= rx_tvalid        when tx_use_loopback = '0' else '0';
-      rx_tready        <= sw2hw.data.ready when tx_use_loopback = '0' else tx_tready;
+      hw2sw.data.valid <= rx_sink_tvalid   when tx_use_loopback = '0' else '0';
+      rx_sink_tready   <= sw2hw.data.ready when tx_use_loopback = '0' else tx_tready;
     end generate gen_uart_tx;
 
     gen_uart_tx_b: if UART_TX_ENABLE = false
@@ -435,8 +460,8 @@ begin  -- architecture rtl
       uart_rx          <= uart_rx_sync;
 
       hw2sw.data.value <= rx_tdata ;
-      hw2sw.data.valid <= rx_tvalid;
-      rx_tready        <= sw2hw.data.ready;
+      hw2sw.data.valid <= rx_sink_tvalid;
+      rx_sink_tready   <= sw2hw.data.ready;
     end generate gen_uart_tx_b;
 
   end generate gen_uart_rx;
@@ -531,7 +556,7 @@ begin  -- architecture rtl
         flush    (file_tx_raw);
       end if;
 
-      if (rx_tvalid and rx_tready)
+      if (rx_sink_tvalid and rx_tready)
       then
         write    (line_buffer, rx_tdata);
         write    (line_buffer, string'(" - 0x"));

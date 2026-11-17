@@ -15,7 +15,9 @@
 -- 2026-11-16  1.3      mrosiere Add err_parity_o, err_framing_o and
 --                               err_break_o in uart_rx_axis
 -- 2026-11-16  1.4      mrosiere Add RX_PARITY_ERROR in sbi_UART and
---                               PARITY_ERROR in uart_rx_axis
+--                               m_axis_parity_error_o in uart_rx_axis,
+--                               parity_error_o renamed
+--                               last_parity_error_o
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -115,10 +117,7 @@ end component uart_baud_rate_gen;
 
 component uart_rx_axis is
   generic (
-    WIDTH              : natural := 8;
-    -- Byte with a parity error (err_parity_o is raised in both cases) :
-    -- "keep" : delivered on m_axis, "drop" : dropped
-    PARITY_ERROR       : string  := "keep"
+    WIDTH              : natural := 8
     );
   port (
     clk_i           : in  std_logic;
@@ -126,7 +125,10 @@ component uart_rx_axis is
 
     uart_rx_i       : in  std_logic;
 
+    -- Every received byte is delivered, with its parity error on
+    -- m_axis_parity_error_o (except a byte dropped by an overrun)
     m_axis_tdata_o  : out std_logic_vector(WIDTH-1 downto 0);
+    m_axis_parity_error_o : out std_logic; -- Parity error of m_axis_tdata_o
     m_axis_tvalid_o : out std_logic;
     m_axis_tready_i : in  std_logic;
 
@@ -137,17 +139,16 @@ component uart_rx_axis is
     parity_enable_i : in  std_logic;
     parity_odd_i    : in  std_logic;
 
-    -- Parity status of the last received frame (updated with m_axis_tvalid_o)
-    -- 0 : parity ok or parity disabled, 1 : parity error
-    parity_error_o  : out std_logic;
+    -- Parity status of the last received frame (updated at the end of each
+    -- frame, debug) : 0 : parity ok or parity disabled, 1 : parity error
+    last_parity_error_o : out std_logic;
 
     -- Overrun : one clock cycle pulse when a frame is received while the
     -- previous byte is still pending on m_axis (the new byte is dropped)
     err_overrun_o   : out std_logic;
 
     -- Errors of the received frame : one clock cycle pulse at the end of the
-    -- frame. The byte is delivered on m_axis, except a byte with a parity
-    -- error when PARITY_ERROR = "drop"
+    -- frame (the byte is delivered on m_axis, unless dropped by an overrun)
     err_parity_o    : out std_logic; -- Parity bit mismatch
     err_framing_o   : out std_logic; -- Stop bit sampled at 0
     err_break_o     : out std_logic; -- Break : all bits of the frame at 0

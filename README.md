@@ -242,7 +242,6 @@ The CSR bank uses 3 address bits (`UART_ADDR_WIDTH = 3`) and 8-bit data (`UART_D
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `WIDTH` | natural | `8` | Data width |
-| `PARITY_ERROR` | string | `"keep"` | `"keep"`: a byte with a parity error is delivered on `m_axis`; `"drop"`: it is dropped (`err_parity_o` only); any other value fails at elaboration. `sbi_UART` connects `RX_PARITY_ERROR` |
 
 #### Ports
 
@@ -252,6 +251,7 @@ The CSR bank uses 3 address bits (`UART_ADDR_WIDTH = 3`) and 8-bit data (`UART_D
 | `arst_b_i` | in | std_logic | Asynchronous reset, active low (connected to `rx_enable`) |
 | `uart_rx_i` | in | std_logic | Serial input |
 | `m_axis_tdata_o` | out | std_logic_vector(WIDTH-1 downto 0) | Received byte |
+| `m_axis_parity_error_o` | out | std_logic | Parity error of the byte on `m_axis_tdata_o`, registered with it (0: parity ok or disabled, 1: parity error). Every received byte is delivered, the policy on a byte with a parity error is applied by the sink (`RX_PARITY_ERROR` of `sbi_UART`) |
 | `m_axis_tvalid_o` | out | std_logic | Received byte valid (cleared when `m_axis_tready_i = 1`) |
 | `err_overrun_o` | out | std_logic | One-cycle pulse when a frame is received while the previous byte is still pending on `m_axis` (`m_axis_tvalid_o = 1` and `m_axis_tready_i = 0`): the new byte is dropped, the pending one is kept |
 | `m_axis_tready_i` | in | std_logic | Byte accepted |
@@ -260,10 +260,10 @@ The CSR bank uses 3 address bits (`UART_ADDR_WIDTH = 3`) and 8-bit data (`UART_D
 | `baud_tick_en_o` | out | std_logic | Enable of the RX baud rate generator (high in START / ACTIVE) |
 | `parity_enable_i` | in | std_logic | 1: a parity bit is expected after the data bits |
 | `parity_odd_i` | in | std_logic | 0: even parity, 1: odd parity (sampled with `parity_enable_i` at the start of each frame) |
-| `err_parity_o` | out | std_logic | One-cycle pulse at the end of a frame with a parity error; the byte is delivered, or dropped with `PARITY_ERROR = "drop"` |
+| `err_parity_o` | out | std_logic | One-cycle pulse at the end of a frame with a parity error (the byte is delivered with `m_axis_parity_error_o = 1`, unless dropped by an overrun) |
 | `err_framing_o` | out | std_logic | One-cycle pulse at the end of a frame whose stop bit is sampled at 0 (the byte is still delivered); the receiver then waits for the line at 1 before a new start bit |
 | `err_break_o` | out | std_logic | One-cycle pulse at the end of a frame with all its bits at 0 (start, data, parity, stop), with `err_framing_o` |
-| `parity_error_o` | out | std_logic | Parity status of the last received frame, updated at the end of each frame (0: parity ok or disabled, 1: parity error) |
+| `last_parity_error_o` | out | std_logic | Parity status of the last received frame, updated at the end of each frame, a frame dropped by an overrun included (0: parity ok or disabled, 1: parity error); debug, the parity error of the delivered byte is `m_axis_parity_error_o` |
 | `debug_o` | out | uart_rx_debug_t | FSM state, bit counter, `baud_tick_half`, `parity_error` |
 
 ## Register Map
@@ -356,9 +356,9 @@ A byte is accepted (`s_axis_tvalid_i = 1` and `s_axis_tready_o = 1`) only when i
 - **IDLE**: waits for `uart_rx_i = 0` (start bit). In `sbi_UART` the receiver input is the synchronized `uart_rx_i` (2 clock cycles of latency) or `uart_tx` in serial loopback.
 - **START**: enables the RX baud generator and samples the start bit at mid-bit; a `'1'` is a false start (glitch) and goes back to IDLE.
 - **ACTIVE**: samples one bit per `baud_tick_half` until all bits are received.
-- **STOP**: extracts the data byte and the parity bit, checks the parity and the stop bit (`err_parity_o`, `err_framing_o`, `err_break_o`), asserts `m_axis_tvalid_o` (not for a byte with a parity error when `PARITY_ERROR = "drop"`: it is dropped), back to IDLE. After a framing error, IDLE waits for `uart_rx_i = 1` before looking for a start bit, so a line held at 0 (break) gives one byte. If the previous byte is still pending (`m_axis_tvalid_o = 1`, `m_axis_tready_i = 0`), the new byte is dropped and `err_overrun_o` pulses (overrun).
+- **STOP**: extracts the data byte and the parity bit, checks the parity and the stop bit (`err_parity_o`, `err_framing_o`, `err_break_o`), asserts `m_axis_tvalid_o` with the parity error of the byte on `m_axis_parity_error_o`, back to IDLE. After a framing error, IDLE waits for `uart_rx_i = 1` before looking for a start bit, so a line held at 0 (break) gives one byte. If the previous byte is still pending (`m_axis_tvalid_o = 1`, `m_axis_tready_i = 0`), the new byte is dropped and `err_overrun_o` pulses (overrun): the pending byte and its `m_axis_parity_error_o` are kept.
 
-The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 11 with parity) and the data bits are extracted at the position that matches the parity configuration sampled at the start of the frame. With `rx_parity_enable = 1` the received parity bit is checked (even: `xor(data, parity) = 0`, odd: `xor(data, parity) = 1`); the result is available on `parity_error_o` of `uart_rx_axis` and on `debug_o.uart_rx.parity_error` of `sbi_UART` (status of the last received frame). With `RX_PARITY_ERROR = "keep"` (default, as AXI UART Lite), a byte with a parity error is pushed into the RX FIFO; the parity error event (`isr` bit 6) tells that an error occurred, but not which byte of the RX FIFO had it. With `RX_PARITY_ERROR = "drop"`, the byte is dropped (not pushed into the RX FIFO, not echoed with `ctrl_tx.tx_use_loopback = 1`), and the event is still raised. A byte with a framing error or a break is pushed into the RX FIFO (unless it also has a parity error and `RX_PARITY_ERROR = "drop"`, e.g. a break with odd parity), reported by the framing error and break events (`isr` bits 5 and 7). An overrun keeps its priority: a frame received while a byte is pending is dropped with an overrun event (and its parity error event if any).
+The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 11 with parity) and the data bits are extracted at the position that matches the parity configuration sampled at the start of the frame. With `rx_parity_enable = 1` the received parity bit is checked (even: `xor(data, parity) = 0`, odd: `xor(data, parity) = 1`); the result is delivered with the byte on `m_axis_parity_error_o` of `uart_rx_axis`, and is available on `last_parity_error_o` and on `debug_o.uart_rx.parity_error` of `sbi_UART` (status of the last received frame). `uart_rx_axis` delivers every byte; `sbi_UART` applies the policy of `RX_PARITY_ERROR` to the bytes with `m_axis_parity_error_o = 1`, with one valid for every sink (RX FIFO and its level tracking for RTS#, transmitter in echo mode, simulation dump). With `RX_PARITY_ERROR = "keep"` (default, as AXI UART Lite), a byte with a parity error is pushed into the RX FIFO; the parity error event (`isr` bit 6) tells that an error occurred, but not which byte of the RX FIFO had it. With `RX_PARITY_ERROR = "drop"`, the byte is dropped (consumed by `sbi_UART`, not pushed into the RX FIFO, not echoed with `ctrl_tx.tx_use_loopback = 1`), and the event is still raised. A byte with a framing error or a break is pushed into the RX FIFO (unless it also has a parity error and `RX_PARITY_ERROR = "drop"`, e.g. a break with odd parity), reported by the framing error and break events (`isr` bits 5 and 7). An overrun keeps its priority: a frame received while a byte is pending is dropped with an overrun event (and its parity error event if any).
 
 ### Loopback and Flow Control
 

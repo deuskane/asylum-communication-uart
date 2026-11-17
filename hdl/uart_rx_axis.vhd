@@ -27,8 +27,10 @@
 --                               (err_framing_o, err_break_o), wait for the
 --                               line at 1 after a framing error, parity
 --                               error pulse (err_parity_o)
--- 2026-11-16  1.4      mrosiere PARITY_ERROR = "drop" : a byte with a
---                               parity error is dropped
+-- 2026-11-16  1.4      mrosiere Parity error of the delivered byte on
+--                               m_axis_parity_error_o (the policy on this
+--                               byte is set by the sink), parity_error_o
+--                               renamed last_parity_error_o
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -42,10 +44,7 @@ use     asylum.uart_pkg.ALL;
 
 entity uart_rx_axis is
   generic (
-    WIDTH              : natural := 8;
-    -- Byte with a parity error (err_parity_o is raised in both cases) :
-    -- "keep" : delivered on m_axis, "drop" : dropped
-    PARITY_ERROR       : string  := "keep"
+    WIDTH              : natural := 8
     );
   port (
     clk_i           : in  std_logic;
@@ -53,7 +52,10 @@ entity uart_rx_axis is
 
     uart_rx_i       : in  std_logic;
 
+    -- Every received byte is delivered, with its parity error on
+    -- m_axis_parity_error_o (except a byte dropped by an overrun)
     m_axis_tdata_o  : out std_logic_vector(WIDTH-1 downto 0);
+    m_axis_parity_error_o : out std_logic; -- Parity error of m_axis_tdata_o
     m_axis_tvalid_o : out std_logic;
     m_axis_tready_i : in  std_logic;
 
@@ -64,17 +66,16 @@ entity uart_rx_axis is
     parity_enable_i : in  std_logic;
     parity_odd_i    : in  std_logic;
 
-    -- Parity status of the last received frame (updated with m_axis_tvalid_o)
-    -- 0 : parity ok or parity disabled, 1 : parity error
-    parity_error_o  : out std_logic;
+    -- Parity status of the last received frame (updated at the end of each
+    -- frame, debug) : 0 : parity ok or parity disabled, 1 : parity error
+    last_parity_error_o : out std_logic;
 
     -- Overrun : one clock cycle pulse when a frame is received while the
     -- previous byte is still pending on m_axis (the new byte is dropped)
     err_overrun_o   : out std_logic;
 
     -- Errors of the received frame : one clock cycle pulse at the end of the
-    -- frame. The byte is delivered on m_axis, except a byte with a parity
-    -- error when PARITY_ERROR = "drop"
+    -- frame (the byte is delivered on m_axis, unless dropped by an overrun)
     err_parity_o    : out std_logic; -- Parity bit mismatch
     err_framing_o   : out std_logic; -- Stop bit sampled at 0
     err_break_o     : out std_logic; -- Break : all bits of the frame at 0
@@ -96,7 +97,6 @@ architecture rtl of uart_rx_axis is
   constant BIT_PARITY                     : natural := BIT_DATA_MSB+1;
   constant BIT_STOP                       : natural := BIT_PARITY+1;
   constant BIT_MSB                        : natural := WIDTH+2-1;
-  constant PARITY_ERROR_KEEP              : boolean := PARITY_ERROR = "keep";
   
   type     state_t is (IDLE, START, ACTIVE, STOP);
   signal   state_r                        : state_t;
@@ -107,6 +107,7 @@ architecture rtl of uart_rx_axis is
   signal   parity_enable_r                : std_logic;
   signal   parity_odd_r                   : std_logic;
   signal   parity_error_r                 : std_logic;
+  signal   m_axis_parity_error_r          : std_logic;
   signal   m_axis_tvalid_r                : std_logic;
   signal   err_overrun_r                  : std_logic;
   signal   err_parity_r                   : std_logic;
@@ -116,11 +117,6 @@ architecture rtl of uart_rx_axis is
   
 begin
   
-  -- PARITY_ERROR : "keep" or "drop"
-  assert (PARITY_ERROR = "keep") or (PARITY_ERROR = "drop")
-    report "uart_rx_axis : PARITY_ERROR must be ""keep"" or ""drop"" (""" & PARITY_ERROR & """)"
-    severity failure;
-
   -- UART reception logic
   process(clk_i, arst_b_i)
     variable v_data          : std_logic_vector(WIDTH-1 downto 0);
@@ -132,6 +128,7 @@ begin
     then
       uart_rx_data_r    <= (others => '0');
       uart_rx_bit_cnt_r <= (others => '0');
+      m_axis_parity_error_r <= '0';
       m_axis_tvalid_r   <= '0';
       err_overrun_r     <= '0';
       state_r           <= IDLE;
@@ -242,16 +239,14 @@ begin
           wait_idle_r       <= v_framing_error;
           
           -- Previous byte still pending : overrun, the new byte is dropped
-          -- (the pending byte is never overwritten). Parity error with
-          -- PARITY_ERROR = "drop" : the byte is dropped (err_parity_o only)
+          -- (the pending byte and its parity error are never overwritten)
           if (m_axis_tvalid_r = '1') and
              (m_axis_tready_i = '0')
           then
             err_overrun_r   <= '1';
-          elsif (v_parity_error     = '0') or
-                (PARITY_ERROR_KEEP  = true)
-          then
+          else
             m_axis_tdata_o  <= v_data;
+            m_axis_parity_error_r <= v_parity_error;
             m_axis_tvalid_r <= '1';
           end if;
         when others =>
@@ -260,11 +255,12 @@ begin
     end if;
   end process;
 
-  parity_error_o         <= parity_error_r;
+  last_parity_error_o    <= parity_error_r;
   err_overrun_o          <= err_overrun_r;
   err_parity_o           <= err_parity_r;
   err_framing_o          <= err_framing_r;
   err_break_o            <= err_break_r;
+  m_axis_parity_error_o  <= m_axis_parity_error_r;
   m_axis_tvalid_o        <= m_axis_tvalid_r;
   
   debug_o.state          <= std_logic_vector(to_unsigned(state_t'pos(state_r), 2));
