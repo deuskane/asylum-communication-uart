@@ -21,7 +21,7 @@ package UART_csr_pkg is
 
   --==================================
   -- Register    : isr
-  -- Description : Interruption Status Register
+  -- Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
   -- Address     : 0x0
   -- Width       : 4
   -- Sw Access   : rw1c
@@ -33,12 +33,12 @@ package UART_csr_pkg is
   type UART_isr_sw2hw_t is record
     re    : std_logic; -- Software read
     we    : std_logic; -- Software write
-    value : std_logic_vector(3 downto 0); -- 0: interrupt is inactive, 1: interrupt is active
+    value : std_logic_vector(3 downto 0); -- 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full
   end record UART_isr_sw2hw_t;
 
   type UART_isr_hw2sw_t is record
     we    : std_logic; -- Hardware write
-    value : std_logic_vector(3 downto 0); -- 0: interrupt is inactive, 1: interrupt is active
+    value : std_logic_vector(3 downto 0); -- 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full
   end record UART_isr_hw2sw_t;
 
   --==================================
@@ -55,7 +55,7 @@ package UART_csr_pkg is
   type UART_imr_sw2hw_t is record
     re     : std_logic; -- Software read
     we     : std_logic; -- Software write
-    enable : std_logic_vector(3 downto 0); -- 0: interrupt is disable, 1: interrupt is enable
+    enable : std_logic_vector(3 downto 0); -- 0: interrupt is disable, 1: interrupt is enable. Same bit mapping as isr
   end record UART_imr_sw2hw_t;
 
   --==================================

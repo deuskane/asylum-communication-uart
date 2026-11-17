@@ -61,7 +61,7 @@ architecture rtl of UART_registers is
 
   --==================================
   -- Register    : isr
-  -- Description : Interruption Status Register
+  -- Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
   -- Address     : 0x0
   -- Width       : 4
   -- Sw Access   : rw1c
@@ -220,7 +220,7 @@ begin  -- architecture rtl
 
   --==================================
   -- Register    : isr
-  -- Description : Interruption Status Register
+  -- Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
   -- Address     : 0x0
   -- Width       : 4
   -- Sw Access   : rw1c
@@ -248,9 +248,10 @@ begin  -- architecture rtl
     sw2hw_o.isr.value <= isr_rdata_hw(3 downto 0);
     ins_isr : csr_reg
       generic map
-        (WIDTH => 4
-        ,INIT  => INIT_isr
-        ,MODEL => "rw1c"
+        (WIDTH         => 4
+        ,INIT          => INIT_isr
+        ,MODEL         => "rw1c"
+        ,RD_WAIT_STATE => 1
         )
       port map
         (clk_i      => clk_i
