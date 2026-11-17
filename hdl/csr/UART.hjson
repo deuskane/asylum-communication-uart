@@ -42,7 +42,7 @@
                 {
                     name: "value",
                     bits: "7:0",
-                    desc: "0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (a received byte was dropped), [5] RX framing error (stop bit at 0), [6] RX parity error (byte stored, or dropped if RX_STORE_PARITY_ERROR = false), [7] RX break (all bits of a frame at 0) (events)"
+                    desc: "0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (a received byte was dropped), [5] RX framing error (stop bit at 0), [6] RX parity error (byte kept, or dropped if RX_PARITY_ERROR = drop), [7] RX break (all bits of a frame at 0) (events)"
                 },
             ]
         },

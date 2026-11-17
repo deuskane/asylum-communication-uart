@@ -27,7 +27,7 @@
 --                               (err_framing_o, err_break_o), wait for the
 --                               line at 1 after a framing error, parity
 --                               error pulse (err_parity_o)
--- 2026-11-16  1.4      mrosiere STORE_PARITY_ERROR = false : a byte with a
+-- 2026-11-16  1.4      mrosiere PARITY_ERROR = "drop" : a byte with a
 --                               parity error is dropped
 -------------------------------------------------------------------------------
 
@@ -43,10 +43,9 @@ use     asylum.uart_pkg.ALL;
 entity uart_rx_axis is
   generic (
     WIDTH              : natural := 8;
-    -- true  : a byte with a parity error is delivered on m_axis
-    -- false : a byte with a parity error is dropped
-    -- (err_parity_o is raised in both cases)
-    STORE_PARITY_ERROR : boolean := true
+    -- Byte with a parity error (err_parity_o is raised in both cases) :
+    -- "keep" : delivered on m_axis, "drop" : dropped
+    PARITY_ERROR       : string  := "keep"
     );
   port (
     clk_i           : in  std_logic;
@@ -75,7 +74,7 @@ entity uart_rx_axis is
 
     -- Errors of the received frame : one clock cycle pulse at the end of the
     -- frame. The byte is delivered on m_axis, except a byte with a parity
-    -- error when STORE_PARITY_ERROR = false
+    -- error when PARITY_ERROR = "drop"
     err_parity_o    : out std_logic; -- Parity bit mismatch
     err_framing_o   : out std_logic; -- Stop bit sampled at 0
     err_break_o     : out std_logic; -- Break : all bits of the frame at 0
@@ -97,6 +96,7 @@ architecture rtl of uart_rx_axis is
   constant BIT_PARITY                     : natural := BIT_DATA_MSB+1;
   constant BIT_STOP                       : natural := BIT_PARITY+1;
   constant BIT_MSB                        : natural := WIDTH+2-1;
+  constant PARITY_ERROR_KEEP              : boolean := PARITY_ERROR = "keep";
   
   type     state_t is (IDLE, START, ACTIVE, STOP);
   signal   state_r                        : state_t;
@@ -116,6 +116,11 @@ architecture rtl of uart_rx_axis is
   
 begin
   
+  -- PARITY_ERROR : "keep" or "drop"
+  assert (PARITY_ERROR = "keep") or (PARITY_ERROR = "drop")
+    report "uart_rx_axis : PARITY_ERROR must be ""keep"" or ""drop"" (""" & PARITY_ERROR & """)"
+    severity failure;
+
   -- UART reception logic
   process(clk_i, arst_b_i)
     variable v_data          : std_logic_vector(WIDTH-1 downto 0);
@@ -238,13 +243,13 @@ begin
           
           -- Previous byte still pending : overrun, the new byte is dropped
           -- (the pending byte is never overwritten). Parity error with
-          -- STORE_PARITY_ERROR = false : the byte is dropped (err_parity_o only)
+          -- PARITY_ERROR = "drop" : the byte is dropped (err_parity_o only)
           if (m_axis_tvalid_r = '1') and
              (m_axis_tready_i = '0')
           then
             err_overrun_r   <= '1';
           elsif (v_parity_error     = '0') or
-                (STORE_PARITY_ERROR = true)
+                (PARITY_ERROR_KEEP  = true)
           then
             m_axis_tdata_o  <= v_data;
             m_axis_tvalid_r <= '1';

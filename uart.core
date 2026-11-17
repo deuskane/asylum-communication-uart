@@ -183,7 +183,7 @@ targets:
     << : *lint_ghdl_synth
     description     : Synthesis check of sbi_UART_wrapper, bytes with a parity error dropped
     parameters      :
-      - RX_STORE_PARITY_ERROR=false
+      - RX_PARITY_ERROR=drop
 
   #---------------------------------------
   sim_basic: &sim_basic
@@ -201,13 +201,13 @@ targets:
 
   #---------------------------------------
   # Same scenario, bytes received with a parity error dropped
-  # (RX_STORE_PARITY_ERROR generic of tb_uart, set at run time)
+  # (RX_PARITY_ERROR generic of tb_uart, set at run time)
   #---------------------------------------
   sim_rx_parity_drop:
     << : *sim_basic
     description     : Simulation of basic unit tests, bytes with a parity error dropped
     parameters      :
-      - RX_STORE_PARITY_ERROR=false
+      - RX_PARITY_ERROR=drop
 
 #=========================================
 scripts:
@@ -259,8 +259,8 @@ parameters :
   #---------------------------------------
   # Generic of sbi_UART_wrapper (lint_ghdl_synth_*) and tb_uart (sim_*)
   #---------------------------------------
-  RX_STORE_PARITY_ERROR :
-    description : true, a byte received with a parity error is stored in the RX FIFO ; false, it is dropped
-    datatype    : bool
-    default     : true
+  RX_PARITY_ERROR :
+    description : byte received with a parity error, keep (stored in the RX FIFO) or drop
+    datatype    : str
+    default     : keep
     paramtype   : generic
