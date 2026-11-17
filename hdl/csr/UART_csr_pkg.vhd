@@ -21,9 +21,9 @@ package UART_csr_pkg is
 
   --==================================
   -- Register    : isr
-  -- Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
+  -- Description : Interruption Status Register. Each source sets its bit, masked or not (imr only masks it_o), until software writes 1 to it. Polling of the FIFO state : write 1 to clear the bits 3:0, then read isr : the bit of a source still active is set again (1 read wait state : the read right after the clear sees it)
   -- Address     : 0x0
-  -- Width       : 4
+  -- Width       : 8
   -- Sw Access   : rw1c
   -- Hw Access   : rw
   -- Hw Type     : reg
@@ -33,19 +33,19 @@ package UART_csr_pkg is
   type UART_isr_sw2hw_t is record
     re    : std_logic; -- Software read
     we    : std_logic; -- Software write
-    value : std_logic_vector(3 downto 0); -- 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full
+    value : std_logic_vector(7 downto 0); -- 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (a received byte was dropped), [5] RX framing error (stop bit at 0), [6] RX parity error (RX_PARITY_ERROR = keep : the byte is stored, drop : the byte is dropped, halt : the byte is stored, last byte of the RX FIFO, and RX is halted until this bit is cleared), [7] RX break (all bits of a frame at 0) (events)
   end record UART_isr_sw2hw_t;
 
   type UART_isr_hw2sw_t is record
     we    : std_logic; -- Hardware write
-    value : std_logic_vector(3 downto 0); -- 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full
+    value : std_logic_vector(7 downto 0); -- 0: interrupt is inactive, 1: interrupt is active. Sources : [0] TX FIFO empty, [1] TX FIFO full, [2] RX FIFO not empty, [3] RX FIFO full (levels), [4] RX overrun (a received byte was dropped), [5] RX framing error (stop bit at 0), [6] RX parity error (RX_PARITY_ERROR = keep : the byte is stored, drop : the byte is dropped, halt : the byte is stored, last byte of the RX FIFO, and RX is halted until this bit is cleared), [7] RX break (all bits of a frame at 0) (events)
   end record UART_isr_hw2sw_t;
 
   --==================================
   -- Register    : imr
   -- Description : Interruption Mask Register
   -- Address     : 0x1
-  -- Width       : 4
+  -- Width       : 8
   -- Sw Access   : rw
   -- Hw Access   : ro
   -- Hw Type     : reg
@@ -55,7 +55,7 @@ package UART_csr_pkg is
   type UART_imr_sw2hw_t is record
     re     : std_logic; -- Software read
     we     : std_logic; -- Software write
-    enable : std_logic_vector(3 downto 0); -- 0: interrupt is disable, 1: interrupt is enable. Same bit mapping as isr
+    enable : std_logic_vector(7 downto 0); -- 0: interrupt is disable, 1: interrupt is enable. Same bit mapping as isr
   end record UART_imr_sw2hw_t;
 
   --==================================

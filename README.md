@@ -40,7 +40,7 @@
 
 **UART transmitter / receiver with CSR access over the SBI bus, TX / RX FIFOs, CTS / RTS flow control, loopback modes and an interrupt output.**
 
-VLNV: `asylum:communication:uart:2.0.0`
+VLNV: `asylum:communication:uart:3.0.0`
 
 ## Table of Contents
 
@@ -61,13 +61,15 @@ This IP is the UART of the Asylum project. Software drives it through a small CS
 
 ### Key Features
 
-- 8-bit frames: 1 start bit, 8 data bits LSB first, optional parity bit (even / odd), 1 stop bit
+- 8-bit frames: 1 start bit, 8 data bits LSB first, optional parity bit (even / odd), 1 stop bit (checked on reception)
 - Baud rate set at elaboration from `CLOCK_FREQ` / `BAUD_RATE`, optionally software-writable through a 16-bit counter (`USER_DEFINE_BAUD_TICK = true`)
 - Separate TX and RX enables (`ctrl_tx.tx_enable`, `ctrl_rx.rx_enable`), each used as the reset of its path; bytes written while TX is disabled or CTS# is inactive are kept in the TX FIFO (no silent loss)
 - Configurable FIFO depths (`DEPTH_TX`, `DEPTH_RX`, 0 = no FIFO), blocking read / write on the `data` register
-- Hardware flow control: CTS# (synchronized, `ctrl_tx.cts_enable`) and RTS# driven by the RX FIFO full flag (`ctrl_rx.rts_enable`)
+- Hardware flow control: CTS# (synchronized, `ctrl_tx.cts_enable`) and RTS# deasserted when the RX FIFO is almost full, at `DEPTH_RX - 2` bytes (`ctrl_rx.rts_enable`)
+- RX overrun detection: a byte received while the previous one is still pending is dropped (it never overwrites it) and raises an interrupt event
+- RX error detection: parity error, framing error (stop bit at 0) and break (all bits of a frame at 0) raise interrupt events; a byte with a parity error is stored in the RX FIFO (as AXI UART Lite), dropped (`RX_PARITY_ERROR = "drop"`), or stored with RX halted until software clears its `isr` bit, so that it is the last byte of the RX FIFO (`"halt"`); after a framing error the receiver waits for the line back to idle (a break gives one byte)
 - Two loopback modes: serial loopback TX to RX (`rx_use_loopback`) and echo of received bytes on TX (`tx_use_loopback`)
-- 4 interrupt sources (TX FIFO empty / full, RX FIFO not empty / full) with status and mask registers; the FIFO state is polled in `isr` (write 1 to clear, then read)
+- 8 interrupt sources (TX FIFO empty / full, RX FIFO not empty / full, RX overrun, framing error, parity error, break) with status and mask registers; the FIFO state is polled in `isr` (write 1 to clear, then read)
 - TX or RX path can be removed at elaboration (`UART_TX_ENABLE`, `UART_RX_ENABLE`)
 - Debug port with the TX / RX FSM states and the parity error flag of the last received frame
 - Simulation-only dump of TX / RX bytes into raw and annotated text files
@@ -80,7 +82,7 @@ Diagram: [doc/uart.drawio](doc/uart.drawio) (open with diagrams.net or the VS Co
 - The `data` register is a bidirectional `csr_fifo`: writes fill the TX FIFO, reads drain the RX FIFO.
 - `uart_tx_axis` and `uart_rx_axis` exchange bytes with the FIFOs as AXI-Stream-like valid/ready channels; each one has its own `uart_baud_rate_gen` (the RX one also provides the mid-bit `baud_tick_half` used for sampling).
 - `uart_cts_b_i` and `uart_rx_i` go through a `sync2dffrn` synchronizer (techmap) before reaching the transmitter / receiver (`uart_rx_i` is synchronized inverted, so that its idle level `'1'` is kept during reset).
-- The FIFO empty / full / not-empty flags feed `GIC_core`, which updates the `isr` register and drives `it_o`.
+- The FIFO empty / full / not-empty flags and the RX error pulses of `uart_rx_axis` (overrun, framing, parity, break) feed `GIC_core`, which updates the `isr` register and drives `it_o`. With `RX_PARITY_ERROR = "halt"`, the parity error source is the transfer of a byte with a parity error to the RX FIFO (or to the transmitter in echo mode), and `isr` bit 6 halts RX until it is cleared.
 
 ## Top-Level
 
@@ -99,6 +101,7 @@ Top-level entity: **`sbi_UART`** ([hdl/sbi_uart.vhd](hdl/sbi_uart.vhd)), library
 | `USER_DEFINE_BAUD_TICK` | boolean | `true` | `true`: `baud_tick_cnt_max_lsb/msb` registers exist and are software-writable; `false`: the counter is fixed to `CLOCK_FREQ / BAUD_RATE - 1` |
 | `DEPTH_TX` | natural | `0` | Depth of the TX FIFO (software to hardware, 0 = no FIFO) |
 | `DEPTH_RX` | natural | `0` | Depth of the RX FIFO (hardware to software, 0 = no FIFO) |
+| `RX_PARITY_ERROR` | string | `"keep"` | `"keep"`: a byte received with a parity error is stored in the RX FIFO (echoed with `tx_use_loopback = 1`); `"drop"`: it is dropped; `"halt"`: it is stored (echoed), then RX is halted (RTS# deasserted) until software clears `isr` bit 6, so it is the last byte of the RX FIFO, see [Parity Error Policy](#parity-error-policy); any other value fails at elaboration. The parity error event (`isr` bit 6) is raised in the three cases |
 | `FILENAME_TX` | string | `"dump_uart_tx.txt"` | Simulation only: raw dump of transmitted bytes (annotated copy in `FILENAME_TX & ".dbg"`) |
 | `FILENAME_RX` | string | `"dump_uart_rx.txt"` | Simulation only: raw dump of received bytes (annotated copy in `FILENAME_RX & ".dbg"`) |
 
@@ -125,7 +128,7 @@ Top-level entity: **`sbi_UART`** ([hdl/sbi_uart.vhd](hdl/sbi_uart.vhd)), library
 | `uart_tx_o` | out | std_logic | Serial data output (idle high) |
 | `uart_rx_i` | in | std_logic | Serial data input (idle high); synchronized by `sync2dffrn` (2 FF, idle level `'1'` during reset) |
 | `uart_cts_b_i` | in | std_logic | Clear To Send, active low; synchronized by `sync2dffrn`, only used when `ctrl_tx.cts_enable = 1` |
-| `uart_rts_b_o` | out | std_logic | Request To Send, active low, registered (reset value `'0'`): `'0'` when `ctrl_rx.rts_enable = 0`, else the RX FIFO full flag |
+| `uart_rts_b_o` | out | std_logic | Request To Send, active low, registered (reset value `'0'`): `'0'` when `ctrl_rx.rts_enable = 0`, else `'1'` when the RX FIFO holds `max(DEPTH_RX - 2, 1)` bytes or more (`DEPTH_RX = 0`: while a received byte is pending), or while RX is halted (`RX_PARITY_ERROR = "halt"`) |
 
 #### Interrupts
 
@@ -157,6 +160,7 @@ use     asylum.uart_pkg.all;
      ,USER_DEFINE_BAUD_TICK => true
      ,DEPTH_TX              => 16
      ,DEPTH_RX              => 16
+     ,RX_PARITY_ERROR       => "keep"
      ,FILENAME_TX           => "dump_uart0_tx.txt"
      ,FILENAME_RX           => "dump_uart0_rx.txt"
     )
@@ -247,14 +251,19 @@ The CSR bank uses 3 address bits (`UART_ADDR_WIDTH = 3`) and 8-bit data (`UART_D
 | `arst_b_i` | in | std_logic | Asynchronous reset, active low (connected to `rx_enable`) |
 | `uart_rx_i` | in | std_logic | Serial input |
 | `m_axis_tdata_o` | out | std_logic_vector(WIDTH-1 downto 0) | Received byte |
+| `m_axis_parity_error_o` | out | std_logic | Parity error of the byte on `m_axis_tdata_o`, registered with it (0: parity ok or disabled, 1: parity error). Every received byte is delivered, the policy on a byte with a parity error is applied by the sink (`RX_PARITY_ERROR` of `sbi_UART`) |
 | `m_axis_tvalid_o` | out | std_logic | Received byte valid (cleared when `m_axis_tready_i = 1`) |
+| `err_overrun_o` | out | std_logic | One-cycle pulse when a frame is received while the previous byte is still pending on `m_axis` (`m_axis_tvalid_o = 1` and `m_axis_tready_i = 0`): the new byte is dropped, the pending one is kept |
 | `m_axis_tready_i` | in | std_logic | Byte accepted |
 | `baud_tick_i` | in | std_logic | Baud tick (not used by the FSM, sampling uses `baud_tick_half_i`) |
 | `baud_tick_half_i` | in | std_logic | Mid-bit sampling pulse |
 | `baud_tick_en_o` | out | std_logic | Enable of the RX baud rate generator (high in START / ACTIVE) |
 | `parity_enable_i` | in | std_logic | 1: a parity bit is expected after the data bits |
 | `parity_odd_i` | in | std_logic | 0: even parity, 1: odd parity (sampled with `parity_enable_i` at the start of each frame) |
-| `parity_error_o` | out | std_logic | Parity status of the last received frame, updated with `m_axis_tvalid_o` (0: parity ok or disabled, 1: parity error) |
+| `err_parity_o` | out | std_logic | One-cycle pulse at the end of a frame with a parity error (the byte is delivered with `m_axis_parity_error_o = 1`, unless dropped by an overrun) |
+| `err_framing_o` | out | std_logic | One-cycle pulse at the end of a frame whose stop bit is sampled at 0 (the byte is still delivered); the receiver then waits for the line at 1 before a new start bit |
+| `err_break_o` | out | std_logic | One-cycle pulse at the end of a frame with all its bits at 0 (start, data, parity, stop), with `err_framing_o` |
+| `last_parity_error_o` | out | std_logic | Parity status of the last received frame, updated at the end of each frame, a frame dropped by an overrun included (0: parity ok or disabled, 1: parity error); debug, the parity error of the delivered byte is `m_axis_parity_error_o` |
 | `debug_o` | out | uart_rx_debug_t | FSM state, bit counter, `baud_tick_half`, `parity_error` |
 
 ## Register Map
@@ -266,9 +275,9 @@ The register map is generated by regtool from [hdl/csr/UART.hjson](hdl/csr/UART.
 
 Notes:
 
-- `data` is a FIFO register with blocking read / write: writes go to the TX FIFO (`DEPTH_TX`), reads come from the RX FIFO (`DEPTH_RX`).
+- `data` is a FIFO register with blocking read / write: writes go to the TX FIFO (`DEPTH_TX`), reads come from the RX FIFO (`DEPTH_RX`). With `RX_PARITY_ERROR = "halt"`, a read of `data` while the RX FIFO is empty and RX is halted blocks the bus forever (no byte is received before `isr` bit 6 is cleared): software polls `isr` bit 2 before each read while it drains the RX FIFO, see [Parity Error Policy](#parity-error-policy).
 - `baud_tick_cnt_max_lsb` / `baud_tick_cnt_max_msb` only exist when `USER_DEFINE_BAUD_TICK = true`; their reset value is `CLOCK_FREQ / BAUD_RATE - 1` (computed in `sbi_UART`). The value must be written as `f_clk / baud - 1`. Write it at setup time, with `ctrl_tx.tx_enable = 0` and `ctrl_rx.rx_enable = 0`: these bits are the reset of the TX / RX baud rate generators and state machines, so the intermediate value `{old MSB, new LSB}` between the two writes is never used. Changing the baud rate while TX or RX is enabled is not supported.
-- The meaning of the 4 `isr` / `imr` bits is set by `sbi_UART`: bit 0 = TX FIFO empty (`DEPTH_TX = 0`: the transmitter can accept a byte; up to version 2.0.0 this bit was TX FIFO not empty), bit 1 = TX FIFO full, bit 2 = RX FIFO not empty, bit 3 = RX FIFO full.
+- The meaning of the 8 `isr` / `imr` bits is set by `sbi_UART`: bit 0 = TX FIFO empty (`DEPTH_TX = 0`: the transmitter can accept a byte; up to version 2.0.0 this bit was TX FIFO not empty), bit 1 = TX FIFO full, bit 2 = RX FIFO not empty, bit 3 = RX FIFO full, bit 4 = RX overrun (a received byte was dropped: RX FIFO full, or `DEPTH_RX = 0` and the previous byte not read yet), bit 5 = RX framing error (stop bit at 0), bit 6 = RX parity error (the byte is stored, or dropped with `RX_PARITY_ERROR = "drop"`; with `"halt"` the byte is stored, last byte of the RX FIFO, and RX is halted until this bit is cleared), bit 7 = RX break (all bits of a frame at 0, with a framing error).
 - `isr` has one read wait state (`rd_wait_state: 1`, a read lasts 2 cycles), so that the FIFO state can be polled in `isr`, see [Interrupts](#interrupts).
 
 ## Verification
@@ -277,7 +286,7 @@ Notes:
 
 | File | DUT | Description |
 |------|-----|-------------|
-| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, self-checking (501 checks). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, the RX-not-empty event of tests 1-3 and the TX FIFO empty level recorded while masked, the RX-not-empty event cleared before unmasking, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag; (10) bytes written while TX is disabled or while CTS# is inactive are not sent, then sent after TX enable / CTS# activation; (13) polling of the FIFO state in `isr`, written 1 to clear then read in the next SBI access (TX FIFO empty, neither empty nor full, full), TX FIFO empty interrupt raised when the last byte leaves the TX FIFO, kept by a clear while the TX FIFO is empty, dropped by `imr`; (14) RTS# (registered) active with an empty RX FIFO, inactive with a full RX FIFO, forced active by `rts_enable = 0`, active again after the FIFO is read; at the end the RX not-empty event and the TX FIFO empty level of the masked sources are recorded in `isr` without interrupt. `tx_use_loopback` is not checked |
+| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, generic `RX_PARITY_ERROR` forwarded to the DUT, self-checking (681 checks with `RX_PARITY_ERROR = "keep"`, 681 with `"drop"`, 717 with `"halt"`). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, the RX-not-empty event of tests 1-3 and the TX FIFO empty level recorded while masked, the RX-not-empty event cleared before unmasking, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, a byte with a corrupted parity read back (`"keep"`), dropped (`"drop"`: parity error event in `isr`, RX FIFO empty: `isr` bit 2 cleared then read at 0) or read back with RX halted (`"halt"`: last byte of the RX FIFO, `isr` bit 2 cleared then read at 0 with the parity error event set, then `isr` bit 6 cleared to resume RX), the good byte sent right after received, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag, the byte read back, dropped, or read back with RX halted then resumed, as in 5; (10) bytes written while TX is disabled or while CTS# is inactive are not sent, then sent after TX enable / CTS# activation; (11) blocking read of `data` waiting for a byte in serial loopback, RTS# deasserted at 14 bytes in the RX FIFO, 18 bytes received without reading: the 17 first bytes are read back unchanged, the 18th is dropped and sets the RX overrun event in `isr` (recorded while masked, interrupt when unmasked, rw1c clear), RTS# active again after the FIFO is read; (12) stop bit at 0: framing error event, byte delivered; break of 25 bit periods: one 0x00 byte with framing error and break events, receiver back on the next frame; parity error event and interrupt (`imr`), the byte stored and read back (`"keep"`; `"halt"`: the clear of `isr` bit 6 resumes RX) or dropped, RX not empty never set (`"drop"`), the good byte sent right after received, no event with a good parity; (13) polling of the FIFO state in `isr`, written 1 to clear then read in the next SBI access (TX FIFO empty, neither empty nor full, full), TX FIFO empty interrupt raised when the last byte leaves the TX FIFO, kept by a clear while the TX FIFO is empty, dropped by `imr`; (14) RTS# (registered) active with an empty RX FIFO, inactive with a full RX FIFO, forced active by `rts_enable = 0`, active again after the FIFO is read; (15) echo mode (`tx_use_loopback`): 8 received bytes echoed on `uart_tx_o` and checked bit by bit, RX not empty never set, 20 writes to `data` accepted without blocking and not transmitted, a byte with a parity error echoed (`"keep"`, `"halt"`) or not (`"drop"`) with its parity error event, the next good byte echoed (`"halt"`: received while RX is halted, not echoed before the clear of `isr` bit 6), with `cts_enable = 1` the echo ignores the inactive CTS# pin and is held by the internal RTS# (14 bytes in the RX FIFO) until a read of `data`; at the end the RX not-empty event and the TX FIFO empty level of the masked sources are recorded in `isr` without interrupt; (16) parity error policy with `rts_enable = 1`, good byte A, byte B with a parity error, then C and D back to back: A, B, C and D read back with RTS# always active (`"keep"`), A, C and D read back (`"drop"`), or (`"halt"`) RTS# inactive from B on, RX FIFO = A, B then empty (polled in `isr`, never a blocking read), C waiting, D dropped with the overrun event, then after the clear of `isr` bit 6 RTS# active again and C read back; overrun of a frame with a parity error while a good byte waits for room in the full RX FIFO: the waiting byte is stored (not marked with the parity error of the dropped frame), the parity error event of the dropped frame raised with `"keep"` / `"drop"`, not with `"halt"`; (`"halt"` only) a byte with a parity error waiting for room in the full RX FIFO raises the event only when it enters it, and is the last byte read |
 
 ### Targets
 
@@ -285,12 +294,16 @@ Notes:
 |--------|----------|-------------|
 | `default` | `sbi_UART` | RTL fileset + CSR generation (not a simulation) |
 | `sim_basic` | `tb_uart` | Simulation of basic unit tests (GHDL) |
+| `sim_rx_parity_drop` | `tb_uart` | Same scenario with `RX_PARITY_ERROR=drop` (generic set at run time): the bytes received with a parity error are checked dropped |
+| `sim_rx_parity_halt` | `tb_uart` | Same scenario with `RX_PARITY_ERROR=halt` (generic set at run time): after a byte received with a parity error, RX is checked halted until `isr` bit 6 is cleared |
 | `lint_ghdl` | `asylum.sbi_UART_wrapper` | Lint: GHDL `-Wall` analysis and elaboration (empty simulation) of `sbi_UART` in a wrapper with flat SBI ports (`syn/sbi_UART_wrapper.vhd`) |
 | `lint_ghdl_synth_default` | `asylum.sbi_UART_wrapper` | Synthesis check (see below), default generics (PicoSoC) |
 | `lint_ghdl_synth_fifo16` | `asylum.sbi_UART_wrapper` | Synthesis check, FIFO depths 16 (tb_uart): `DEPTH_TX=16`, `DEPTH_RX=16` |
 | `lint_ghdl_synth_tx_only` | `asylum.sbi_UART_wrapper` | Synthesis check, TX only: `UART_RX_ENABLE=false`, `DEPTH_TX=4` |
 | `lint_ghdl_synth_rx_only` | `asylum.sbi_UART_wrapper` | Synthesis check, RX only: `UART_TX_ENABLE=false`, `DEPTH_RX=4` |
 | `lint_ghdl_synth_fixed_baud` | `asylum.sbi_UART_wrapper` | Synthesis check, fixed baud tick: `USER_DEFINE_BAUD_TICK=false` |
+| `lint_ghdl_synth_parity_drop` | `asylum.sbi_UART_wrapper` | Synthesis check, bytes with a parity error dropped: `RX_PARITY_ERROR=drop` |
+| `lint_ghdl_synth_parity_halt` | `asylum.sbi_UART_wrapper` | Synthesis check, RX halted after a byte with a parity error: `RX_PARITY_ERROR=halt` |
 
 A `lint_ghdl_synth_*` target is `lint_ghdl` with the generics of its configuration (FuseSoC `parameters`) and a `pre_run` hook, `ghdl_synth.sh` of `asylum:utils:ghdl_synth`, which adds `include ghdl_synth.mk` to the Makefile generated by edalize. The run step (`make run EXTRA_OPTIONS=<generics>`) then runs, in the build directory:
 
@@ -315,10 +328,10 @@ make clean                # remove build/ and log/
 Equivalent FuseSoC command:
 
 ```bash
-fusesoc --cores-root . run --build-root build --target sim_basic asylum:communication:uart:2.0.0
+fusesoc --cores-root . run --build-root build --target sim_basic asylum:communication:uart:3.0.0
 ```
 
-The `sim_basic` target runs GHDL with `--fst=dut.fst --ieee-asserts=disable`. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `sim_basic`.
+The `sim_basic` target runs GHDL with `--fst=dut.fst --ieee-asserts=disable`. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `sim_basic`, `sim_rx_parity_drop` and `sim_rx_parity_halt`.
 
 ### Simulation Features
 
@@ -345,23 +358,33 @@ A byte is accepted (`s_axis_tvalid_i = 1` and `s_axis_tready_o = 1`) only when i
 - **IDLE**: waits for `uart_rx_i = 0` (start bit). In `sbi_UART` the receiver input is the synchronized `uart_rx_i` (2 clock cycles of latency) or `uart_tx` in serial loopback.
 - **START**: enables the RX baud generator and samples the start bit at mid-bit; a `'1'` is a false start (glitch) and goes back to IDLE.
 - **ACTIVE**: samples one bit per `baud_tick_half` until all bits are received.
-- **STOP**: extracts the data byte and the parity bit, asserts `m_axis_tvalid_o`, back to IDLE.
+- **STOP**: extracts the data byte and the parity bit, checks the parity and the stop bit (`err_parity_o`, `err_framing_o`, `err_break_o`), asserts `m_axis_tvalid_o` with the parity error of the byte on `m_axis_parity_error_o`, back to IDLE. After a framing error, IDLE waits for `uart_rx_i = 1` before looking for a start bit, so a line held at 0 (break) gives one byte. If the previous byte is still pending (`m_axis_tvalid_o = 1`, `m_axis_tready_i = 0`), the new byte is dropped and `err_overrun_o` pulses (overrun): the pending byte and its `m_axis_parity_error_o` are kept.
 
-The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 11 with parity) and the data bits are extracted at the position that matches the parity configuration sampled at the start of the frame. With `rx_parity_enable = 1` the received parity bit is checked (even: `xor(data, parity) = 0`, odd: `xor(data, parity) = 1`); the result is available on `parity_error_o` of `uart_rx_axis` and on `debug_o.uart_rx.parity_error` of `sbi_UART` (status of the last received frame). The byte is pushed into the RX FIFO even when its parity is wrong: the CSR map has no parity error flag, so software cannot see the error.
+The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 11 with parity) and the data bits are extracted at the position that matches the parity configuration sampled at the start of the frame. With `rx_parity_enable = 1` the received parity bit is checked (even: `xor(data, parity) = 0`, odd: `xor(data, parity) = 1`); the result is delivered with the byte on `m_axis_parity_error_o` of `uart_rx_axis`, and is available on `last_parity_error_o` and on `debug_o.uart_rx.parity_error` of `sbi_UART` (status of the last received frame). `uart_rx_axis` delivers every byte; `sbi_UART` applies the policy of `RX_PARITY_ERROR` to the bytes with `m_axis_parity_error_o = 1`, with one valid for every sink (RX FIFO and its level tracking for RTS#, transmitter in echo mode, simulation dump). With `RX_PARITY_ERROR = "keep"` (default, as AXI UART Lite), a byte with a parity error is pushed into the RX FIFO; the parity error event (`isr` bit 6) tells that an error occurred, but not which byte of the RX FIFO had it. With `RX_PARITY_ERROR = "drop"`, the byte is dropped (consumed by `sbi_UART`, not pushed into the RX FIFO, not echoed with `ctrl_tx.tx_use_loopback = 1`), and the event is still raised. With `RX_PARITY_ERROR = "halt"`, the byte is stored and RX halts, so that the faulty byte is identified without any new register (see [Parity Error Policy](#parity-error-policy)). A byte with a framing error or a break is pushed into the RX FIFO (unless it also has a parity error and `RX_PARITY_ERROR = "drop"`, e.g. a break with odd parity), reported by the framing error and break events (`isr` bits 5 and 7). An overrun keeps its priority: a frame received while a byte is pending is dropped with an overrun event (and its parity error event with `"keep"` and `"drop"`; with `"halt"` only the overrun event, the frame never enters the RX FIFO).
+
+### Parity Error Policy
+
+With `RX_PARITY_ERROR = "halt"`, the parity error event (`isr` bit 6) is raised when the byte with the parity error enters the RX FIFO (in echo mode: when the transmitter accepts it), at the same clock edge, not at the end of the frame: a byte that waits for room in a full RX FIFO raises it only when it enters the RX FIFO. While `isr` bit 6 is set, RX is halted: no byte is given to the RX FIFO (or to the transmitter in echo mode), the next received byte waits in `uart_rx_axis` and the following frames are dropped with the overrun event (`isr` bit 4), as with a full RX FIFO; RTS# is deasserted (with `ctrl_rx.rts_enable = 1`), so that a flow-controlled sender stops. The byte with the parity error is therefore the last byte of the RX FIFO. Software:
+
+1. sees `isr` bit 6 set (interrupt or polling);
+2. drains the RX FIFO, polling `isr` bit 2 before each read of `data` (write 1 to bit 2, then read `isr`): `data` has a blocking read, and a read of the empty RX FIFO while RX is halted never completes. The last byte read is the faulty one;
+3. writes 1 to `isr` bit 6 to resume RX: the waiting byte enters the RX FIFO at the next clock edge and RTS# is active again.
+
+Software writes 1 to `isr` bit 6 only to resume RX: a write of 1 at the clock edge where a byte with a parity error enters the RX FIFO clears its event (as for any `isr` event), and RX does not halt.
 
 ### Loopback and Flow Control
 
 - `ctrl_rx.rx_use_loopback = 1`: the receiver input is `uart_tx` instead of `uart_rx_i` (serial loopback).
-- `ctrl_tx.tx_use_loopback = 1`: received bytes are sent directly to the transmitter (echo); the `data` register then always accepts writes and returns no RX data. In this mode, with `cts_enable = 1`, CTS# is taken from the internal RTS#.
-- `ctrl_rx.rts_enable = 1`: `uart_rts_b_o` goes high when the RX FIFO is full. RTS# comes from a flip-flop (one cycle after the FIFO flag), so the pad does not see the glitches of the FIFO pointer comparison.
+- `ctrl_tx.tx_use_loopback = 1`: received bytes are sent directly to the transmitter (echo; a byte with a parity error is echoed, or dropped with `RX_PARITY_ERROR = "drop"`; with `"halt"` it is echoed, then the echo stops until `isr` bit 6 is cleared); the `data` register then always accepts writes and drops them (not transmitted), and no received byte reaches the RX FIFO. In this mode, with `cts_enable = 1`, CTS# is taken from the internal RTS# (the `uart_cts_b_i` pin is ignored): with `rts_enable = 1`, the echo stops while the RX FIFO holds `DEPTH_RX - 2` bytes or more (bytes received before the echo mode).
+- `ctrl_rx.rts_enable = 1`: `uart_rts_b_o` goes high when the RX FIFO holds `DEPTH_RX - 2` bytes or more (at least 1, constant `RX_RTS_MARGIN = 2` in `sbi_UART`), so that the remote transmitter can still send 2 bytes, plus 1 byte pending in `uart_rx_axis`, after RTS# deassertion without overrun. With `RX_PARITY_ERROR = "halt"`, RTS# is also high while RX is halted (`isr` bit 6 set). `csr_fifo` exports neither its number of elements nor its pop: `sbi_UART` tracks the RX FIFO level from the push (`uart_rx_axis` handshake) and the pop (SBI read of `data` while the RX FIFO is not empty: the cycle where the access completes, one pop per read even for a blocking read lasting several cycles). With `DEPTH_RX = 0`, RTS# goes high while a received byte is pending. RTS# comes from a flip-flop (one cycle after the level comparison), so the pad does not see its glitches.
 
 ### Interrupts
 
 `GIC_core` (`asylum:system:GIC` >= 2.0.0) computes `isr_next = status or isr` every cycle, whatever `imr`, and `it_o = or(isr and imr)`: the masked sources are latched too (they can be polled) and `imr` only masks `it_o`. Software clears the events by writing 1 into `isr` (rw1c), and clears the old events it wants to ignore before unmasking a source (e.g. the RX not-empty event of bytes already read).
 
-The sources are levels: bit 0 TX FIFO empty, bit 1 TX FIFO full, bit 2 RX FIFO not empty, bit 3 RX FIFO full. TX FIFO empty rises when the last byte of the TX FIFO is loaded into the transmitter, while this byte is still being sent: an interrupt-driven TX driver writes its next bytes, and masks bit 0 in `imr` when it has nothing more to send (clearing the bit has no effect while the TX FIFO is empty).
+Bits 3:0 are levels: bit 0 TX FIFO empty, bit 1 TX FIFO full, bit 2 RX FIFO not empty, bit 3 RX FIFO full. Bits 7:4 are events: bit 4 RX overrun, bit 5 RX framing error, bit 6 RX parity error, bit 7 RX break, one-cycle pulses of `uart_rx_axis` (bit 6 with `RX_PARITY_ERROR = "halt"`: the transfer of the faulty byte to the RX FIFO, see [Parity Error Policy](#parity-error-policy)), kept in `isr` until software writes 1 to them (`GIC_core` records them, masked or not: no sticky flags in `sbi_UART`). TX FIFO empty rises when the last byte of the TX FIFO is loaded into the transmitter, while this byte is still being sent: an interrupt-driven TX driver writes its next bytes, and masks bit 0 in `imr` when it has nothing more to send (clearing the bit has no effect while the TX FIFO is empty).
 
-Polling of the FIFO state: there is no status register, software reads the level sources in `isr`. It writes 1 to the bits 3:0 to clear them, then reads `isr`: the bit of a source still active is set again. `isr` is a `csr_reg` `rw1c` written by the hardware every cycle, and the software clear wins in the cycle of the write, so the bit comes back one cycle after the clear. The read wait state of `isr` (`rd_wait_state: 1`, `asylum:utils:generators` >= 2.10.0) returns the value of the second cycle of the read: a read issued right after the clear (back-to-back accesses) sees the bit set again.
+Polling of the FIFO state: there is no status register, software reads the level sources in `isr`. It writes 1 to the bits 3:0 to clear them (and only them: a write of 1 to an event bit can clear an event not seen yet), then reads `isr`: the bit of a source still active is set again. `isr` is a `csr_reg` `rw1c` written by the hardware every cycle, and the software clear wins in the cycle of the write, so the bit comes back one cycle after the clear. The read wait state of `isr` (`rd_wait_state: 1`, `asylum:utils:generators` >= 2.10.0) returns the value of the second cycle of the read: a read issued right after the clear (back-to-back accesses) sees the bit set again.
 
 ```c
 PORT_WR(UART, UART_ISR, 0x0F);   // clear the FIFO state bits (3:0)

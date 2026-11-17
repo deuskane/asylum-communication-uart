@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2026-10-05
+-- Last update: 2026-11-16
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -20,6 +20,17 @@
 -- 2026-10-05  1.1      mrosiere Fix data bit 0 lost when parity is enabled
 --                               (frame register on WIDTH+3 bits),
 --                               restore parity check (parity_error_o)
+-- 2026-11-16  1.2      mrosiere RX overrun : a frame received while the
+--                               previous byte is pending is dropped
+--                               (err_overrun_o)
+-- 2026-11-16  1.3      mrosiere Stop bit checked : framing error and break
+--                               (err_framing_o, err_break_o), wait for the
+--                               line at 1 after a framing error, parity
+--                               error pulse (err_parity_o)
+-- 2026-11-16  1.4      mrosiere Parity error of the delivered byte on
+--                               m_axis_parity_error_o (the policy on this
+--                               byte is set by the sink), parity_error_o
+--                               renamed last_parity_error_o
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -33,7 +44,7 @@ use     asylum.uart_pkg.ALL;
 
 entity uart_rx_axis is
   generic (
-    WIDTH           : natural := 8
+    WIDTH              : natural := 8
     );
   port (
     clk_i           : in  std_logic;
@@ -41,7 +52,10 @@ entity uart_rx_axis is
 
     uart_rx_i       : in  std_logic;
 
+    -- Every received byte is delivered, with its parity error on
+    -- m_axis_parity_error_o (except a byte dropped by an overrun)
     m_axis_tdata_o  : out std_logic_vector(WIDTH-1 downto 0);
+    m_axis_parity_error_o : out std_logic; -- Parity error of m_axis_tdata_o
     m_axis_tvalid_o : out std_logic;
     m_axis_tready_i : in  std_logic;
 
@@ -52,9 +66,19 @@ entity uart_rx_axis is
     parity_enable_i : in  std_logic;
     parity_odd_i    : in  std_logic;
 
-    -- Parity status of the last received frame (updated with m_axis_tvalid_o)
-    -- 0 : parity ok or parity disabled, 1 : parity error
-    parity_error_o  : out std_logic;
+    -- Parity status of the last received frame (updated at the end of each
+    -- frame, debug) : 0 : parity ok or parity disabled, 1 : parity error
+    last_parity_error_o : out std_logic;
+
+    -- Overrun : one clock cycle pulse when a frame is received while the
+    -- previous byte is still pending on m_axis (the new byte is dropped)
+    err_overrun_o   : out std_logic;
+
+    -- Errors of the received frame : one clock cycle pulse at the end of the
+    -- frame (the byte is delivered on m_axis, unless dropped by an overrun)
+    err_parity_o    : out std_logic; -- Parity bit mismatch
+    err_framing_o   : out std_logic; -- Stop bit sampled at 0
+    err_break_o     : out std_logic; -- Break : all bits of the frame at 0
 
     debug_o         : out uart_rx_debug_t
   );
@@ -83,32 +107,51 @@ architecture rtl of uart_rx_axis is
   signal   parity_enable_r                : std_logic;
   signal   parity_odd_r                   : std_logic;
   signal   parity_error_r                 : std_logic;
+  signal   m_axis_parity_error_r          : std_logic;
+  signal   m_axis_tvalid_r                : std_logic;
+  signal   err_overrun_r                  : std_logic;
+  signal   err_parity_r                   : std_logic;
+  signal   err_framing_r                  : std_logic;
+  signal   err_break_r                    : std_logic;
+  signal   wait_idle_r                    : std_logic;
   
 begin
   
   -- UART reception logic
   process(clk_i, arst_b_i)
-    variable v_data   : std_logic_vector(WIDTH-1 downto 0);
-    variable v_parity : std_logic;
+    variable v_data          : std_logic_vector(WIDTH-1 downto 0);
+    variable v_parity        : std_logic;
+    variable v_parity_error  : std_logic;
+    variable v_framing_error : std_logic;
   begin
     if arst_b_i = '0'
     then
       uart_rx_data_r    <= (others => '0');
       uart_rx_bit_cnt_r <= (others => '0');
-      m_axis_tvalid_o   <= '0';
+      m_axis_parity_error_r <= '0';
+      m_axis_tvalid_r   <= '0';
+      err_overrun_r     <= '0';
       state_r           <= IDLE;
       baud_tick_en_o    <= '0';
       parity_enable_r   <= '0';
       parity_odd_r      <= '0';
       parity_error_r    <= '0';
+      err_parity_r      <= '0';
+      err_framing_r     <= '0';
+      err_break_r       <= '0';
+      wait_idle_r       <= '0';
     elsif rising_edge(clk_i)
     then
       baud_tick_en_o    <= '0';
+      err_overrun_r     <= '0';
+      err_parity_r      <= '0';
+      err_framing_r     <= '0';
+      err_break_r       <= '0';
       
       -- FIFO consume the character
       if m_axis_tready_i = '1'
       then
-        m_axis_tvalid_o <= '0';
+        m_axis_tvalid_r <= '0';
       end if;
 
       case state_r is
@@ -126,7 +169,14 @@ begin
           parity_odd_r      <= parity_odd_i;
           
           -- No transmission, wait START Bit
-          if uart_rx_i = '0'
+          -- After a framing error (or a break), wait the line back to idle
+          if wait_idle_r = '1'
+          then
+            if uart_rx_i = '1'
+            then
+              wait_idle_r    <= '0';
+            end if;
+          elsif uart_rx_i = '0'
           then
             state_r          <= START;
           end if;
@@ -168,24 +218,50 @@ begin
           -- Extract data bits (and parity bit)
           if parity_enable_r = '1'
           then
-            v_data        := uart_rx_data_r(BIT_DATA_MSB   downto BIT_DATA_LSB  );
-            v_parity      := uart_rx_data_r(BIT_PARITY);
+            v_data          := uart_rx_data_r(BIT_DATA_MSB   downto BIT_DATA_LSB  );
+            v_parity        := uart_rx_data_r(BIT_PARITY);
             -- Even parity : xor(data,parity) = 0, Odd parity : xor(data,parity) = 1
-            parity_error_r<= reduce_xor(v_data) xor v_parity xor parity_odd_r;
+            v_parity_error  := reduce_xor(v_data) xor v_parity xor parity_odd_r;
           else
-            v_data        := uart_rx_data_r(BIT_DATA_MSB+1 downto BIT_DATA_LSB+1);
-            parity_error_r<= '0';
+            v_data          := uart_rx_data_r(BIT_DATA_MSB+1 downto BIT_DATA_LSB+1);
+            v_parity        := '0';
+            v_parity_error  := '0';
           end if;
+          parity_error_r    <= v_parity_error;
+
+          -- Stop bit (last sample) at 0 : framing error, then wait the line
+          -- at 1 before a new start bit (a break gives only one frame)
+          v_framing_error   := not uart_rx_data_r(BIT_STOP);
+          err_parity_r      <= v_parity_error;
+          err_framing_r     <= v_framing_error;
+          -- Break : start, data, parity and stop bits at 0
+          err_break_r       <= v_framing_error and not reduce_or(v_data) and not v_parity;
+          wait_idle_r       <= v_framing_error;
           
-          m_axis_tdata_o  <= v_data;
-          m_axis_tvalid_o <= '1';
+          -- Previous byte still pending : overrun, the new byte is dropped
+          -- (the pending byte and its parity error are never overwritten)
+          if (m_axis_tvalid_r = '1') and
+             (m_axis_tready_i = '0')
+          then
+            err_overrun_r   <= '1';
+          else
+            m_axis_tdata_o  <= v_data;
+            m_axis_parity_error_r <= v_parity_error;
+            m_axis_tvalid_r <= '1';
+          end if;
         when others =>
           state_r         <= IDLE;
       end case;
     end if;
   end process;
 
-  parity_error_o         <= parity_error_r;
+  last_parity_error_o    <= parity_error_r;
+  err_overrun_o          <= err_overrun_r;
+  err_parity_o           <= err_parity_r;
+  err_framing_o          <= err_framing_r;
+  err_break_o            <= err_break_r;
+  m_axis_parity_error_o  <= m_axis_parity_error_r;
+  m_axis_tvalid_o        <= m_axis_tvalid_r;
   
   debug_o.state          <= std_logic_vector(to_unsigned(state_t'pos(state_r), 2));
   debug_o.baud_tick_half <= baud_tick_half_i;
