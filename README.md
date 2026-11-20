@@ -1,436 +1,507 @@
 <!--
-  README GENERATION INSTRUCTIONS (for the next regeneration run)
+  README MODEL (common to every Asylum IP, keep the same headings)
   ----------------------------------------------------------------
-  This README follows the common Asylum IP model. Regenerate it from the
-  sources, never from the previous README text alone.
-
-  Sources of truth (in priority order):
-    1. hdl/*.vhd            : entities, generics, ports, packages
-    2. hdl/csr/*.hjson      : register map (regtool); *_csr.md/.h are generated
-    3. <IP>.core            : VLNV (name), filesets, targets, depends, revisions
-    4. mk/targets.txt       : target list shown by `make help`; mk/defs.mk
-    5. sim/, syn/, esw/, boards/ : testbenches, constraints, software
-  Section order (keep it, same headings in every IP):
-    CI badge / Title + one-line description + VLNV / Table of Contents /
-    Introduction (Key Features) / Block Diagram / Top-Level (Parameters,
-    Ports, Instantiation Example) / HDL Modules / Register Map /
-    Verification / Synthesis / Design Notes (optional) /
-    Directory Structure / Dependencies
+  Regenerate from the sources, never from the previous README text alone:
+    hdl/*.vhd (entities, generics, ports), hdl/csr/*.hjson (register map),
+    <IP>.core (VLNV, targets, depends), mk/targets.txt, sim/, syn/, esw/.
+  Sections, in this order:
+    badges / title + one-line pitch / Overview / Features / Block Diagram /
+    Getting Started / Hardware Interfaces / Configuration / Resources /
+    Theory of Operation / Registers / Programmer's Guide /
+    Design Verification / Dependencies and Related IPs / License
   Rules:
-    - Language: English. Tables: Parameters = Name|Type|Default|Description,
-      Ports = Name|Direction|Type|Description (grouped by interface).
-    - Register Map: link to the generated hdl/csr/<X>_csr.md (plus the
-      .hjson source and _csr.h header); never copy register tables here.
-    - Top-Level = sbi_* wrapper if present, else the entity used by the
-      `default` target, else the main entity (libraries: list packages).
-    - Write "This IP has no software-visible registers." / "No dedicated
-      synthesis target ..." instead of removing a section.
-    - Keep still-accurate hand-written content (ISA tables, results,
-      images) in "Design Notes"; drop anything not backed by the sources.
-    - Block diagram: doc/<NAME>.drawio (NAME = 4th field of the VLNV),
-      top entity box with generics on top, inputs left, outputs right,
-      bus interfaces as bold arrows, internal blocks colour-coded
-      (CSR yellow, FIFO/memory green, core logic blue, external grey).
-      Update it whenever ports/generics/sub-blocks change.
-    - Do not edit generated files (hdl/csr/*_csr.*) or the CI badge URL.
+    - English, short and factual: every statement backed by the sources.
+    - No VLNV line: the version badge shows it.
+    - Badges: first line version, license; second line CI, lint, sim, syn.
+    - Block diagram and FSM: pages Overview and FSM of doc/<NAME>.drawio, exported to
+      doc/<NAME>-Overview.png and doc/<NAME>-FSM.png (make -C doc).
+    - Timing diagrams: WaveDrom source doc/<NAME>-<what>.json, rendered
+      doc/<NAME>-<what>.svg (make -C doc), shown as images.
+    - No CPU named (OpenBlaze, PicoBlaze, RISC-V) outside the CPU and SoC IPs.
+    - Registers: link to the generated hdl/csr/<X>_csr.md, never copy the tables.
+    - Tables: Configuration = Name|Type|Default|Description,
+      Hardware Interfaces = Name|Direction|Type|Description, grouped by interface.
+    - A section with nothing to say is one line ("This IP has no
+      software-visible registers."), never removed.
 -->
+[![Version](https://img.shields.io/github/v/tag/deuskane/asylum-communication-uart?filter=asylum-communication-uart-*&label=version&color=blue)](https://github.com/deuskane/asylum-communication-uart/tags)
+[![License](https://img.shields.io/github/license/deuskane/asylum-communication-uart)](LICENSE)
+
 [![CI](https://github.com/deuskane/asylum-communication-uart/actions/workflows/ci.yml/badge.svg)](https://github.com/deuskane/asylum-communication-uart/actions/workflows/ci.yml)
+[![lint](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdeuskane%2Fasylum-communication-uart%2Fbadges%2Flint.json)](https://github.com/deuskane/asylum-communication-uart/actions/workflows/ci.yml)
+[![sim](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdeuskane%2Fasylum-communication-uart%2Fbadges%2Fsim.json)](https://github.com/deuskane/asylum-communication-uart/actions/workflows/ci.yml)
+[![syn](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdeuskane%2Fasylum-communication-uart%2Fbadges%2Fsyn.json)](https://github.com/deuskane/asylum-communication-uart/actions/workflows/ci.yml)
 
-# asylum-communication-uart
+# UART
 
-**UART transmitter / receiver with CSR access over the SBI bus, TX / RX FIFOs, CTS / RTS flow control, loopback modes and an interrupt output.**
+**A small, readable UART in VHDL: TX and RX FIFOs, even / odd parity, CTS# / RTS# flow control, RX error detection and 8 interrupt sources, verified with UVVM.**
 
-VLNV: `asylum:communication:uart:3.0.0`
+Part of the [Asylum project](https://github.com/deuskane/asylum-project), a collection of small IP cores, written to be read and learned from.
 
 ## Table of Contents
 
-1. [Introduction](#introduction)
-2. [Block Diagram](#block-diagram)
-3. [Top-Level](#top-level)
-4. [HDL Modules](#hdl-modules)
-5. [Register Map](#register-map)
-6. [Verification](#verification)
-7. [Synthesis](#synthesis)
-8. [Design Notes](#design-notes)
-9. [Directory Structure](#directory-structure)
-10. [Dependencies](#dependencies)
+1. [Overview](#overview)
+2. [Features](#features)
+3. [Block Diagram](#block-diagram)
+4. [Getting Started](#getting-started)
+5. [Hardware Interfaces](#hardware-interfaces)
+6. [Configuration](#configuration)
+7. [Resources](#resources)
+8. [Theory of Operation](#theory-of-operation)
+9. [Registers](#registers)
+10. [Programmer's Guide](#programmers-guide)
+11. [Design Verification](#design-verification)
+12. [Dependencies and Related IPs](#dependencies-and-related-ips)
+13. [License](#license)
 
-## Introduction
+## Overview
 
-This IP is the UART of the Asylum project. Software drives it through a small CSR bank on the SBI bus: bytes written to the `data` register go through a TX FIFO to the transmitter (`uart_tx_axis`), and bytes received by `uart_rx_axis` are pushed into an RX FIFO and read back from the same `data` register. Each direction has its own baud rate generator, enable, parity configuration and loopback option. FIFO status flags are turned into an interrupt by a `GIC_core` instance (ISR / IMR registers in the CSR bank).
+This IP is an asynchronous serial port (UART) with 8-bit frames. Software drives it through seven 8-bit registers on the SBI bus (the simple bus of Asylum):
 
-### Key Features
+- a byte written to `data` goes through a TX FIFO to the transmitter `uart_tx_axis`,
+- a byte received by `uart_rx_axis` is pushed into an RX FIFO and read back from the same `data` register,
+- the FIFO state and the receive errors are the 8 sources of an interrupt controller (`isr`, `imr`, `it_o`), also read by polling.
 
-- 8-bit frames: 1 start bit, 8 data bits LSB first, optional parity bit (even / odd), 1 stop bit (checked on reception)
-- Baud rate set at elaboration from `CLOCK_FREQ` / `BAUD_RATE`, optionally software-writable through a 16-bit counter (`USER_DEFINE_BAUD_TICK = true`)
-- Separate TX and RX enables (`ctrl_tx.tx_enable`, `ctrl_rx.rx_enable`), each used as the reset of its path; bytes written while TX is disabled or CTS# is inactive are kept in the TX FIFO (no silent loss)
-- Configurable FIFO depths (`DEPTH_TX`, `DEPTH_RX`, 0 = no FIFO), blocking read / write on the `data` register
-- Hardware flow control: CTS# (synchronized, `ctrl_tx.cts_enable`) and RTS# deasserted when the RX FIFO is almost full, at `DEPTH_RX - 2` bytes (`ctrl_rx.rts_enable`)
-- RX overrun detection: a byte received while the previous one is still pending is dropped (it never overwrites it) and raises an interrupt event
-- RX error detection: parity error, framing error (stop bit at 0) and break (all bits of a frame at 0) raise interrupt events; a byte with a parity error is stored in the RX FIFO (as AXI UART Lite), dropped (`RX_PARITY_ERROR = "drop"`), or stored with RX halted until software clears its `isr` bit, so that it is the last byte of the RX FIFO (`"halt"`); after a framing error the receiver waits for the line back to idle (a break gives one byte)
-- Two loopback modes: serial loopback TX to RX (`rx_use_loopback`) and echo of received bytes on TX (`tx_use_loopback`)
-- 8 interrupt sources (TX FIFO empty / full, RX FIFO not empty / full, RX overrun, framing error, parity error, break) with status and mask registers; the FIFO state is polled in `isr` (write 1 to clear, then read)
-- TX or RX path can be removed at elaboration (`UART_TX_ENABLE`, `UART_RX_ENABLE`)
-- Debug port with the TX / RX FSM states and the parity error flag of the last received frame
-- Simulation-only dump of TX / RX bytes into raw and annotated text files
+The transmitter and the receiver have AXI-Stream-like valid/ready interfaces, their own baud rate generator, enable and parity configuration.
+
+## Features
+
+- Frame: 1 start bit, 8 data bits LSB first, optional parity bit (even or odd), 1 stop bit
+- Baud rate `f_clk / (baud_tick_cnt_max + 1)`: reset value from the generics `CLOCK_FREQ` / `BAUD_RATE`, software-writable 16-bit divider (`USER_DEFINE_BAUD_TICK`)
+- Separate TX and RX enables, each one the reset of its path; bytes written while TX is disabled stay in the TX FIFO
+- Configurable FIFO depths (`DEPTH_TX`, `DEPTH_RX`, 0 = no FIFO), blocking read / write of `data`
+- Hardware flow control: CTS# gates the transmitter, RTS# deasserted at `DEPTH_RX - 2` bytes in the RX FIFO
+- RX checks: false start bit (glitch) rejected, parity error, framing error (stop bit at 0), break, overrun (the pending byte is kept)
+- Policy on a byte with a parity error (`RX_PARITY_ERROR`): keep it, drop it, or keep it and halt RX until software has seen it
+- Serial loopback (TX to RX) and echo mode (received bytes sent back), for self-test
+- 8 interrupt sources: TX FIFO empty / full, RX FIFO not empty / full, RX overrun, framing error, parity error, break
+- TX or RX path removable at elaboration (`UART_TX_ENABLE`, `UART_RX_ENABLE`)
+- Simulation only: dump of the sent and received bytes to text files
 
 ## Block Diagram
 
-Diagram: [doc/uart.drawio](doc/uart.drawio) (open with diagrams.net or the VS Code Draw.io extension).
+![Block diagram of sbi_UART](doc/uart-Overview.png)
 
-- The SBI bus accesses `UART_registers` (generated by regtool from [hdl/csr/UART.hjson](hdl/csr/UART.hjson)).
-- The `data` register is a bidirectional `csr_fifo`: writes fill the TX FIFO, reads drain the RX FIFO.
-- `uart_tx_axis` and `uart_rx_axis` exchange bytes with the FIFOs as AXI-Stream-like valid/ready channels; each one has its own `uart_baud_rate_gen` (the RX one also provides the mid-bit `baud_tick_half` used for sampling).
-- `uart_cts_b_i` and `uart_rx_i` go through a `sync2dffrn` synchronizer (techmap) before reaching the transmitter / receiver (`uart_rx_i` is synchronized inverted, so that its idle level `'1'` is kept during reset).
-- The FIFO empty / full / not-empty flags and the RX error pulses of `uart_rx_axis` (overrun, framing, parity, break) feed `GIC_core`, which updates the `isr` register and drives `it_o`. With `RX_PARITY_ERROR = "halt"`, the parity error source is the transfer of a byte with a parity error to the RX FIFO (or to the transmitter in echo mode), and `isr` bit 6 halts RX until it is cleared.
+## Getting Started
 
-## Top-Level
+The cores of the Asylum IPs are published in the FuseSoC library [asylum-cores](https://github.com/deuskane/asylum-cores) (with the UVVM core used by the testbenches):
 
-Top-level entity: **`sbi_UART`** ([hdl/sbi_uart.vhd](hdl/sbi_uart.vhd)), library `asylum`, component declared in `asylum.uart_pkg`.
+```bash
+pip install fusesoc
+fusesoc library add https://github.com/deuskane/asylum-cores
+fusesoc run --target sim_basic_rx asylum:communication:uart  # needs GHDL
+```
 
-### Parameters
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `NAME` | string | `""` | Instance name, forwarded to the CSR block (`MODULE_NAME`, visible in `sbi_tgt_o.info`) |
-| `BAUD_RATE` | integer | `115200` | Baud rate (bit/s) used to compute the default baud tick counter |
-| `CLOCK_FREQ` | integer | `50000000` | Frequency of `clk_i` in Hz |
-| `BAUD_TICK_CNT_WIDTH` | integer | `16` | Width of the counter of `uart_baud_rate_gen`; must stay 16 because `sbi_UART` drives it with the 16-bit `baud_tick_cnt_max_msb & baud_tick_cnt_max_lsb` |
-| `UART_TX_ENABLE` | boolean | `true` | `false`: no transmitter (`uart_tx_o = '1'`, bytes written to `data` are accepted and dropped) |
-| `UART_RX_ENABLE` | boolean | `true` | `false`: no receiver (RX FIFO never written, `uart_rts_b_o = '0'`) |
-| `USER_DEFINE_BAUD_TICK` | boolean | `true` | `true`: `baud_tick_cnt_max_lsb/msb` registers exist and are software-writable; `false`: the counter is fixed to `CLOCK_FREQ / BAUD_RATE - 1` |
-| `DEPTH_TX` | natural | `0` | Depth of the TX FIFO (software to hardware, 0 = no FIFO) |
-| `DEPTH_RX` | natural | `0` | Depth of the RX FIFO (hardware to software, 0 = no FIFO) |
-| `RX_PARITY_ERROR` | string | `"keep"` | `"keep"`: a byte received with a parity error is stored in the RX FIFO (echoed with `tx_use_loopback = 1`); `"drop"`: it is dropped; `"halt"`: it is stored (echoed), then RX is halted (RTS# deasserted) until software clears `isr` bit 6, so it is the last byte of the RX FIFO, see [Parity Error Policy](#parity-error-policy); any other value fails at elaboration. The parity error event (`isr` bit 6) is raised in the three cases |
-| `FILENAME_TX` | string | `"dump_uart_tx.txt"` | Simulation only: raw dump of transmitted bytes (annotated copy in `FILENAME_TX & ".dbg"`) |
-| `FILENAME_RX` | string | `"dump_uart_rx.txt"` | Simulation only: raw dump of received bytes (annotated copy in `FILENAME_RX & ".dbg"`) |
-
-### Ports
-
-#### Clock & Reset
-
-| Name | Direction | Type | Description |
-|------|-----------|------|-------------|
-| `clk_i` | in | std_logic | System clock |
-| `arst_b_i` | in | std_logic | Asynchronous reset, active low |
-
-#### Bus (SBI)
-
-| Name | Direction | Type | Description |
-|------|-----------|------|-------------|
-| `sbi_ini_i` | in | sbi_ini_t | SBI request from the initiator (`cs`, `re`, `we`, `addr`, `wdata`) |
-| `sbi_tgt_o` | out | sbi_tgt_t | SBI response to the initiator (`ready`, `rdata`, `info`) |
-
-#### UART
-
-| Name | Direction | Type | Description |
-|------|-----------|------|-------------|
-| `uart_tx_o` | out | std_logic | Serial data output (idle high) |
-| `uart_rx_i` | in | std_logic | Serial data input (idle high); synchronized by `sync2dffrn` (2 FF, idle level `'1'` during reset) |
-| `uart_cts_b_i` | in | std_logic | Clear To Send, active low; synchronized by `sync2dffrn`, only used when `ctrl_tx.cts_enable = 1` |
-| `uart_rts_b_o` | out | std_logic | Request To Send, active low, registered (reset value `'0'`): `'0'` when `ctrl_rx.rts_enable = 0`, else `'1'` when the RX FIFO holds `max(DEPTH_RX - 2, 1)` bytes or more (`DEPTH_RX = 0`: while a received byte is pending), or while RX is halted (`RX_PARITY_ERROR = "halt"`) |
-
-#### Interrupts
-
-| Name | Direction | Type | Description |
-|------|-----------|------|-------------|
-| `it_o` | out | std_logic | Interrupt request: OR of the `isr` bits enabled in `imr` |
-
-#### Debug
-
-| Name | Direction | Type | Description |
-|------|-----------|------|-------------|
-| `debug_o` | out | uart_debug_t | `uart_tx.state` (TX active), `uart_rx.state` (RX FSM state), `uart_rx.bit_cnt` (4 LSB of the bit counter), `uart_rx.baud_tick_half`, `uart_rx.parity_error` (parity error on the last received frame) |
-
-### Instantiation Example
+To use the IP in your design, add `asylum:communication:uart` to the `depend` list of your core and instantiate `sbi_UART` (library `asylum`):
 
 ```vhdl
 library asylum;
 use     asylum.sbi_pkg.all;
 use     asylum.uart_pkg.all;
 
-  ins_uart : entity asylum.sbi_UART
+  ins_uart : sbi_UART
     generic map
     ( NAME                  => "UART0"
      ,BAUD_RATE             => 115200
      ,CLOCK_FREQ            => 50000000
-     ,BAUD_TICK_CNT_WIDTH   => 16
-     ,UART_TX_ENABLE        => true
-     ,UART_RX_ENABLE        => true
-     ,USER_DEFINE_BAUD_TICK => true
      ,DEPTH_TX              => 16
      ,DEPTH_RX              => 16
-     ,RX_PARITY_ERROR       => "keep"
-     ,FILENAME_TX           => "dump_uart0_tx.txt"
-     ,FILENAME_RX           => "dump_uart0_rx.txt"
     )
     port map
     ( clk_i        => clk
      ,arst_b_i     => arst_b
-     ,sbi_ini_i    => sbi_inis(UART0_ID)  -- sbi_ini_t(addr(2 downto 0), wdata(7 downto 0))
-     ,sbi_tgt_o    => sbi_tgts(UART0_ID)  -- sbi_tgt_t(rdata(7 downto 0))
+     ,sbi_ini_i    => sbi_ini        -- 3 address bits, 8-bit data
+     ,sbi_tgt_o    => sbi_tgt
      ,uart_tx_o    => uart_tx
      ,uart_rx_i    => uart_rx
      ,uart_cts_b_i => uart_cts_b
      ,uart_rts_b_o => uart_rts_b
-     ,it_o         => it_uart0
-     ,debug_o      => uart0_debug          -- uart_debug_t
+     ,it_o         => it_uart
+     ,debug_o      => open
     );
 ```
 
-The CSR bank uses 3 address bits (`UART_ADDR_WIDTH = 3`) and 8-bit data (`UART_DATA_WIDTH = 8`), see `asylum.UART_csr_pkg`.
+[PicoSoC](https://github.com/deuskane/asylum-soc-picosoc) is a complete example: it connects this IP to a CPU, with its software driver.
 
-## HDL Modules
+## Hardware Interfaces
 
-| File | Unit | Kind | Role |
-|------|------|------|------|
-| [hdl/uart_pkg.vhd](hdl/uart_pkg.vhd) | `uart_pkg` | package | Debug record types (`uart_tx_debug_t`, `uart_rx_debug_t`, `uart_debug_t`) and component declarations of `sbi_UART`, `uart_baud_rate_gen`, `uart_rx_axis`, `uart_tx_axis` |
-| [hdl/uart_baud_rate_gen.vhd](hdl/uart_baud_rate_gen.vhd) | `uart_baud_rate_gen` | entity | Baud tick and half-baud tick generator |
-| [hdl/uart_tx_axis.vhd](hdl/uart_tx_axis.vhd) | `uart_tx_axis` | entity | Transmitter with AXI-Stream-like slave input, parity generation, CTS# gating |
-| [hdl/uart_rx_axis.vhd](hdl/uart_rx_axis.vhd) | `uart_rx_axis` | entity | Receiver FSM with false start bit rejection, parity check and AXI-Stream-like master output |
-| [hdl/sbi_uart.vhd](hdl/sbi_uart.vhd) | `sbi_UART` | entity | Top-level: CSR + TX / RX paths + loopback / flow control muxes + `GIC_core`, simulation dumps |
-| hdl/csr/UART_csr.vhd | `UART_registers` | entity | Generated CSR bank (regtool), TX / RX FIFO included |
-| hdl/csr/UART_csr_pkg.vhd | `UART_csr_pkg` | package | Generated types (`UART_sw2hw_t`, `UART_hw2sw_t`), address constants and `UART_registers` component |
+Top-level entity: **`sbi_UART`** ([hdl/sbi_uart.vhd](hdl/sbi_uart.vhd)), component in `asylum.uart_pkg`.
 
-### uart_baud_rate_gen
-
-#### Parameters
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `BAUD_TICK_CNT_WIDTH` | integer | `16` | Width of the down counter |
-
-#### Ports
+### Clock and Reset
 
 | Name | Direction | Type | Description |
 |------|-----------|------|-------------|
-| `clk_i` | in | std_logic | System clock |
-| `arst_b_i` | in | std_logic | Asynchronous reset, active low (connected to `tx_enable` / `rx_enable` in `sbi_UART`) |
-| `baud_tick_en_i` | in | std_logic | Enable; the counter is loaded with `cfg_baud_tick_cnt_max_i` on its rising edge |
-| `baud_tick_o` | out | std_logic | One-cycle pulse when the counter reaches 0 (every `cfg_baud_tick_cnt_max_i + 1` cycles) |
-| `baud_tick_half_o` | out | std_logic | One-cycle pulse when the counter equals `cfg_baud_tick_cnt_max_i / 2` (mid-bit) |
-| `cfg_baud_tick_cnt_max_i` | in | std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) | Reload value of the counter |
+| `clk_i` | in | std_logic | System clock, the only clock of the IP |
+| `arst_b_i` | in | std_logic | Asynchronous reset, active low |
 
-### uart_tx_axis
-
-#### Parameters
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `WIDTH` | natural | `8` | Data width (`sbi_UART` uses 8) |
-
-#### Ports
+### Bus (SBI)
 
 | Name | Direction | Type | Description |
 |------|-----------|------|-------------|
-| `clk_i` | in | std_logic | System clock |
-| `arst_b_i` | in | std_logic | Asynchronous reset, active low (connected to `tx_enable`) |
-| `s_axis_tdata_i` | in | std_logic_vector(WIDTH-1 downto 0) | Byte to transmit |
-| `s_axis_tvalid_i` | in | std_logic | Byte valid |
-| `s_axis_tready_o` | out | std_logic | Ready: high when the byte is loaded in the shift register, i.e. out of reset (`arst_b_i = 1` for at least one cycle), no frame being sent and `uart_cts_b_i = 0` |
+| `sbi_ini_i` | in | sbi_ini_t | Request from the initiator (`cs`, `re`, `we`, `addr`, `wdata`); 3 address bits, 8-bit data |
+| `sbi_tgt_o` | out | sbi_tgt_t | Response to the initiator (`ready`, `rdata`, `info`) |
+
+### UART
+
+| Name | Direction | Type | Description |
+|------|-----------|------|-------------|
+| `uart_tx_o` | out | std_logic | Serial data output, idle high |
+| `uart_rx_i` | in | std_logic | Serial data input, idle high; synchronized in the IP (`sync2dffrn`, idle level kept during reset) |
+| `uart_cts_b_i` | in | std_logic | Clear To Send, active low; synchronized in the IP, used when `ctrl_tx.cts_enable = 1` |
+| `uart_rts_b_o` | out | std_logic | Request To Send, active low, registered (reset value `'0'`): `'0'` when `ctrl_rx.rts_enable = 0`, else `'1'` when the RX FIFO holds `max(DEPTH_RX - 2, 1)` bytes or more (`DEPTH_RX = 0`: while a received byte is pending) or while RX is halted (`RX_PARITY_ERROR = "halt"`) |
+
+The asynchronous inputs are synchronized inside the IP: connect them directly to the pads.
+
+### Interrupt
+
+| Name | Direction | Type | Description |
+|------|-----------|------|-------------|
+| `it_o` | out | std_logic | Interrupt request: OR of the `isr` bits enabled in `imr` |
+
+### Debug
+
+| Name | Direction | Type | Description |
+|------|-----------|------|-------------|
+| `debug_o` | out | uart_debug_t | `uart_tx.state` (TX active), `uart_rx.state` (receiver FSM state), `uart_rx.bit_cnt` (4 LSB of the bit counter), `uart_rx.baud_tick_half`, `uart_rx.parity_error` (parity error of the last received frame) |
+
+<details>
+<summary><b>uart_tx_axis, uart_rx_axis, uart_baud_rate_gen</b>: transmitter, receiver and baud rate generator, for a standalone use without the registers</summary>
+
+Components in `asylum.uart_pkg`, generic `WIDTH` (8) for the transmitter and the receiver, `BAUD_TICK_CNT_WIDTH` (16) for the baud rate generator. `arst_b_i` is the enable of the path in `sbi_UART` (`ctrl_tx.tx_enable` / `ctrl_rx.rx_enable`).
+
+[hdl/uart_tx_axis.vhd](hdl/uart_tx_axis.vhd):
+
+| Name | Direction | Type | Description |
+|------|-----------|------|-------------|
+| `s_axis_tdata_i` / `s_axis_tvalid_i` / `s_axis_tready_o` | in / in / out | std_logic_vector(WIDTH-1 downto 0) / std_logic / std_logic | Byte to send; ready when the transmitter is out of reset, idle and CTS# is low |
 | `uart_tx_o` | out | std_logic | Serial output (reset value `'1'`) |
-| `uart_cts_b_i` | in | std_logic | A new frame only starts when `'0'` |
-| `baud_tick_i` | in | std_logic | Baud tick: one bit is shifted out per tick |
-| `parity_enable_i` | in | std_logic | 1: insert a parity bit before the stop bit |
-| `parity_odd_i` | in | std_logic | 0: even parity, 1: odd parity |
-| `debug_o` | out | uart_tx_debug_t | `state` = transmitter active |
+| `uart_cts_b_i` | in | std_logic | A new frame starts only when `'0'` |
+| `baud_tick_i` | in | std_logic | One bit shifted out per tick |
+| `parity_enable_i` / `parity_odd_i` | in | std_logic | Parity bit inserted before the stop bit; 0: even, 1: odd |
+| `debug_o` | out | uart_tx_debug_t | `state`: transmitter active |
 
-### uart_rx_axis
-
-#### Parameters
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `WIDTH` | natural | `8` | Data width |
-
-#### Ports
+[hdl/uart_rx_axis.vhd](hdl/uart_rx_axis.vhd):
 
 | Name | Direction | Type | Description |
 |------|-----------|------|-------------|
-| `clk_i` | in | std_logic | System clock |
-| `arst_b_i` | in | std_logic | Asynchronous reset, active low (connected to `rx_enable`) |
-| `uart_rx_i` | in | std_logic | Serial input |
-| `m_axis_tdata_o` | out | std_logic_vector(WIDTH-1 downto 0) | Received byte |
-| `m_axis_parity_error_o` | out | std_logic | Parity error of the byte on `m_axis_tdata_o`, registered with it (0: parity ok or disabled, 1: parity error). Every received byte is delivered, the policy on a byte with a parity error is applied by the sink (`RX_PARITY_ERROR` of `sbi_UART`) |
-| `m_axis_tvalid_o` | out | std_logic | Received byte valid (cleared when `m_axis_tready_i = 1`) |
-| `err_overrun_o` | out | std_logic | One-cycle pulse when a frame is received while the previous byte is still pending on `m_axis` (`m_axis_tvalid_o = 1` and `m_axis_tready_i = 0`): the new byte is dropped, the pending one is kept |
-| `m_axis_tready_i` | in | std_logic | Byte accepted |
-| `baud_tick_i` | in | std_logic | Baud tick (not used by the FSM, sampling uses `baud_tick_half_i`) |
-| `baud_tick_half_i` | in | std_logic | Mid-bit sampling pulse |
-| `baud_tick_en_o` | out | std_logic | Enable of the RX baud rate generator (high in START / ACTIVE) |
-| `parity_enable_i` | in | std_logic | 1: a parity bit is expected after the data bits |
-| `parity_odd_i` | in | std_logic | 0: even parity, 1: odd parity (sampled with `parity_enable_i` at the start of each frame) |
-| `err_parity_o` | out | std_logic | One-cycle pulse at the end of a frame with a parity error (the byte is delivered with `m_axis_parity_error_o = 1`, unless dropped by an overrun) |
-| `err_framing_o` | out | std_logic | One-cycle pulse at the end of a frame whose stop bit is sampled at 0 (the byte is still delivered); the receiver then waits for the line at 1 before a new start bit |
-| `err_break_o` | out | std_logic | One-cycle pulse at the end of a frame with all its bits at 0 (start, data, parity, stop), with `err_framing_o` |
-| `last_parity_error_o` | out | std_logic | Parity status of the last received frame, updated at the end of each frame, a frame dropped by an overrun included (0: parity ok or disabled, 1: parity error); debug, the parity error of the delivered byte is `m_axis_parity_error_o` |
+| `uart_rx_i` | in | std_logic | Serial input (already synchronized) |
+| `m_axis_tdata_o` / `m_axis_tvalid_o` / `m_axis_tready_i` | out / out / in | std_logic_vector(WIDTH-1 downto 0) / std_logic / std_logic | Received byte, every byte is delivered (except a byte dropped by an overrun) |
+| `m_axis_parity_error_o` | out | std_logic | Parity error of the byte on `m_axis_tdata_o`; the policy is applied by the sink |
+| `baud_tick_i` / `baud_tick_half_i` | in | std_logic | Baud ticks (sampling on `baud_tick_half_i`, mid-bit) |
+| `baud_tick_en_o` | out | std_logic | Enable of the baud rate generator (START and ACTIVE states) |
+| `parity_enable_i` / `parity_odd_i` | in | std_logic | Parity configuration, sampled at the start of each frame |
+| `last_parity_error_o` | out | std_logic | Parity status of the last received frame (debug) |
+| `err_overrun_o` | out | std_logic | One-cycle pulse: a frame received while the previous byte is still pending, the new byte is dropped |
+| `err_parity_o` / `err_framing_o` / `err_break_o` | out | std_logic | One-cycle pulses at the end of a frame: parity bit mismatch, stop bit at 0, every bit at 0 |
 | `debug_o` | out | uart_rx_debug_t | FSM state, bit counter, `baud_tick_half`, `parity_error` |
 
-## Register Map
+[hdl/uart_baud_rate_gen.vhd](hdl/uart_baud_rate_gen.vhd):
 
-The register map is generated by regtool from [hdl/csr/UART.hjson](hdl/csr/UART.hjson):
+| Name | Direction | Type | Description |
+|------|-----------|------|-------------|
+| `baud_tick_en_i` | in | std_logic | Enable; the counter is loaded with `cfg_baud_tick_cnt_max_i` on its rising edge |
+| `baud_tick_o` | out | std_logic | One-cycle pulse every `cfg_baud_tick_cnt_max_i + 1` cycles |
+| `baud_tick_half_o` | out | std_logic | One-cycle pulse when the counter is at `cfg_baud_tick_cnt_max_i / 2` (mid-bit) |
+| `cfg_baud_tick_cnt_max_i` | in | std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) | Reload value of the down counter |
+
+</details>
+
+## Configuration
+
+Generics of `sbi_UART`:
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `NAME` | string | `""` | Instance name, visible in `sbi_tgt_o.info` |
+| `BAUD_RATE` | integer | `115200` | Baud rate (bit/s) of the reset value of `baud_tick_cnt_max` |
+| `CLOCK_FREQ` | integer | `50000000` | Frequency of `clk_i` in Hz |
+| `BAUD_TICK_CNT_WIDTH` | integer | `16` | Width of the baud rate counters; keep 16, the width of `baud_tick_cnt_max_msb & baud_tick_cnt_max_lsb` |
+| `UART_TX_ENABLE` | boolean | `true` | `false`: no transmitter (`uart_tx_o = '1'`, writes to `data` accepted and dropped) |
+| `UART_RX_ENABLE` | boolean | `true` | `false`: no receiver (RX FIFO never written, `uart_rts_b_o = '0'`) |
+| `USER_DEFINE_BAUD_TICK` | boolean | `true` | `true`: `baud_tick_cnt_max_lsb` / `_msb` are software-writable; `false`: the divider is fixed to `CLOCK_FREQ / BAUD_RATE - 1` |
+| `DEPTH_TX` | natural | `0` | Depth of the TX FIFO (0 = no FIFO) |
+| `DEPTH_RX` | natural | `0` | Depth of the RX FIFO (0 = no FIFO) |
+| `RX_PARITY_ERROR` | string | `"keep"` | Byte received with a parity error: `"keep"` stored in the RX FIFO, `"drop"` dropped, `"halt"` stored then RX halted until `isr` bit 6 is cleared (see [Parity error policy](#parity-error-policy)); any other value fails at elaboration |
+| `FILENAME_TX` / `FILENAME_RX` | string | `"dump_uart_tx.txt"` / `"dump_uart_rx.txt"` | Simulation only: raw dump of the sent / received bytes, annotated copy in `<FILENAME>.dbg` |
+
+The FIFO depths set most of the area of the IP.
+
+## Resources
+
+Figures of the `syn_*` targets (`make nonreg_syn`, see [Targets](#targets)): [syn/sbi_UART_wrapper.vhd](syn/sbi_UART_wrapper.vhd) with the generics of each configuration, synthesized by Yosys and its GHDL plugin; the reports are in the build directory of each target.
+
+| Configuration | LUT¹ | LUTRAM¹ | FF¹ | CARRY4¹ | MUXF7/F8¹ | BRAM¹ | DSP¹ | Area² (µm²) | kGE³ |
+|---|---|---|---|---|---|---|---|---|---|
+| `syn_default` (default generics, no FIFO) | 359 | 0 | 146 | 8 | 31 | 0 | 0 | 6690.17 | 1.782 |
+| `syn_fifo16` (FIFOs 16 / 16, as `tb_UART`) | 411 | 16 | 171 | 18 | 42 | 0 | 0 | 17646.92 | 4.701 |
+| `syn_tx_only` (no receiver, TX FIFO 4) | 223 | 8 | 91 | 6 | 16 | 0 | 0 | 5142.43 | 1.370 |
+| `syn_rx_only` (no transmitter, RX FIFO 4) | 243 | 8 | 113 | 7 | 14 | 0 | 0 | 6367.36 | 1.696 |
+| `syn_fixed_baud` (no FIFO, fixed divider) | 333 | 0 | 130 | 8 | 4 | 0 | 0 | 5601.62 | 1.492 |
+| `syn_parity_drop` (no FIFO, `RX_PARITY_ERROR = "drop"`) | 363 | 0 | 147 | 8 | 33 | 0 | 0 | 6757.73 | 1.800 |
+| `syn_parity_halt` (no FIFO, `RX_PARITY_ERROR = "halt"`) | 361 | 0 | 146 | 8 | 37 | 0 | 0 | 6722.70 | 1.791 |
+
+¹ Xilinx Artix-7 (LUT6), Yosys 0.33 `synth_xilinx -flatten -noiopad -noclkbuf`, before place and route: every cell of the netlist is counted, Vivado may differ. An `INV` counts as a `LUT1`: `synth_xilinx` puts one on the reset pin of each flip-flop with an active-low reset (169 of the 359 LUTs of `syn_default`; `ctrl_tx.tx_enable` and `ctrl_rx.rx_enable` are resets too). The FIFO storage is in LUTRAM (`RAM32M`), not in BRAM.
+
+² SkyWater sky130 `sky130_fd_sc_hd`, typical corner (tt, 25 °C, 1.80 V), Yosys 0.33 `synth` + `dfflibmap` + `abc -liberty`: standard-cell area only, no timing constraint, no buffering, clock tree or placement; the FIFO storage becomes flip-flops (no SRAM macro).
+
+³ Area in thousands of NAND2 gate equivalents (`sky130_fd_sc_hd__nand2_1` = 3.7536 µm²).
+
+## Theory of Operation
+
+### Hierarchy
+
+| File | Unit | Role |
+|------|------|------|
+| [hdl/sbi_uart.vhd](hdl/sbi_uart.vhd) | `sbi_UART` | Top level: registers, synchronizers, loopback and echo muxes, parity error policy, RTS#, `GIC_core`, simulation dumps |
+| [hdl/uart_tx_axis.vhd](hdl/uart_tx_axis.vhd) | `uart_tx_axis` | Transmitter: shift register, parity, CTS# gating |
+| [hdl/uart_rx_axis.vhd](hdl/uart_rx_axis.vhd) | `uart_rx_axis` | Receiver: FSM, parity, stop bit and overrun checks |
+| [hdl/uart_baud_rate_gen.vhd](hdl/uart_baud_rate_gen.vhd) | `uart_baud_rate_gen` | Baud tick and mid-bit tick (one per direction) |
+| [hdl/uart_pkg.vhd](hdl/uart_pkg.vhd) | `uart_pkg` | Components, debug record types |
+| `hdl/csr/UART_csr.vhd` | `UART_registers` | Register bank and FIFOs, generated by regtool from [hdl/csr/UART.hjson](hdl/csr/UART.hjson) |
+
+### Data path
+
+`data` is a bidirectional FIFO register: a write pushes a byte in the TX FIFO, a read pops a byte from the RX FIFO. Both accesses are *blocking*: an access waits (holds the bus) until the FIFO can accept or provide the byte. The FIFOs talk to the transmitter and the receiver with valid/ready handshakes, so the transmitter simply waits for a byte and a received byte waits in the receiver while the RX FIFO is full.
+
+### Frame and baud rate
+
+![UART frame](doc/uart-frame.svg)
+
+Each direction has its own `uart_baud_rate_gen`, a down counter reloaded with `baud_tick_cnt_max`: one bit lasts `baud_tick_cnt_max + 1` clock cycles. The reset value of `baud_tick_cnt_max` is `CLOCK_FREQ / BAUD_RATE - 1` (integer division): 433 for 115200 baud at 50 MHz (115207 baud). The TX generator runs free and the transmitter shifts one bit per `baud_tick`. The RX generator starts on the falling edge of the start bit, and the receiver samples each bit at mid-bit (`baud_tick_half`), which tolerates a few percent of baud rate mismatch (± 3 % in simulation).
+
+`ctrl_tx.tx_enable` and `ctrl_rx.rx_enable` are the resets of their path (transmitter or receiver and its generator): write `baud_tick_cnt_max` while both are 0.
+
+### Transmitter
+
+A byte is taken from the TX FIFO only when it is loaded in the shift register: transmitter enabled, idle and CTS# low. While TX is disabled or CTS# is high, the bytes stay in the TX FIFO (with `DEPTH_TX = 0`, a write to `data` waits until the transmitter takes the byte). With `ctrl_tx.cts_enable = 0` CTS# is ignored. The frame `start + 8 data bits LSB first + [parity] + stop` is shifted out, one bit per `baud_tick`; back-to-back bytes give back-to-back frames.
+
+### Receiver FSM
+
+![FSM of uart_rx_axis](doc/uart-FSM.png)
+
+- **IDLE**: waits for `uart_rx = 0` (start bit). After a framing error it first waits for `uart_rx = 1`, so a line held at 0 (break) gives a single byte.
+- **START**: enables the RX baud rate generator, samples the start bit at mid-bit; a `'1'` is a false start (glitch), back to IDLE.
+- **ACTIVE**: shifts in one sample per `baud_tick_half`, 9 or 10 samples (data, parity, stop).
+- **STOP**: extracts the byte, checks the parity (even: `xor(data, parity) = 0`, odd: `xor(data, parity) = 1`) and the stop bit, pulses `err_parity_o`, `err_framing_o` (stop bit at 0), `err_break_o` (every bit at 0), and delivers the byte with its parity error on `m_axis`. If the previous byte is still pending, the new byte is dropped and `err_overrun_o` pulses: the pending byte is never overwritten.
+
+The receiver input is the synchronized `uart_rx_i` (2 clock cycles of latency), or `uart_tx` with `ctrl_rx.rx_use_loopback = 1`.
+
+### Parity error policy
+
+`uart_rx_axis` delivers every byte with its parity error; `sbi_UART` applies `RX_PARITY_ERROR` to the bytes with a parity error, for every sink (RX FIFO, transmitter in echo mode, simulation dump):
+
+- `"keep"` (default): the byte is stored. The parity error event (`isr` bit 6) tells that an error occurred, not which byte had it.
+- `"drop"`: the byte is dropped at once (not stored, not echoed), the event is raised.
+- `"halt"`: the byte is stored and the event is raised when it enters the RX FIFO (a byte waiting for room raises it only then). While `isr` bit 6 is set, RX is halted: no byte reaches the RX FIFO, the next received byte waits in the receiver, the following ones are overruns (`isr` bit 4), and RTS# is deasserted (with `rts_enable = 1`). The byte with the parity error is therefore the last byte of the RX FIFO. Software drains the RX FIFO, polling `isr` bit 2 before each read (a blocking read of the empty RX FIFO while RX is halted never completes), then writes 1 to `isr` bit 6 to resume RX.
+
+An overrun has priority: a frame received while a byte is pending is dropped with the overrun event (and its parity error event with `"keep"` and `"drop"`; with `"halt"` only the overrun event).
+
+### Loopback and flow control
+
+- `ctrl_rx.rx_use_loopback = 1`: serial loopback, the receiver input is `uart_tx`.
+- `ctrl_tx.tx_use_loopback = 1`: echo mode, the received bytes go straight to the transmitter (a byte with a parity error is echoed, or dropped with `"drop"`); no byte reaches the RX FIFO and the writes to `data` are accepted and dropped. With `cts_enable = 1`, CTS# is the internal RTS# (the `uart_cts_b_i` pin is ignored).
+- `ctrl_rx.rts_enable = 1`: RTS# goes high when the RX FIFO holds `DEPTH_RX - 2` bytes or more (at least 1): the remote transmitter can still send 2 bytes, plus 1 waiting in the receiver, without overrun. `csr_fifo` exports neither its level nor its pop: `sbi_UART` counts the pushes (receiver handshake) and the pops (a read of `data` that completes, one per read even for a blocking read lasting several cycles). RTS# comes from a flip-flop.
+
+### Interrupts
+
+`GIC_core` (`asylum:system:GIC` >= 2.0.0) sets the `isr` bit of an active source every cycle, masked or not, and `it_o = OR(isr and imr)`: `imr` only masks `it_o`. Software clears a bit by writing 1 to it (rw1c).
+
+| Bit | Source | Kind |
+|-----|--------|------|
+| 0 | TX FIFO empty (`DEPTH_TX = 0`: the transmitter can take a byte) | level |
+| 1 | TX FIFO full (`DEPTH_TX = 0`: the transmitter cannot take a byte) | level |
+| 2 | RX FIFO not empty (`DEPTH_RX = 0`: a byte is pending) | level |
+| 3 | RX FIFO full (`DEPTH_RX = 0`: a byte is pending) | level |
+| 4 | RX overrun: a received byte was dropped | event |
+| 5 | RX framing error: stop bit at 0 | event |
+| 6 | RX parity error (with `"halt"`: halts RX until cleared) | event |
+| 7 | RX break: every bit of a frame at 0 | event |
+
+A level bit cleared while its source is active is set again on the next cycle; an event stays set until software writes 1 to it. TX FIFO empty rises when the last byte of the TX FIFO is loaded into the transmitter, while it is still being sent: an interrupt-driven driver writes its next bytes, and masks bit 0 when it has nothing more to send.
+
+There is no status register: software polls the FIFO state in `isr`. It writes 1 to bits 3:0 (and only them: a write of 1 to an event bit could clear an event not seen yet), then reads `isr`. `isr` has one read wait state, so a read issued right after the clear already sees the bits of the active sources set again.
+
+## Registers
+
+Seven 8-bit registers (3 address bits): `isr` (0x0), `imr` (0x1), `data` (0x2), `ctrl_tx` (0x4), `ctrl_rx` (0x5), `baud_tick_cnt_max_lsb` (0x6), `baud_tick_cnt_max_msb` (0x7, both only with `USER_DEFINE_BAUD_TICK = true`).
 
 - Register documentation: **[hdl/csr/UART_csr.md](hdl/csr/UART_csr.md)**
 - C header: [hdl/csr/UART_csr.h](hdl/csr/UART_csr.h)
+- Source: [hdl/csr/UART.hjson](hdl/csr/UART.hjson) (regtool)
 
-Notes:
+## Programmer's Guide
 
-- `data` is a FIFO register with blocking read / write: writes go to the TX FIFO (`DEPTH_TX`), reads come from the RX FIFO (`DEPTH_RX`). With `RX_PARITY_ERROR = "halt"`, a read of `data` while the RX FIFO is empty and RX is halted blocks the bus forever (no byte is received before `isr` bit 6 is cleared): software polls `isr` bit 2 before each read while it drains the RX FIFO, see [Parity Error Policy](#parity-error-policy).
-- `baud_tick_cnt_max_lsb` / `baud_tick_cnt_max_msb` only exist when `USER_DEFINE_BAUD_TICK = true`; their reset value is `CLOCK_FREQ / BAUD_RATE - 1` (computed in `sbi_UART`). The value must be written as `f_clk / baud - 1`. Write it at setup time, with `ctrl_tx.tx_enable = 0` and `ctrl_rx.rx_enable = 0`: these bits are the reset of the TX / RX baud rate generators and state machines, so the intermediate value `{old MSB, new LSB}` between the two writes is never used. Changing the baud rate while TX or RX is enabled is not supported.
-- The meaning of the 8 `isr` / `imr` bits is set by `sbi_UART`: bit 0 = TX FIFO empty (`DEPTH_TX = 0`: the transmitter can accept a byte; up to version 2.0.0 this bit was TX FIFO not empty), bit 1 = TX FIFO full, bit 2 = RX FIFO not empty, bit 3 = RX FIFO full, bit 4 = RX overrun (a received byte was dropped: RX FIFO full, or `DEPTH_RX = 0` and the previous byte not read yet), bit 5 = RX framing error (stop bit at 0), bit 6 = RX parity error (the byte is stored, or dropped with `RX_PARITY_ERROR = "drop"`; with `"halt"` the byte is stored, last byte of the RX FIFO, and RX is halted until this bit is cleared), bit 7 = RX break (all bits of a frame at 0, with a framing error).
-- `isr` has one read wait state (`rd_wait_state: 1`, a read lasts 2 cycles), so that the FIFO state can be polled in `isr`, see [Interrupts](#interrupts).
+### Initialization
 
-## Verification
+1. Write `ctrl_tx` and `ctrl_rx` with the enables at 0.
+2. Write `baud_tick_cnt_max_lsb` and `_msb` with `f_clk / baud - 1` (only when `USER_DEFINE_BAUD_TICK = true`).
+3. Write `ctrl_tx` / `ctrl_rx` with the enable, parity, loopback and flow control bits.
+4. Write `isr = 0xFF` to clear the old events, then `imr` with the wanted interrupts.
 
-### Testbenches
+### Never stall the bus
+
+`data` is blocking: a read of an empty RX FIFO or a write to a full TX FIFO holds the bus (and the CPU) until the UART moves. Poll `isr` instead (write 1 to bits 3:0, then read `isr`): read `data` only when bit 2 (RX FIFO not empty) is set, write it only when bit 1 (TX FIFO full) is clear. With `RX_PARITY_ERROR = "halt"` this is mandatory while RX is halted.
+
+### Example: polled serial port
+
+The registers are 8 bits wide, at consecutive byte addresses from the base address of the IP (`0x40002000` is an example, use the address map of your SoC).
+
+```c
+#include <stdint.h>
+#include "UART_csr.h"
+
+#define UART_BASE ((uintptr_t)0x40002000u)   // example base address
+
+// isr / imr sources of sbi_UART
+#define UART_TX_EMPTY     (1u << 0)
+#define UART_TX_FULL      (1u << 1)
+#define UART_RX_NOT_EMPTY (1u << 2)
+#define UART_RX_FULL      (1u << 3)
+#define UART_RX_ERRORS    0xF0u              // overrun, framing, parity, break
+
+static inline void reg_wr(uint32_t offset, uint8_t data)
+{
+  *(volatile uint8_t *)(UART_BASE + offset) = data;
+}
+
+static inline uint8_t reg_rd(uint32_t offset)
+{
+  return *(volatile uint8_t *)(UART_BASE + offset);
+}
+
+// 8 data bits, no parity, no flow control
+void uart_init(uint32_t f_clk, uint32_t baud)
+{
+  uint16_t cnt_max = (uint16_t)(f_clk / baud - 1);
+
+  reg_wr(UART_CTRL_TX, 0);                   // TX and RX disabled while the
+  reg_wr(UART_CTRL_RX, 0);                   // baud rate is written
+  reg_wr(UART_BAUD_TICK_CNT_MAX_LSB, cnt_max & 0xFF);
+  reg_wr(UART_BAUD_TICK_CNT_MAX_MSB, cnt_max >> 8);
+  reg_wr(UART_CTRL_TX, 1 << UART_CTRL_TX_TX_ENABLE);
+  reg_wr(UART_CTRL_RX, 1 << UART_CTRL_RX_RX_ENABLE);
+  reg_wr(UART_ISR, 0xFF);                    // clear the old events
+}
+
+// FIFO state : clear the level bits 3:0, then read isr
+static uint8_t uart_state(void)
+{
+  reg_wr(UART_ISR, 0x0F);
+  return reg_rd(UART_ISR);
+}
+
+void uart_putc(uint8_t c)
+{
+  while (uart_state() & UART_TX_FULL)
+    ;                                        // wait without blocking the bus
+  reg_wr(UART_DATA, c);
+}
+
+// Returns the received byte, or -1 if none
+int uart_getc(void)
+{
+  if (!(uart_state() & UART_RX_NOT_EMPTY))
+    return -1;
+  return reg_rd(UART_DATA);
+}
+```
+
+The receive errors are the bits `UART_RX_ERRORS` of `isr`: read them, then write them back to clear them.
+
+## Design Verification
+
+### Testbench
 
 | File | DUT | Description |
 |------|-----|-------------|
-| [sim/tb_uart.vhd](sim/tb_uart.vhd) | `sbi_UART` | UVVM testbench with the SBI VIP (`bitvis_vip_sbi`), 50 MHz / 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, generic `RX_PARITY_ERROR` forwarded to the DUT, self-checking (681 checks with `RX_PARITY_ERROR = "keep"`, 681 with `"drop"`, 717 with `"halt"`). (1-3) RX through a UART BFM on `uart_rx_i` at nominal rate and with a +/-3 % bit period; (4) 1/4-bit glitch rejected, the RX-not-empty event of tests 1-3 and the TX FIFO empty level recorded while masked, the RX-not-empty event cleared before unmasking, then RX-not-empty interrupt (`imr`/`isr`/`it_o`, rw1c clear); (5) RX with even and odd parity: 8 patterns (data bit 0 at 0 and 1) read from `data`, `debug_o.uart_rx.parity_error` checked for correct and corrupted parity bits, a byte with a corrupted parity read back (`"keep"`), dropped (`"drop"`: parity error event in `isr`, RX FIFO empty: `isr` bit 2 cleared then read at 0) or read back with RX halted (`"halt"`: last byte of the RX FIFO, `isr` bit 2 cleared then read at 0 with the parity error event set, then `isr` bit 6 cleared to resume RX), the good byte sent right after received, back to no parity; (6) TX without / with even / with odd parity: every bit of the frame on `uart_tx_o` (start, data, parity, stop) checked by a UART monitor, back-to-back frames; (7) internal serial loopback (`rx_use_loopback`) without / with even / with odd parity: frame on the pin and byte read back; (8) loopback with a TX/RX parity mismatch sets the parity error flag, the byte read back, dropped, or read back with RX halted then resumed, as in 5; (10) bytes written while TX is disabled or while CTS# is inactive are not sent, then sent after TX enable / CTS# activation; (11) blocking read of `data` waiting for a byte in serial loopback, RTS# deasserted at 14 bytes in the RX FIFO, 18 bytes received without reading: the 17 first bytes are read back unchanged, the 18th is dropped and sets the RX overrun event in `isr` (recorded while masked, interrupt when unmasked, rw1c clear), RTS# active again after the FIFO is read; (12) stop bit at 0: framing error event, byte delivered; break of 25 bit periods: one 0x00 byte with framing error and break events, receiver back on the next frame; parity error event and interrupt (`imr`), the byte stored and read back (`"keep"`; `"halt"`: the clear of `isr` bit 6 resumes RX) or dropped, RX not empty never set (`"drop"`), the good byte sent right after received, no event with a good parity; (13) polling of the FIFO state in `isr`, written 1 to clear then read in the next SBI access (TX FIFO empty, neither empty nor full, full), TX FIFO empty interrupt raised when the last byte leaves the TX FIFO, kept by a clear while the TX FIFO is empty, dropped by `imr`; (14) RTS# (registered) active with an empty RX FIFO, inactive with a full RX FIFO, forced active by `rts_enable = 0`, active again after the FIFO is read; (15) echo mode (`tx_use_loopback`): 8 received bytes echoed on `uart_tx_o` and checked bit by bit, RX not empty never set, 20 writes to `data` accepted without blocking and not transmitted, a byte with a parity error echoed (`"keep"`, `"halt"`) or not (`"drop"`) with its parity error event, the next good byte echoed (`"halt"`: received while RX is halted, not echoed before the clear of `isr` bit 6), with `cts_enable = 1` the echo ignores the inactive CTS# pin and is held by the internal RTS# (14 bytes in the RX FIFO) until a read of `data`; at the end the RX not-empty event and the TX FIFO empty level of the masked sources are recorded in `isr` without interrupt; (16) parity error policy with `rts_enable = 1`, good byte A, byte B with a parity error, then C and D back to back: A, B, C and D read back with RTS# always active (`"keep"`), A, C and D read back (`"drop"`), or (`"halt"`) RTS# inactive from B on, RX FIFO = A, B then empty (polled in `isr`, never a blocking read), C waiting, D dropped with the overrun event, then after the clear of `isr` bit 6 RTS# active again and C read back; overrun of a frame with a parity error while a good byte waits for room in the full RX FIFO: the waiting byte is stored (not marked with the parity error of the dropped frame), the parity error event of the dropped frame raised with `"keep"` / `"drop"`, not with `"halt"`; (`"halt"` only) a byte with a parity error waiting for room in the full RX FIFO raises the event only when it enters it, and is the last byte read |
+| [sim/basic/tb_UART.vhd](sim/basic/tb_UART.vhd) | `sbi_UART` | Self-checking UVVM testbench with the SBI VIP, 50 MHz, 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, generics `TESTS_LIST` (scenarios, see below) and `RX_PARITY_ERROR` (of the DUT). A UART BFM drives `uart_rx_i` (bit period, parity, corrupted parity bit, stop bit level) and a monitor checks every bit of the frames on `uart_tx_o`. Scenarios in `tb_UART_<name>_pkg` (one package per scenario), names and dispatch in [tb_UART_tests_pkg](sim/basic/tb_UART_tests_pkg.vhd), helpers (register accesses, UART BFM and monitor, reset pulse) in [tb_UART_bfm_pkg](sim/basic/tb_UART_bfm_pkg.vhd) |
+
+### Scenarios (`TESTS_LIST`)
+
+The scenarios are chosen at run time with the generic `TESTS_LIST`: names separated by `,` without space (`rx,tx,rx`), a name may be repeated. The sequencer first checks every name (an unknown name is a `TB_ERROR` before any scenario runs), then for each scenario drives a reset pulse with the bus inactive and the lines idle, logs `TEST <i>/<N> : <name>` and runs it: each scenario starts from reset and configures the DUT itself. The empty list (default) only compiles and elaborates the testbench. The list is parsed with `list_length` / `list_item` / `list_contains` of `asylum.string_pkg` (`asylum:utils:pkg` >= 1.10.0).
+
+Checks counted as the `=> OK` lines of the log, for `RX_PARITY_ERROR` = keep / drop / halt:
+
+| Name | Checks | Description |
+|------|--------|-------------|
+| `reset_values` | 14 / 14 / 14 | Reset values of the pads (`uart_tx_o` idle, RTS# active, `it_o`) and of the registers (`isr` = TX FIFO empty only, `baud_tick_cnt_max` = `CLOCK_FREQ / BAUD_RATE - 1`), read / write of `imr`, `ctrl_tx`, `ctrl_rx`, `baud_tick_cnt_max` |
+| `rx` | 17 / 17 / 17 | Reception without parity: one byte read after the frame, then 8 patterns, parity error flag at 0 |
+| `rx_drift` | 2 / 2 / 2 | Reception with a bit period 3 % longer, then 3 % shorter |
+| `rx_glitch` | 10 / 10 / 10 | A byte received while masked is recorded in `isr` without interrupt; a glitch of 1/4 bit is not a start bit; RX FIFO not empty interrupt on the next byte, cleared by `imr` and `isr` |
+| `rx_parity` | 50 / 54 / 58 | Even then odd parity: 8 patterns, corrupted parity bits (flag, byte kept, dropped, or read then RX resumed), back to no parity |
+| `tx` | 143 / 143 / 143 | Transmission without, with even and with odd parity: 8 patterns, every bit of the frame, back-to-back frames |
+| `loopback` | 181 / 183 / 185 | Serial loopback without, with even and with odd parity, then TX even / RX odd: parity error |
+| `tx_flow` | 18 / 18 / 18 | A byte written while TX is disabled waits in the TX FIFO; CTS# ignored while `cts_enable = 0`; bytes written while CTS# is inactive sent after its activation |
+| `rx_overrun` | 45 / 45 / 45 | A blocking read of `data` counts as one read; RTS# deasserted at 14 bytes; overrun of the 18th byte (event, interrupt), the 17 first bytes read back |
+| `rx_pending` | 20 / 20 / 20 | Serial loopback, RX FIFO full and one byte waiting in the receiver: a read during the next frame lets it in, no overrun, no duplicate, order kept |
+| `rx_errors` | 20 / 19 / 20 | Framing error (byte delivered), break (one 0x00 byte, then wait for the line at 1), parity error event and interrupt, no event with a good parity |
+| `tx_irq` | 75 / 75 / 75 | Polling of the TX FIFO state in `isr` (empty, neither, full, read right after the clear), TX FIFO empty interrupt when the last byte leaves the TX FIFO, kept by a clear, dropped by `imr` |
+| `rts` | 21 / 21 / 21 | RTS# inactive with a full RX FIFO, forced active by `rts_enable = 0`, active again once the RX FIFO is read |
+| `echo` | 87 / 83 / 88 | Echo mode: bytes echoed and not stored, writes to `data` dropped (also while the echo is blocked), byte with a parity error echoed or not, CTS# = internal RTS# (pin ignored), echo blocked while RTS# is inactive, masked sources recorded without interrupt |
+| `parity_policy` | 54 / 53 / 58 | `RX_PARITY_ERROR` with RTS# enabled (keep, drop, or halt with RTS# inactive and resume), overrun of a frame with a parity error while a good byte waits, byte with a parity error received while the RX FIFO is full |
+| `baud` | 5 / 5 / 5 | `baud_tick_cnt_max` written by software (57600 baud, both bytes not 0): a frame sent and a frame received at the new bit period |
+| **Total** | **762 / 762 / 779** | |
+
+The testbench was validated with 42 RTL mutants (transmitter, receiver, baud rate generator, `sbi_UART`, register map), each run scenario by scenario in the three configurations: 40 are killed; the 2 others do not change the function (receiver synchronizer bypassed, first RX sample one clock cycle earlier). Not simulated: `DEPTH_TX` / `DEPTH_RX` = 0, `UART_TX_ENABLE` / `UART_RX_ENABLE` = false and `USER_DEFINE_BAUD_TICK` = false (checked by the `lint_ghdl_synth_*` and `syn_*` targets only).
 
 ### Targets
 
 | Target | Toplevel | Description |
 |--------|----------|-------------|
-| `default` | `sbi_UART` | RTL fileset + CSR generation (not a simulation) |
-| `sim_basic` | `tb_uart` | Simulation of basic unit tests (GHDL) |
-| `sim_rx_parity_drop` | `tb_uart` | Same scenario with `RX_PARITY_ERROR=drop` (generic set at run time): the bytes received with a parity error are checked dropped |
-| `sim_rx_parity_halt` | `tb_uart` | Same scenario with `RX_PARITY_ERROR=halt` (generic set at run time): after a byte received with a parity error, RX is checked halted until `isr` bit 6 is cleared |
-| `lint_ghdl` | `asylum.sbi_UART_wrapper` | Lint: GHDL `-Wall` analysis and elaboration (empty simulation) of `sbi_UART` in a wrapper with flat SBI ports (`syn/sbi_UART_wrapper.vhd`) |
-| `lint_ghdl_synth_default` | `asylum.sbi_UART_wrapper` | Synthesis check (see below), default generics (PicoSoC) |
-| `lint_ghdl_synth_fifo16` | `asylum.sbi_UART_wrapper` | Synthesis check, FIFO depths 16 (tb_uart): `DEPTH_TX=16`, `DEPTH_RX=16` |
-| `lint_ghdl_synth_tx_only` | `asylum.sbi_UART_wrapper` | Synthesis check, TX only: `UART_RX_ENABLE=false`, `DEPTH_TX=4` |
-| `lint_ghdl_synth_rx_only` | `asylum.sbi_UART_wrapper` | Synthesis check, RX only: `UART_TX_ENABLE=false`, `DEPTH_RX=4` |
-| `lint_ghdl_synth_fixed_baud` | `asylum.sbi_UART_wrapper` | Synthesis check, fixed baud tick: `USER_DEFINE_BAUD_TICK=false` |
-| `lint_ghdl_synth_parity_drop` | `asylum.sbi_UART_wrapper` | Synthesis check, bytes with a parity error dropped: `RX_PARITY_ERROR=drop` |
-| `lint_ghdl_synth_parity_halt` | `asylum.sbi_UART_wrapper` | Synthesis check, RX halted after a byte with a parity error: `RX_PARITY_ERROR=halt` |
+| `default` | `sbi_UART` | HDL fileset + CSR generation (not a simulation) |
+| `sim_basic` | `tb_UART` | Reference configuration (`RX_PARITY_ERROR = "keep"`): build and elaboration only (`TESTS_LIST` empty), base of the scenario targets and of the list runs |
+| `sim_basic_<name>` | `tb_UART` | One target per scenario: `sim_basic_reset_values`, `_rx`, `_rx_drift`, `_rx_glitch`, `_rx_parity`, `_tx`, `_loopback`, `_tx_flow`, `_rx_overrun`, `_rx_pending`, `_rx_errors`, `_tx_irq`, `_rts`, `_echo`, `_parity_policy`, `_baud` (762 checks in all) |
+| `sim_rx_parity_drop` | `tb_UART` | `RX_PARITY_ERROR = "drop"`, every scenario (762 checks) |
+| `sim_rx_parity_halt` | `tb_UART` | `RX_PARITY_ERROR = "halt"`, every scenario (779 checks) |
+| `lint_ghdl` | `asylum.sbi_UART_wrapper` | GHDL `-Wall` analysis and elaboration of [syn/sbi_UART_wrapper.vhd](syn/sbi_UART_wrapper.vhd) |
+| `lint_ghdl_synth_<config>` | `asylum.sbi_UART_wrapper` | `ghdl --synth` check (no latch, synthesizable) for 7 generic configurations: `default`, `fifo16`, `tx_only`, `rx_only`, `fixed_baud`, `parity_drop`, `parity_halt` |
+| `syn_<config>` | `asylum.sbi_UART_wrapper` | Synthesis with Yosys, Artix-7 and sky130 (see [Resources](#resources)), same 7 configurations as `lint_ghdl_synth_<config>` |
 
-A `lint_ghdl_synth_*` target is `lint_ghdl` with the generics of its configuration (FuseSoC `parameters`) and a `pre_run` hook, `ghdl_synth.sh` of `asylum:utils:ghdl_synth`, which adds `include ghdl_synth.mk` to the Makefile generated by edalize. The run step (`make run EXTRA_OPTIONS=<generics>`) then runs, in the build directory:
+The reference configuration of a testbench has a build-only base target and one target per scenario: one CI job per scenario, a failure is isolated. Every other configuration has one target that runs its whole list: the `TEST <i>/<N>` header names a failing scenario. FuseSoC replaces the `parameters` list of an inherited target, so each target repeats the generics of its configuration.
 
-1. `ghdl --synth` of the toplevel (rule `ghdl_synth` of `ghdl_synth.mk`), with the options of the target: `STD`, `ANALYZE_OPTIONS` (`-Wall`), `TOPLEVEL_LIBS`, `TOPLEVEL` and the generics. It writes `sbi_UART_wrapper_synth.vhd` (netlist) and `sbi_UART_wrapper_synth.log`, prints the warnings, and fails on a synthesis error (an inferred latch is one);
-2. `ghdl -r --no-run`: elaboration with the same generics, without simulation.
-
-To add a configuration, add a target with its `parameters` (the generics are declared in the `parameters` section of `uart.core`).
+Every `sim_*`, `lint_*` and `syn_*` target is a job of the [GitHub CI](https://github.com/deuskane/asylum-communication-uart/actions/workflows/ci.yml), run in the [asylum-env](https://github.com/deuskane/asylum-ci) image (GHDL, FuseSoC, UVVM, Yosys). The `sim`, `lint` and `syn` badges count the passed and failed targets of the last run on `main`.
 
 ### How to Run
 
-The default tool is GHDL (`mk/defs.mk`: `TOOL ?= ghdl`, `TARGET ?= sim_basic`).
+From a clone of [asylum-project](https://github.com/deuskane/asylum-project) (GHDL and FuseSoC installed, or in the asylum-env image):
 
 ```bash
-make help                 # variables, rules and target list (mk/targets.txt)
-make sim_basic            # run one target (log in log/)
-make nonreg_sim           # run every sim_* target
-make lint_ghdl            # GHDL -Wall lint (make nonreg_lint: every lint_* target)
-make lint_ghdl_synth_default   # GHDL -Wall lint + ghdl --synth -Wall check of one configuration
-make clean                # remove build/ and log/
+make help                        # variables, rules and targets
+make sim_basic_rx                # one scenario, log in log/
+make sim_rx_parity_halt          # every scenario of a configuration
+make nonreg_sim                  # every sim_* target
+make nonreg_lint                 # every lint_* target
+make nonreg_syn                  # every syn_* target (Yosys, figures of Resources)
 ```
 
-Equivalent FuseSoC command:
+To run a list of scenarios, build the testbench once, then run the list without recompiling, with FuseSoC (same `--build-root` and `--no-export` as the Makefile, so that the build of the target is reused; any generic of the target can be overridden after the VLNV):
 
 ```bash
-fusesoc --cores-root . run --build-root build --target sim_basic asylum:communication:uart:3.0.0
+make sim_basic                   # build and elaboration (TESTS_LIST empty)
+fusesoc --cores-root . run --build-root build --no-export --run --target sim_basic asylum:communication:uart:3.0.0 --TESTS_LIST=rx,echo,rx --RX_PARITY_ERROR=halt
 ```
 
-The `sim_basic` target runs GHDL with `--fst=dut.fst --ieee-asserts=disable`. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `sim_basic`, `sim_rx_parity_drop` and `sim_rx_parity_halt`.
+or in the build directory of the target, `make run EXTRA_OPTIONS="-gTESTS_LIST=rx,echo -gRX_PARITY_ERROR=keep"`: `EXTRA_OPTIONS` replaces every generic set by the target, repeat the generics of the configuration.
 
-### Simulation Features
+To add a scenario: a package `tb_UART_<name>_pkg` with a procedure `run` (in the `sim_basic` fileset), its name in `C_TESTS` and its case in `run_test` of `tb_UART_tests_pkg`, a `sim_basic_<name>` target and the name in the `TESTS_LIST` of the other configurations in [uart.core](uart.core), then `make mk/targets.txt` and `make ci_generate`.
 
-- `sbi_UART` writes every transmitted / received byte to `FILENAME_TX` / `FILENAME_RX` (raw characters) and to `<FILENAME>.dbg` (binary, hexadecimal and character per line); code inside `synthesis translate_off`.
-- At elaboration `sbi_UART` reports `CLOCK_FREQ`, `BAUD_RATE` and the computed baud tick counter values.
-- `ctrl_rx.rx_use_loopback = 1` loops `uart_tx` back to the receiver for tests without an external device.
+Outside the CI, GHDL writes a waveform `dut.fst`, and `sbi_UART` writes the dumps `dump_uart_tx.txt`, `dump_uart_rx.txt` (and their `.dbg` annotated copies).
 
-## Synthesis
+## Dependencies and Related IPs
 
-No vendor synthesis target (the `lint_ghdl_synth_*` targets check the RTL with `ghdl --synth`, see [Targets](#targets)). The HDL sources of the `default` target (`hdl/*.vhd` + generated CSR) are synthesizable: the file dumps and reports of `sbi_UART` are enclosed in `synthesis translate_off / translate_on` (only the `textio` `use` clauses remain outside). Resource usage mainly depends on `DEPTH_TX` / `DEPTH_RX` (FIFOs in the CSR bank), `UART_TX_ENABLE` / `UART_RX_ENABLE` and `USER_DEFINE_BAUD_TICK`. The asynchronous inputs `uart_rx_i` and `uart_cts_b_i` are synchronized inside the IP (`sync2dffrn`), they can be connected directly to pads.
+| Core | Repository | Purpose |
+|------|------------|---------|
+| `asylum:utils:generators` | [asylum-utils-generators](https://github.com/deuskane/asylum-utils-generators) | regtool (register generator) and the CSR building blocks (`csr_reg`, `csr_fifo`); >= 2.10.0 for the read wait state of `isr` |
+| `asylum:component:fifo` | [asylum-component-fifo](https://github.com/deuskane/asylum-component-fifo) | FIFOs of the `data` register |
+| `asylum:system:GIC` | [asylum-system-gic](https://github.com/deuskane/asylum-system-gic) | `GIC_core` (>= 2.0.0: masked sources recorded in `isr`) |
+| `asylum:target:techmap` | [asylum-target-techmap](https://github.com/deuskane/asylum-target-techmap) | `sync2dffrn` synchronizers of `uart_rx_i` and `uart_cts_b_i` |
+| `asylum:utils:pkg` | [asylum-utils-pkg](https://github.com/deuskane/asylum-utils-pkg) | Common packages (`sbi_pkg`, `math_pkg`, ...); the testbench needs >= 1.10.0 (`string_pkg` lists of `TESTS_LIST`) |
+| `asylum:utils:ghdl_synth` | [asylum-utils-generators](https://github.com/deuskane/asylum-utils-generators) | `ghdl --synth` check of the `lint_ghdl_synth_*` targets |
+| `asylum:utils:yosys_synth` | [asylum-utils-generators](https://github.com/deuskane/asylum-utils-generators) | Yosys synthesis of the `syn_*` targets (Artix-7 and sky130) |
+| `bitvis:verification:uvvm` | [UVVM](https://github.com/UVVM/UVVM) | Verification library and SBI VIP |
 
-## Design Notes
+Used by [asylum-soc-picosoc](https://github.com/deuskane/asylum-soc-picosoc). Other communication IPs of Asylum: [SPI](https://github.com/deuskane/asylum-communication-spi), [I2C](https://github.com/deuskane/asylum-communication-i2c). All the IPs: [asylum-project](https://github.com/deuskane/asylum-project).
 
-### Baud Rate
+## License
 
-`baud_tick_cnt_max = CLOCK_FREQ / BAUD_RATE - 1` (integer division). Each `uart_baud_rate_gen` emits one `baud_tick` every `baud_tick_cnt_max + 1` clock cycles and a `baud_tick_half` when the counter is at `baud_tick_cnt_max / 2`. Example: 50 MHz and 115200 baud give `baud_tick_cnt_max = 433` (actual rate 115207 baud).
-
-### Transmitter
-
-A byte is accepted (`s_axis_tvalid_i = 1` and `s_axis_tready_o = 1`) only when it is loaded in the shift register: transmitter enabled, idle and CTS# low. While `ctrl_tx.tx_enable = 0` (reset of the transmitter) or CTS# is high, `s_axis_tready_o = 0`: the bytes stay in the TX FIFO, and with `DEPTH_TX = 0` a write to `data` is blocked until the byte is accepted (enable TX before writing). The frame `start + 8 data bits (LSB first) + [parity] + stop` is shifted out, one bit per `baud_tick`. With `ctrl_tx.cts_enable = 0` CTS# is forced low (always clear to send).
-
-### Receiver FSM
-
-- **IDLE**: waits for `uart_rx_i = 0` (start bit). In `sbi_UART` the receiver input is the synchronized `uart_rx_i` (2 clock cycles of latency) or `uart_tx` in serial loopback.
-- **START**: enables the RX baud generator and samples the start bit at mid-bit; a `'1'` is a false start (glitch) and goes back to IDLE.
-- **ACTIVE**: samples one bit per `baud_tick_half` until all bits are received.
-- **STOP**: extracts the data byte and the parity bit, checks the parity and the stop bit (`err_parity_o`, `err_framing_o`, `err_break_o`), asserts `m_axis_tvalid_o` with the parity error of the byte on `m_axis_parity_error_o`, back to IDLE. After a framing error, IDLE waits for `uart_rx_i = 1` before looking for a start bit, so a line held at 0 (break) gives one byte. If the previous byte is still pending (`m_axis_tvalid_o = 1`, `m_axis_tready_i = 0`), the new byte is dropped and `err_overrun_o` pulses (overrun): the pending byte and its `m_axis_parity_error_o` are kept.
-
-The frame is shifted into a `WIDTH+3`-bit register (10 samples without parity, 11 with parity) and the data bits are extracted at the position that matches the parity configuration sampled at the start of the frame. With `rx_parity_enable = 1` the received parity bit is checked (even: `xor(data, parity) = 0`, odd: `xor(data, parity) = 1`); the result is delivered with the byte on `m_axis_parity_error_o` of `uart_rx_axis`, and is available on `last_parity_error_o` and on `debug_o.uart_rx.parity_error` of `sbi_UART` (status of the last received frame). `uart_rx_axis` delivers every byte; `sbi_UART` applies the policy of `RX_PARITY_ERROR` to the bytes with `m_axis_parity_error_o = 1`, with one valid for every sink (RX FIFO and its level tracking for RTS#, transmitter in echo mode, simulation dump). With `RX_PARITY_ERROR = "keep"` (default, as AXI UART Lite), a byte with a parity error is pushed into the RX FIFO; the parity error event (`isr` bit 6) tells that an error occurred, but not which byte of the RX FIFO had it. With `RX_PARITY_ERROR = "drop"`, the byte is dropped (consumed by `sbi_UART`, not pushed into the RX FIFO, not echoed with `ctrl_tx.tx_use_loopback = 1`), and the event is still raised. With `RX_PARITY_ERROR = "halt"`, the byte is stored and RX halts, so that the faulty byte is identified without any new register (see [Parity Error Policy](#parity-error-policy)). A byte with a framing error or a break is pushed into the RX FIFO (unless it also has a parity error and `RX_PARITY_ERROR = "drop"`, e.g. a break with odd parity), reported by the framing error and break events (`isr` bits 5 and 7). An overrun keeps its priority: a frame received while a byte is pending is dropped with an overrun event (and its parity error event with `"keep"` and `"drop"`; with `"halt"` only the overrun event, the frame never enters the RX FIFO).
-
-### Parity Error Policy
-
-With `RX_PARITY_ERROR = "halt"`, the parity error event (`isr` bit 6) is raised when the byte with the parity error enters the RX FIFO (in echo mode: when the transmitter accepts it), at the same clock edge, not at the end of the frame: a byte that waits for room in a full RX FIFO raises it only when it enters the RX FIFO. While `isr` bit 6 is set, RX is halted: no byte is given to the RX FIFO (or to the transmitter in echo mode), the next received byte waits in `uart_rx_axis` and the following frames are dropped with the overrun event (`isr` bit 4), as with a full RX FIFO; RTS# is deasserted (with `ctrl_rx.rts_enable = 1`), so that a flow-controlled sender stops. The byte with the parity error is therefore the last byte of the RX FIFO. Software:
-
-1. sees `isr` bit 6 set (interrupt or polling);
-2. drains the RX FIFO, polling `isr` bit 2 before each read of `data` (write 1 to bit 2, then read `isr`): `data` has a blocking read, and a read of the empty RX FIFO while RX is halted never completes. The last byte read is the faulty one;
-3. writes 1 to `isr` bit 6 to resume RX: the waiting byte enters the RX FIFO at the next clock edge and RTS# is active again.
-
-Software writes 1 to `isr` bit 6 only to resume RX: a write of 1 at the clock edge where a byte with a parity error enters the RX FIFO clears its event (as for any `isr` event), and RX does not halt.
-
-### Loopback and Flow Control
-
-- `ctrl_rx.rx_use_loopback = 1`: the receiver input is `uart_tx` instead of `uart_rx_i` (serial loopback).
-- `ctrl_tx.tx_use_loopback = 1`: received bytes are sent directly to the transmitter (echo; a byte with a parity error is echoed, or dropped with `RX_PARITY_ERROR = "drop"`; with `"halt"` it is echoed, then the echo stops until `isr` bit 6 is cleared); the `data` register then always accepts writes and drops them (not transmitted), and no received byte reaches the RX FIFO. In this mode, with `cts_enable = 1`, CTS# is taken from the internal RTS# (the `uart_cts_b_i` pin is ignored): with `rts_enable = 1`, the echo stops while the RX FIFO holds `DEPTH_RX - 2` bytes or more (bytes received before the echo mode).
-- `ctrl_rx.rts_enable = 1`: `uart_rts_b_o` goes high when the RX FIFO holds `DEPTH_RX - 2` bytes or more (at least 1, constant `RX_RTS_MARGIN = 2` in `sbi_UART`), so that the remote transmitter can still send 2 bytes, plus 1 byte pending in `uart_rx_axis`, after RTS# deassertion without overrun. With `RX_PARITY_ERROR = "halt"`, RTS# is also high while RX is halted (`isr` bit 6 set). `csr_fifo` exports neither its number of elements nor its pop: `sbi_UART` tracks the RX FIFO level from the push (`uart_rx_axis` handshake) and the pop (SBI read of `data` while the RX FIFO is not empty: the cycle where the access completes, one pop per read even for a blocking read lasting several cycles). With `DEPTH_RX = 0`, RTS# goes high while a received byte is pending. RTS# comes from a flip-flop (one cycle after the level comparison), so the pad does not see its glitches.
-
-### Interrupts
-
-`GIC_core` (`asylum:system:GIC` >= 2.0.0) computes `isr_next = status or isr` every cycle, whatever `imr`, and `it_o = or(isr and imr)`: the masked sources are latched too (they can be polled) and `imr` only masks `it_o`. Software clears the events by writing 1 into `isr` (rw1c), and clears the old events it wants to ignore before unmasking a source (e.g. the RX not-empty event of bytes already read).
-
-Bits 3:0 are levels: bit 0 TX FIFO empty, bit 1 TX FIFO full, bit 2 RX FIFO not empty, bit 3 RX FIFO full. Bits 7:4 are events: bit 4 RX overrun, bit 5 RX framing error, bit 6 RX parity error, bit 7 RX break, one-cycle pulses of `uart_rx_axis` (bit 6 with `RX_PARITY_ERROR = "halt"`: the transfer of the faulty byte to the RX FIFO, see [Parity Error Policy](#parity-error-policy)), kept in `isr` until software writes 1 to them (`GIC_core` records them, masked or not: no sticky flags in `sbi_UART`). TX FIFO empty rises when the last byte of the TX FIFO is loaded into the transmitter, while this byte is still being sent: an interrupt-driven TX driver writes its next bytes, and masks bit 0 in `imr` when it has nothing more to send (clearing the bit has no effect while the TX FIFO is empty).
-
-Polling of the FIFO state: there is no status register, software reads the level sources in `isr`. It writes 1 to the bits 3:0 to clear them (and only them: a write of 1 to an event bit can clear an event not seen yet), then reads `isr`: the bit of a source still active is set again. `isr` is a `csr_reg` `rw1c` written by the hardware every cycle, and the software clear wins in the cycle of the write, so the bit comes back one cycle after the clear. The read wait state of `isr` (`rd_wait_state: 1`, `asylum:utils:generators` >= 2.10.0) returns the value of the second cycle of the read: a read issued right after the clear (back-to-back accesses) sees the bit set again.
-
-```c
-PORT_WR(UART, UART_ISR, 0x0F);   // clear the FIFO state bits (3:0)
-isr = PORT_RD(UART, UART_ISR);   // the bits of the active sources are set again
-if (isr & 0x02) { /* TX FIFO full : do not write data */ }
-```
-
-## Directory Structure
-
-```
-asylum-communication-uart/
-├── uart.core               # FuseSoC core (asylum:communication:uart)
-├── Makefile                # Common Asylum Makefile (FuseSoC wrapper)
-├── mk/
-│   ├── defs.mk             # FILE_CORE, default TARGET and TOOL
-│   └── targets.txt         # Target list (generated from the .core)
-├── .github/workflows/
-│   └── ci.yml              # CI jobs (generated by make ci_generate)
-├── doc/
-│   └── uart.drawio         # Block diagram
-├── hdl/
-│   ├── uart_pkg.vhd
-│   ├── uart_baud_rate_gen.vhd
-│   ├── uart_rx_axis.vhd
-│   ├── uart_tx_axis.vhd
-│   ├── sbi_uart.vhd
-│   └── csr/
-│       ├── UART.hjson       # Register description (source)
-│       ├── UART_csr.vhd     # Generated
-│       ├── UART_csr_pkg.vhd # Generated
-│       ├── UART_csr.md      # Generated
-│       └── UART_csr.h       # Generated
-├── sim/
-│   └── tb_uart.vhd         # UVVM testbench
-└── syn/
-    └── sbi_UART_wrapper.vhd    # Lint / synthesis check wrapper (sbi_UART, flat SBI ports)
-```
-
-## Dependencies
-
-| Core | Used by (fileset) | Purpose |
-|------|-------------------|---------|
-| `asylum:utils:pkg` | `rtl` | Common packages (`sbi_pkg`, `math_pkg`, `convert_pkg`, ...) |
-| `asylum:component:fifo` | `rtl` | FIFO used by the `csr_fifo` of the `data` register |
-| `asylum:system:GIC` (`>=2.0.0`) | `rtl` | `GIC_core` (interrupt status / mask / merge; raw `isr`, `imr` masks `it_o`) |
-| `asylum:target:techmap` | `rtl` | `sync2dffrn` synchronizers of `uart_rx_i` and `uart_cts_b_i` (`techmap_pkg`) |
-| `asylum:utils:generators` (`>=2.10.0`) | `rtl` | regtool generator (`gen_csr`) and CSR building blocks (read wait state of `isr`) |
-| `asylum:utils:ghdl_synth` | `syn` | `ghdl_synth.sh` / `ghdl_synth.mk` (`pre_run` hook of `lint_ghdl_synth_*`) |
-| `bitvis:verification:uvvm` | `sim_basic` | UVVM utility library and SBI VIP |
+Apache License 2.0, see [LICENSE](LICENSE).

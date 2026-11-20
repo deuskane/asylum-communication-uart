@@ -1,0 +1,43 @@
+{
+ "signal": [
+  {
+   "name": "baud_tick (TX: next bit)",
+   "wave": "0...10..10..10..10..10..10..10..10..10..10..10..10.."
+  },
+  {
+   "name": "uart_tx_o / uart_rx_i",
+   "wave": "1...0...1...0...1...0...1.......0...........1......."
+  },
+  {
+   "name": "frame",
+   "wave": "x...4...5...5...5...5...5...5...5...5...6...7...x...",
+   "data": [
+    "start",
+    "D0 = 1",
+    "D1 = 0",
+    "D2 = 1",
+    "D3 = 0",
+    "D4 = 1",
+    "D5 = 1",
+    "D6 = 0",
+    "D7 = 0",
+    "parity = 0",
+    "stop"
+   ]
+  },
+  {},
+  {
+   "name": "baud_tick_half (RX: sample)",
+   "wave": "0.....10..10..10..10..10..10..10..10..10..10..10...."
+  }
+ ],
+ "head": {
+  "text": "UART frame of 0x35 with even parity: start bit, 8 data bits LSB first, parity bit, stop bit"
+ },
+ "foot": {
+  "text": "One bit = baud_tick_cnt_max + 1 clock cycles; without parity the stop bit follows D7"
+ },
+ "config": {
+  "hscale": 0.5
+ }
+}

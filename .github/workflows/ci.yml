@@ -12,6 +12,86 @@ jobs:
     with:
       name: sim_basic
 
+  sim_basic_baud:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_baud
+
+  sim_basic_echo:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_echo
+
+  sim_basic_loopback:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_loopback
+
+  sim_basic_parity_policy:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_parity_policy
+
+  sim_basic_reset_values:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_reset_values
+
+  sim_basic_rts:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_rts
+
+  sim_basic_rx:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_rx
+
+  sim_basic_rx_drift:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_rx_drift
+
+  sim_basic_rx_errors:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_rx_errors
+
+  sim_basic_rx_glitch:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_rx_glitch
+
+  sim_basic_rx_overrun:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_rx_overrun
+
+  sim_basic_rx_parity:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_rx_parity
+
+  sim_basic_rx_pending:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_rx_pending
+
+  sim_basic_tx:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_tx
+
+  sim_basic_tx_flow:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_tx_flow
+
+  sim_basic_tx_irq:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: sim_basic_tx_irq
+
   sim_rx_parity_drop:
     uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
     with:
@@ -21,5 +101,89 @@ jobs:
     uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
     with:
       name: sim_rx_parity_halt
+
+  lint_ghdl:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: lint_ghdl
+
+  lint_ghdl_synth_default:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: lint_ghdl_synth_default
+
+  lint_ghdl_synth_fifo16:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: lint_ghdl_synth_fifo16
+
+  lint_ghdl_synth_fixed_baud:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: lint_ghdl_synth_fixed_baud
+
+  lint_ghdl_synth_parity_drop:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: lint_ghdl_synth_parity_drop
+
+  lint_ghdl_synth_parity_halt:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: lint_ghdl_synth_parity_halt
+
+  lint_ghdl_synth_rx_only:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: lint_ghdl_synth_rx_only
+
+  lint_ghdl_synth_tx_only:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: lint_ghdl_synth_tx_only
+
+  syn_default:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: syn_default
+
+  syn_fifo16:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: syn_fifo16
+
+  syn_fixed_baud:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: syn_fixed_baud
+
+  syn_parity_drop:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: syn_parity_drop
+
+  syn_parity_halt:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: syn_parity_halt
+
+  syn_rx_only:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: syn_rx_only
+
+  syn_tx_only:
+    uses: deuskane/asylum-ci/.github/workflows/vhdl-ci.yml@main
+    with:
+      name: syn_tx_only
+
+  badges:
+    needs: [sim_basic, sim_basic_baud, sim_basic_echo, sim_basic_loopback, sim_basic_parity_policy, sim_basic_reset_values, sim_basic_rts, sim_basic_rx, sim_basic_rx_drift, sim_basic_rx_errors, sim_basic_rx_glitch, sim_basic_rx_overrun, sim_basic_rx_parity, sim_basic_rx_pending, sim_basic_tx, sim_basic_tx_flow, sim_basic_tx_irq, sim_rx_parity_drop, sim_rx_parity_halt, lint_ghdl, lint_ghdl_synth_default, lint_ghdl_synth_fifo16, lint_ghdl_synth_fixed_baud, lint_ghdl_synth_parity_drop, lint_ghdl_synth_parity_halt, lint_ghdl_synth_rx_only, lint_ghdl_synth_tx_only, syn_default, syn_fifo16, syn_fixed_baud, syn_parity_drop, syn_parity_halt, syn_rx_only, syn_tx_only]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    uses: deuskane/asylum-ci/.github/workflows/badges.yml@main
+    with:
+      results: ${{ toJSON(needs) }}
 
 #<GENERATE_END>
