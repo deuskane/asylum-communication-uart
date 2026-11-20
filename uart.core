@@ -130,6 +130,13 @@ filesets:
     depend       :
       - asylum:utils:ghdl_synth
 
+  #---------------------------------------
+  syn_yosys:
+  #---------------------------------------
+    # yosys_synth.sh / yosys_synth.mk / yosys_synth.py (pre_run hook of syn_*)
+    depend       :
+      - asylum:utils:yosys_synth
+
 #=========================================
 targets:
 #=========================================
@@ -177,7 +184,7 @@ targets:
   lint_ghdl_synth_fifo16 :
   #---------------------------------------
     << : *lint_ghdl_synth
-    description     : Synthesis check of sbi_UART_wrapper, FIFO depths 16 (tb_uart)
+    description     : Synthesis check of sbi_UART_wrapper, FIFO depths 16 (tb_UART)
     parameters      :
       - DEPTH_TX=16
       - DEPTH_RX=16
@@ -221,6 +228,74 @@ targets:
   #---------------------------------------
     << : *lint_ghdl_synth
     description     : Synthesis check of sbi_UART_wrapper, RX halted after a byte with a parity error
+    parameters      :
+      - RX_PARITY_ERROR=halt
+
+  #---------------------------------------
+  # Synthesis : size of sbi_UART_wrapper with the generics of the target,
+  # Xilinx Artix-7 (LUT, FF, BRAM, DSP) and sky130 (area), by Yosys and
+  # its GHDL plugin. Same configurations as lint_ghdl_synth_*.
+  # The pre_run hook (yosys_synth.sh of asylum:utils:yosys_synth) adds
+  # yosys_synth.mk to the edalize Makefile.
+  #---------------------------------------
+  syn_default : &syn
+    << : *lint_ghdl
+    description     : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, default generics (PicoSoC)
+    filesets_append : [syn, syn_yosys]
+    tools :
+      ghdl :
+        run_options     : ["--no-run"]
+    hooks :
+      pre_run : [yosys_synth]
+
+  #---------------------------------------
+  syn_fifo16 :
+  #---------------------------------------
+    << : *syn
+    description     : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, FIFO depths 16 (tb_UART)
+    parameters      :
+      - DEPTH_TX=16
+      - DEPTH_RX=16
+
+  #---------------------------------------
+  syn_tx_only :
+  #---------------------------------------
+    << : *syn
+    description     : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, TX only
+    parameters      :
+      - UART_RX_ENABLE=false
+      - DEPTH_TX=4
+
+  #---------------------------------------
+  syn_rx_only :
+  #---------------------------------------
+    << : *syn
+    description     : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, RX only
+    parameters      :
+      - UART_TX_ENABLE=false
+      - DEPTH_RX=4
+
+  #---------------------------------------
+  syn_fixed_baud :
+  #---------------------------------------
+    << : *syn
+    description     : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, fixed baud tick
+    parameters      :
+      - USER_DEFINE_BAUD_TICK=false
+
+  #---------------------------------------
+  syn_parity_drop :
+  #---------------------------------------
+    << : *syn
+    description     : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, bytes with a parity error dropped
+    parameters      :
+      - RX_PARITY_ERROR=drop
+
+  #---------------------------------------
+  syn_parity_halt :
+  #---------------------------------------
+    << : *syn
+    description     : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, RX halted after a byte with a parity error
     parameters      :
       - RX_PARITY_ERROR=halt
 
@@ -426,12 +501,18 @@ scripts:
   ghdl_synth :
     cmd : [bash, ghdl_synth.sh]
 
+  #---------------------------------------
+  # pre_run hook of syn_* (cwd = work_root)
+  #---------------------------------------
+  yosys_synth :
+    cmd : [bash, yosys_synth.sh]
+
 #=========================================
 parameters :
 #=========================================
 
   #---------------------------------------
-  # Generics of sbi_UART_wrapper (lint_ghdl_synth_*)
+  # Generics of sbi_UART_wrapper (lint_ghdl_synth_*, syn_*)
   #---------------------------------------
   UART_TX_ENABLE :
     description : true, UART TX instantiated
@@ -470,7 +551,7 @@ parameters :
     paramtype   : generic
 
   #---------------------------------------
-  # Generic of sbi_UART_wrapper (lint_ghdl_synth_*) and tb_UART (sim_*)
+  # Generic of sbi_UART_wrapper (lint_ghdl_synth_*, syn_*) and tb_UART (sim_*)
   #---------------------------------------
   RX_PARITY_ERROR :
     description : byte received with a parity error, keep (stored in the RX FIFO), drop, or halt (stored, then RX halted until isr bit 6 is cleared)

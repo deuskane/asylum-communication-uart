@@ -1,7 +1,7 @@
 default                     : Default Target
 lint_ghdl                   : Lint with GHDL (-Wall analysis and elaboration of sbi_UART_wrapper)
 lint_ghdl_synth_default     : Synthesis check of sbi_UART_wrapper, default generics (PicoSoC)
-lint_ghdl_synth_fifo16      : Synthesis check of sbi_UART_wrapper, FIFO depths 16 (tb_uart)
+lint_ghdl_synth_fifo16      : Synthesis check of sbi_UART_wrapper, FIFO depths 16 (tb_UART)
 lint_ghdl_synth_fixed_baud  : Synthesis check of sbi_UART_wrapper, fixed baud tick
 lint_ghdl_synth_parity_drop : Synthesis check of sbi_UART_wrapper, bytes with a parity error dropped
 lint_ghdl_synth_parity_halt : Synthesis check of sbi_UART_wrapper, RX halted after a byte with a parity error
@@ -26,4 +26,11 @@ sim_basic_tx_flow           : Simulation of sbi_UART (UVVM) - TX disabled and CT
 sim_basic_tx_irq            : Simulation of sbi_UART (UVVM) - isr polling of the TX FIFO state, TX FIFO empty interrupt
 sim_rx_parity_drop          : Simulation of sbi_UART (UVVM) - bytes with a parity error dropped (RX_PARITY_ERROR drop), every scenario
 sim_rx_parity_halt          : Simulation of sbi_UART (UVVM) - RX halted after a byte with a parity error (RX_PARITY_ERROR halt), every scenario
+syn_default                 : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, default generics (PicoSoC)
+syn_fifo16                  : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, FIFO depths 16 (tb_UART)
+syn_fixed_baud              : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, fixed baud tick
+syn_parity_drop             : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, bytes with a parity error dropped
+syn_parity_halt             : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, RX halted after a byte with a parity error
+syn_rx_only                 : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, RX only
+syn_tx_only                 : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, TX only
 
