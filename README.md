@@ -232,15 +232,15 @@ Figures of the `syn_*` targets (`make nonreg_syn`, see [Targets](#targets)): [sy
 
 | Configuration | LUT¹ | LUTRAM¹ | FF¹ | CARRY4¹ | MUXF7/F8¹ | BRAM¹ | DSP¹ | Area² (µm²) | kGE³ |
 |---|---|---|---|---|---|---|---|---|---|
-| `syn_default` (default generics, no FIFO) | 359 | 0 | 146 | 8 | 31 | 0 | 0 | 6690.17 | 1.782 |
-| `syn_fifo16` (FIFOs 16 / 16, as `tb_UART`) | 411 | 16 | 171 | 18 | 42 | 0 | 0 | 17646.92 | 4.701 |
-| `syn_tx_only` (no receiver, TX FIFO 4) | 223 | 8 | 91 | 6 | 16 | 0 | 0 | 5142.43 | 1.370 |
-| `syn_rx_only` (no transmitter, RX FIFO 4) | 243 | 8 | 113 | 7 | 14 | 0 | 0 | 6367.36 | 1.696 |
-| `syn_fixed_baud` (no FIFO, fixed divider) | 333 | 0 | 130 | 8 | 4 | 0 | 0 | 5601.62 | 1.492 |
-| `syn_parity_drop` (no FIFO, `RX_PARITY_ERROR = "drop"`) | 363 | 0 | 147 | 8 | 33 | 0 | 0 | 6757.73 | 1.800 |
-| `syn_parity_halt` (no FIFO, `RX_PARITY_ERROR = "halt"`) | 361 | 0 | 146 | 8 | 37 | 0 | 0 | 6722.70 | 1.791 |
+| `syn_default` (default generics, no FIFO) | 223 | 0 | 146 | 8 | 31 | 0 | 0 | 6690.17 | 1.782 |
+| `syn_fifo16` (FIFOs 16 / 16, as `tb_UART`) | 248 | 16 | 171 | 18 | 42 | 0 | 0 | 17646.92 | 4.701 |
+| `syn_tx_only` (no receiver, TX FIFO 4) | 134 | 8 | 91 | 6 | 16 | 0 | 0 | 5142.43 | 1.370 |
+| `syn_rx_only` (no transmitter, RX FIFO 4) | 139 | 8 | 113 | 7 | 14 | 0 | 0 | 6367.36 | 1.696 |
+| `syn_fixed_baud` (no FIFO, fixed divider) | 214 | 0 | 130 | 8 | 4 | 0 | 0 | 5601.62 | 1.492 |
+| `syn_parity_drop` (no FIFO, `RX_PARITY_ERROR = "drop"`) | 226 | 0 | 147 | 8 | 33 | 0 | 0 | 6757.73 | 1.800 |
+| `syn_parity_halt` (no FIFO, `RX_PARITY_ERROR = "halt"`) | 224 | 0 | 146 | 8 | 36 | 0 | 0 | 6722.70 | 1.791 |
 
-¹ Xilinx Artix-7 (LUT6), Yosys 0.33 `synth_xilinx -flatten -noiopad -noclkbuf`, before place and route: every cell of the netlist is counted, Vivado may differ. An `INV` counts as a `LUT1`: `synth_xilinx` puts one on the reset pin of each flip-flop with an active-low reset (169 of the 359 LUTs of `syn_default`; `ctrl_tx.tx_enable` and `ctrl_rx.rx_enable` are resets too). The FIFO storage is in LUTRAM (`RAM32M`), not in BRAM.
+¹ Xilinx Artix-7 (LUT6), Yosys 0.33 `synth_xilinx -flatten -noiopad -noclkbuf`, before place and route: every cell of the netlist is counted, Vivado may differ. Identical cells are merged as a vendor tool does (`opt_merge -share_all`): the inverters of an active-low reset net become one (`ctrl_tx.tx_enable` and `ctrl_rx.rx_enable` are reset nets too); every remaining cell is counted, an `INV` as a `LUT1` (34 of the 223 LUTs of `syn_default`). The FIFO storage is in LUTRAM (`RAM32M`), not in BRAM.
 
 ² SkyWater sky130 `sky130_fd_sc_hd`, typical corner (tt, 25 °C, 1.80 V), Yosys 0.33 `synth` + `dfflibmap` + `abc -liberty`: standard-cell area only, no timing constraint, no buffering, clock tree or placement; the FIFO storage becomes flip-flops (no SRAM macro).
 
