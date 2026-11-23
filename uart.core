@@ -49,9 +49,17 @@ CAPI=2:
 #                               sim_rx_parity_halt,
 #                               lint_ghdl_synth_parity_drop and
 #                               lint_ghdl_synth_parity_halt
+# 2026-11-23  3.1.0    mrosiere uart_core : TX and RX with their baud rate
+#                               generators, TX_ENABLE / RX_ENABLE (constant
+#                               outputs of a removed direction), sbi_UART
+#                               on uart_core, targets sim_core*,
+#                               lint_ghdl_synth_core* and syn_core*,
+#                               synchronizers of uart_rx_i / uart_cts_b_i
+#                               moved into uart_core (internal loopbacks
+#                               of sbi_UART : 2 more clock cycles)
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:3.0.0
+name        : asylum:communication:uart:3.1.0
 description : UART TX and RX
 
 #=========================================
