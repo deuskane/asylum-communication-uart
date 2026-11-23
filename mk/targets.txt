@@ -1,36 +1,49 @@
-default                     : Default Target
-lint_ghdl                   : Lint with GHDL (-Wall analysis and elaboration of sbi_UART_wrapper)
-lint_ghdl_synth_default     : Synthesis check of sbi_UART_wrapper, default generics (PicoSoC)
-lint_ghdl_synth_fifo16      : Synthesis check of sbi_UART_wrapper, FIFO depths 16 (tb_UART)
-lint_ghdl_synth_fixed_baud  : Synthesis check of sbi_UART_wrapper, fixed baud tick
-lint_ghdl_synth_parity_drop : Synthesis check of sbi_UART_wrapper, bytes with a parity error dropped
-lint_ghdl_synth_parity_halt : Synthesis check of sbi_UART_wrapper, RX halted after a byte with a parity error
-lint_ghdl_synth_rx_only     : Synthesis check of sbi_UART_wrapper, RX only
-lint_ghdl_synth_tx_only     : Synthesis check of sbi_UART_wrapper, TX only
-sim_basic                   : Simulation of sbi_UART (UVVM) - build only (scenarios of TESTS_LIST)
-sim_basic_baud              : Simulation of sbi_UART (UVVM) - baud rate written by software (57600 baud)
-sim_basic_echo              : Simulation of sbi_UART (UVVM) - echo mode (tx_use_loopback), CTS# = internal RTS#
-sim_basic_loopback          : Simulation of sbi_UART (UVVM) - internal loopback without, with even and with odd parity, parity mismatch
-sim_basic_parity_policy     : Simulation of sbi_UART (UVVM) - policy on a byte with a parity error (RX_PARITY_ERROR), with a full RX FIFO
-sim_basic_reset_values      : Simulation of sbi_UART (UVVM) - reset values of the pads and registers, read / write of the registers
-sim_basic_rts               : Simulation of sbi_UART (UVVM) - RTS# with a full RX FIFO, rts_enable
-sim_basic_rx                : Simulation of sbi_UART (UVVM) - reception without parity, every pattern
-sim_basic_rx_drift          : Simulation of sbi_UART (UVVM) - reception with a bit period +3 % and -3 %
-sim_basic_rx_errors         : Simulation of sbi_UART (UVVM) - framing error, break and parity error events and interrupts
-sim_basic_rx_glitch         : Simulation of sbi_UART (UVVM) - glitch shorter than half a bit, RX FIFO not empty interrupt, isr records the masked sources
-sim_basic_rx_overrun        : Simulation of sbi_UART (UVVM) - blocking read, RTS# threshold, RX overrun event and interrupt
-sim_basic_rx_parity         : Simulation of sbi_UART (UVVM) - reception with even and odd parity, good and corrupted parity bit
-sim_basic_rx_pending        : Simulation of sbi_UART (UVVM) - read of data during a frame lets the byte waiting in the receiver in, no overrun
-sim_basic_tx                : Simulation of sbi_UART (UVVM) - transmission without, with even and with odd parity, back to back frames
-sim_basic_tx_flow           : Simulation of sbi_UART (UVVM) - TX disabled and CTS# inactive keep the TX bytes, CTS# ignored while cts_enable = 0
-sim_basic_tx_irq            : Simulation of sbi_UART (UVVM) - isr polling of the TX FIFO state, TX FIFO empty interrupt
-sim_rx_parity_drop          : Simulation of sbi_UART (UVVM) - bytes with a parity error dropped (RX_PARITY_ERROR drop), every scenario
-sim_rx_parity_halt          : Simulation of sbi_UART (UVVM) - RX halted after a byte with a parity error (RX_PARITY_ERROR halt), every scenario
-syn_default                 : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, default generics (PicoSoC)
-syn_fifo16                  : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, FIFO depths 16 (tb_UART)
-syn_fixed_baud              : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, fixed baud tick
-syn_parity_drop             : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, bytes with a parity error dropped
-syn_parity_halt             : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, RX halted after a byte with a parity error
-syn_rx_only                 : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, RX only
-syn_tx_only                 : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, TX only
+default                      : Default Target
+lint_ghdl                    : Lint with GHDL (-Wall analysis and elaboration of sbi_UART_wrapper)
+lint_ghdl_synth_core         : Synthesis check of uart_core_wrapper, TX and RX
+lint_ghdl_synth_core_tx_only : Synthesis check of uart_core_wrapper, TX only
+lint_ghdl_synth_default      : Synthesis check of sbi_UART_wrapper, default generics (PicoSoC)
+lint_ghdl_synth_fifo16       : Synthesis check of sbi_UART_wrapper, FIFO depths 16 (tb_UART)
+lint_ghdl_synth_fixed_baud   : Synthesis check of sbi_UART_wrapper, fixed baud tick
+lint_ghdl_synth_parity_drop  : Synthesis check of sbi_UART_wrapper, bytes with a parity error dropped
+lint_ghdl_synth_parity_halt  : Synthesis check of sbi_UART_wrapper, RX halted after a byte with a parity error
+lint_ghdl_synth_rx_only      : Synthesis check of sbi_UART_wrapper, RX only
+lint_ghdl_synth_tx_only      : Synthesis check of sbi_UART_wrapper, TX only
+sim_basic                    : Simulation of sbi_UART (UVVM) - build only (scenarios of TESTS_LIST)
+sim_basic_baud               : Simulation of sbi_UART (UVVM) - baud rate written by software (57600 baud)
+sim_basic_echo               : Simulation of sbi_UART (UVVM) - echo mode (tx_use_loopback), CTS# = internal RTS#
+sim_basic_loopback           : Simulation of sbi_UART (UVVM) - internal loopback without, with even and with odd parity, parity mismatch
+sim_basic_parity_policy      : Simulation of sbi_UART (UVVM) - policy on a byte with a parity error (RX_PARITY_ERROR), with a full RX FIFO
+sim_basic_reset_values       : Simulation of sbi_UART (UVVM) - reset values of the pads and registers, read / write of the registers
+sim_basic_rts                : Simulation of sbi_UART (UVVM) - RTS# with a full RX FIFO, rts_enable
+sim_basic_rx                 : Simulation of sbi_UART (UVVM) - reception without parity, every pattern
+sim_basic_rx_drift           : Simulation of sbi_UART (UVVM) - reception with a bit period +3 % and -3 %
+sim_basic_rx_errors          : Simulation of sbi_UART (UVVM) - framing error, break and parity error events and interrupts
+sim_basic_rx_glitch          : Simulation of sbi_UART (UVVM) - glitch shorter than half a bit, RX FIFO not empty interrupt, isr records the masked sources
+sim_basic_rx_overrun         : Simulation of sbi_UART (UVVM) - blocking read, RTS# threshold, RX overrun event and interrupt
+sim_basic_rx_parity          : Simulation of sbi_UART (UVVM) - reception with even and odd parity, good and corrupted parity bit
+sim_basic_rx_pending         : Simulation of sbi_UART (UVVM) - read of data during a frame lets the byte waiting in the receiver in, no overrun
+sim_basic_tx                 : Simulation of sbi_UART (UVVM) - transmission without, with even and with odd parity, back to back frames
+sim_basic_tx_flow            : Simulation of sbi_UART (UVVM) - TX disabled and CTS# inactive keep the TX bytes, CTS# ignored while cts_enable = 0
+sim_basic_tx_irq             : Simulation of sbi_UART (UVVM) - isr polling of the TX FIFO state, TX FIFO empty interrupt
+sim_core                     : Simulation of uart_core (UVVM) - build only (scenarios of TESTS_LIST)
+sim_core_cts                 : Simulation of uart_core (UVVM) - CTS# back-pressure
+sim_core_disabled            : Simulation of uart_core (UVVM) - TX and RX disabled, predefined outputs
+sim_core_loopback            : Simulation of uart_core (UVVM) - TX looped back to RX at two baud rates, every parity, TX and RX parities set separately
+sim_core_rx                  : Simulation of uart_core (UVVM) - reception without, with even and with odd parity, parity error, cfg_rx_enable_i
+sim_core_rx_errors           : Simulation of uart_core (UVVM) - framing error, break and overrun pulses
+sim_core_rx_only             : Simulation of uart_core (UVVM) - RX only (TX_ENABLE false), predefined outputs of TX
+sim_core_tx                  : Simulation of uart_core (UVVM) - transmission without, with even and with odd parity, cfg_tx_enable_i
+sim_core_tx_only             : Simulation of uart_core (UVVM) - TX only (RX_ENABLE false), predefined outputs of RX
+sim_rx_parity_drop           : Simulation of sbi_UART (UVVM) - bytes with a parity error dropped (RX_PARITY_ERROR drop), every scenario
+sim_rx_parity_halt           : Simulation of sbi_UART (UVVM) - RX halted after a byte with a parity error (RX_PARITY_ERROR halt), every scenario
+syn_core                     : Synthesis (Artix-7, sky130) of uart_core_wrapper, TX and RX
+syn_core_tx_only             : Synthesis (Artix-7, sky130) of uart_core_wrapper, TX only
+syn_default                  : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, default generics (PicoSoC)
+syn_fifo16                   : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, FIFO depths 16 (tb_UART)
+syn_fixed_baud               : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, fixed baud tick
+syn_parity_drop              : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, bytes with a parity error dropped
+syn_parity_halt              : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, RX halted after a byte with a parity error
+syn_rx_only                  : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, RX only
+syn_tx_only                  : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, TX only
 
