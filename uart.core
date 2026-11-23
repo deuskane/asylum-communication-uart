@@ -145,6 +145,7 @@ filesets:
   #---------------------------------------
     files        :
       - syn/sbi_UART_wrapper.vhd
+      - syn/uart_core_wrapper.vhd
     file_type    : vhdlSource-2008
     logical_name : asylum
     # ghdl_synth.sh / ghdl_synth.mk (pre_run hook of lint_ghdl_synth_*)
@@ -253,6 +254,29 @@ targets:
       - RX_PARITY_ERROR=halt
 
   #---------------------------------------
+  # Synthesis check of uart_core_wrapper : uart_core alone (TX and RX, TX
+  # only), 8 data bits, 16-bit baud tick counter
+  #---------------------------------------
+  lint_ghdl_synth_core :
+  #---------------------------------------
+    << : *lint_ghdl_synth
+    description     : Synthesis check of uart_core_wrapper, TX and RX
+    toplevel        : asylum.uart_core_wrapper
+    parameters      :
+      - TX_ENABLE=true
+      - RX_ENABLE=true
+
+  #---------------------------------------
+  lint_ghdl_synth_core_tx_only :
+  #---------------------------------------
+    << : *lint_ghdl_synth
+    description     : Synthesis check of uart_core_wrapper, TX only
+    toplevel        : asylum.uart_core_wrapper
+    parameters      :
+      - TX_ENABLE=true
+      - RX_ENABLE=false
+
+  #---------------------------------------
   # Synthesis : size of sbi_UART_wrapper with the generics of the target,
   # Xilinx Artix-7 (LUT, FF, BRAM, DSP) and sky130 (area), by Yosys and
   # its GHDL plugin. Same configurations as lint_ghdl_synth_*.
@@ -319,6 +343,29 @@ targets:
     description     : Synthesis (Artix-7, sky130) of sbi_UART_wrapper, RX halted after a byte with a parity error
     parameters      :
       - RX_PARITY_ERROR=halt
+
+  #---------------------------------------
+  # Synthesis : size of uart_core_wrapper, same configurations as
+  # lint_ghdl_synth_core*
+  #---------------------------------------
+  syn_core :
+  #---------------------------------------
+    << : *syn
+    description     : Synthesis (Artix-7, sky130) of uart_core_wrapper, TX and RX
+    toplevel        : asylum.uart_core_wrapper
+    parameters      :
+      - TX_ENABLE=true
+      - RX_ENABLE=true
+
+  #---------------------------------------
+  syn_core_tx_only :
+  #---------------------------------------
+    << : *syn
+    description     : Synthesis (Artix-7, sky130) of uart_core_wrapper, TX only
+    toplevel        : asylum.uart_core_wrapper
+    parameters      :
+      - TX_ENABLE=true
+      - RX_ENABLE=false
 
   #---------------------------------------
   # tb_UART (sim/basic) : compiled once per configuration
@@ -682,7 +729,8 @@ parameters :
     paramtype   : generic
 
   #---------------------------------------
-  # Generics of tb_uart_core (sim_core*)
+  # Generics of tb_uart_core (sim_core*) and uart_core_wrapper
+  # (lint_ghdl_synth_core*, syn_core*)
   #---------------------------------------
   TX_ENABLE :
     description : true, uart_core with its transmitter
