@@ -13,217 +13,227 @@
         <mxCell id="uart-ov-3" value="sbi_UART" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="160" y="130" width="90" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-4" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+        <mxCell id="uart-ov-4" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="548" y="248" width="312" height="294" as="geometry"/>
+        </mxCell>
+        <mxCell id="uart-ov-5" value="uart_core" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="548" y="248" width="80" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="uart-ov-6" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="200" y="170" width="200" height="420" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-5" value="UART_registers" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+        <mxCell id="uart-ov-7" value="UART_registers" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="200" y="170" width="120" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-6" value="isr (rw1c), imr&lt;br&gt;ctrl_tx, ctrl_rx&lt;br&gt;baud_tick_cnt_max" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-8" value="isr (rw1c), imr&lt;br&gt;ctrl_tx, ctrl_rx&lt;br&gt;baud_tick_cnt_max" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
           <mxGeometry x="210" y="195" width="185" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-7" value="M" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxCell id="uart-ov-9" value="M" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="40" y="270" width="20" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-8" value="S" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxCell id="uart-ov-10" value="S" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="200" y="270" width="20" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;startArrow=classic;startFill=1;strokeWidth=2;" edge="1" parent="1">
+        <mxCell id="uart-ov-11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;startArrow=classic;startFill=1;strokeWidth=2;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="60" y="280" as="sourcePoint"/>
             <mxPoint x="200" y="280" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-10" value="SBI" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=center;" vertex="1" parent="1">
+        <mxCell id="uart-ov-12" value="SBI" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=center;" vertex="1" parent="1">
           <mxGeometry x="70" y="252" width="70" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-11" value="FIFO" style="strokeWidth=2;html=1;shape=mxgraph.lean_mapping.fifo_sequence_flow;pointerEvents=1;fontStyle=0;fontSize=12;align=center;direction=east;" vertex="1" parent="1">
+        <mxCell id="uart-ov-13" value="FIFO" style="strokeWidth=2;html=1;shape=mxgraph.lean_mapping.fifo_sequence_flow;pointerEvents=1;fontStyle=0;fontSize=12;align=center;direction=east;" vertex="1" parent="1">
           <mxGeometry x="330" y="330" width="60" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-12" value="data (write)" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-14" value="data (write)" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
           <mxGeometry x="245" y="325" width="80" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-13" value="FIFO" style="strokeWidth=2;html=1;shape=mxgraph.lean_mapping.fifo_sequence_flow;pointerEvents=1;fontStyle=0;fontSize=12;align=center;direction=east;flipH=1;" vertex="1" parent="1">
+        <mxCell id="uart-ov-15" value="FIFO" style="strokeWidth=2;html=1;shape=mxgraph.lean_mapping.fifo_sequence_flow;pointerEvents=1;fontStyle=0;fontSize=12;align=center;direction=east;flipH=1;" vertex="1" parent="1">
           <mxGeometry x="330" y="450" width="60" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-14" value="data (read)" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-16" value="data (read)" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
           <mxGeometry x="245" y="445" width="80" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-15" value="echo mux&lt;br&gt;tx_use_loopback" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="uart-ov-17" value="echo mux&lt;br&gt;tx_use_loopback" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="430" y="320" width="100" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-16" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-18" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="390" y="340" as="sourcePoint"/>
             <mxPoint x="430" y="340" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-17" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="530" y="340" as="sourcePoint"/>
             <mxPoint x="560" y="340" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-18" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="uart-ov-20" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="560" y="280" width="180" height="110" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-19" value="uart_tx_axis" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+        <mxCell id="uart-ov-21" value="uart_tx_axis" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="560" y="280" width="100" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-20" value="" style="points=[];aspect=fixed;html=1;align=center;shadow=0;dashed=0;fillColor=#FF6A00;strokeColor=none;shape=mxgraph.alibaba_cloud.multi-cloud_finops;" vertex="1" parent="1">
+        <mxCell id="uart-ov-22" value="" style="points=[];aspect=fixed;html=1;align=center;shadow=0;dashed=0;fillColor=#FF6A00;strokeColor=none;shape=mxgraph.alibaba_cloud.multi-cloud_finops;" vertex="1" parent="1">
           <mxGeometry x="585" y="305" width="45" height="32.14" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-21" value="shift register,&lt;br&gt;parity" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-23" value="shift register,&lt;br&gt;parity" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
           <mxGeometry x="635" y="300" width="105" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-22" value="uart_baud_rate_gen" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="uart-ov-24" value="uart_baud_rate_gen" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="575" y="350" width="150" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-23" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="uart-ov-25" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="560" y="420" width="180" height="110" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-24" value="uart_rx_axis" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+        <mxCell id="uart-ov-26" value="uart_rx_axis" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="560" y="420" width="100" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-25" value="" style="points=[];aspect=fixed;html=1;align=center;shadow=0;dashed=0;fillColor=#FF6A00;strokeColor=none;shape=mxgraph.alibaba_cloud.multi-cloud_finops;" vertex="1" parent="1">
+        <mxCell id="uart-ov-27" value="" style="points=[];aspect=fixed;html=1;align=center;shadow=0;dashed=0;fillColor=#FF6A00;strokeColor=none;shape=mxgraph.alibaba_cloud.multi-cloud_finops;" vertex="1" parent="1">
           <mxGeometry x="585" y="445" width="45" height="32.14" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-26" value="FSM, parity,&lt;br&gt;stop, overrun" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-28" value="FSM, parity,&lt;br&gt;stop, overrun" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
           <mxGeometry x="635" y="440" width="105" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-27" value="uart_baud_rate_gen" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="uart-ov-29" value="uart_baud_rate_gen" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="575" y="490" width="150" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-28" value="parity policy&lt;br&gt;keep / drop / halt" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="uart-ov-30" value="parity policy&lt;br&gt;keep / drop / halt" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="430" y="440" width="100" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-29" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-31" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="560" y="460" as="sourcePoint"/>
             <mxPoint x="530" y="460" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-30" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-32" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="430" y="460" as="sourcePoint"/>
             <mxPoint x="390" y="460" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-31" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-33" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="480" y="440" as="sourcePoint"/>
             <mxPoint x="480" y="360" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-32" value="echo" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;fontSize=10;fontColor=#666666;fontStyle=2;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-34" value="echo" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;fontSize=10;fontColor=#666666;fontStyle=2;align=left;" vertex="1" parent="1">
           <mxGeometry x="485" y="385" width="60" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-33" value="rx loopback mux&lt;br&gt;rx_use_loopback" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="765" y="475" width="95" height="40" as="geometry"/>
+        <mxCell id="uart-ov-35" value="rx loopback mux&lt;br&gt;rx_use_loopback" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="880" y="475" width="95" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-34" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-36" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="812" y="320" as="sourcePoint"/>
-            <mxPoint x="812" y="475" as="targetPoint"/>
+            <mxPoint x="870" y="320" as="sourcePoint"/>
+            <mxPoint x="927" y="475" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="870" y="465"/>
+              <mxPoint x="927" y="465"/>
+            </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-35" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-37" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="765" y="495" as="sourcePoint"/>
+            <mxPoint x="760" y="495" as="sourcePoint"/>
             <mxPoint x="740" y="495" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-36" value="sync2dffrn" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="880" y="360" width="90" height="30" as="geometry"/>
+        <mxCell id="uart-ov-38" value="sync2dffrn" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="760" y="360" width="90" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-37" value="RTS# register&lt;br&gt;RX FIFO level" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+        <mxCell id="uart-ov-39" value="RTS# register&lt;br&gt;RX FIFO level" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="880" y="415" width="90" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-38" value="sync2dffrn" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="880" y="480" width="90" height="30" as="geometry"/>
+        <mxCell id="uart-ov-40" value="sync2dffrn" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="760" y="480" width="90" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-39" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-41" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="880" y="375" as="sourcePoint"/>
+            <mxPoint x="760" y="375" as="sourcePoint"/>
             <mxPoint x="740" y="375" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-40" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-42" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="880" y="495" as="sourcePoint"/>
-            <mxPoint x="860" y="495" as="targetPoint"/>
+            <mxPoint x="850" y="495" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-41" value="GIC_core&lt;br&gt;OR(isr and imr)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="uart-ov-43" value="GIC_core&lt;br&gt;OR(isr and imr)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="430" y="548" width="100" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-42" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;startArrow=classic;startFill=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-44" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;startArrow=classic;startFill=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="400" y="568" as="sourcePoint"/>
             <mxPoint x="430" y="568" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-43" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+        <mxCell id="uart-ov-45" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="1030" y="310" width="20" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-44" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-46" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="740" y="320" as="sourcePoint"/>
             <mxPoint x="1030" y="320" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-45" value="uart_tx_o" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-47" value="uart_tx_o" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
           <mxGeometry x="1060" y="305" width="170" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-46" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+        <mxCell id="uart-ov-48" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="1030" y="365" width="20" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-47" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-49" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="1030" y="375" as="sourcePoint"/>
-            <mxPoint x="970" y="375" as="targetPoint"/>
+            <mxPoint x="850" y="375" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-48" value="uart_cts_b_i" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-50" value="uart_cts_b_i" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
           <mxGeometry x="1060" y="360" width="170" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-49" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+        <mxCell id="uart-ov-51" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="1030" y="425" width="20" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-50" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-52" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="970" y="435" as="sourcePoint"/>
             <mxPoint x="1030" y="435" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-51" value="uart_rts_b_o" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-53" value="uart_rts_b_o" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
           <mxGeometry x="1060" y="420" width="170" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-52" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+        <mxCell id="uart-ov-54" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="1030" y="485" width="20" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-53" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-55" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="1030" y="495" as="sourcePoint"/>
-            <mxPoint x="970" y="495" as="targetPoint"/>
+            <mxPoint x="975" y="495" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-54" value="uart_rx_i" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-56" value="uart_rx_i" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
           <mxGeometry x="1060" y="480" width="170" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-55" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+        <mxCell id="uart-ov-57" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="1030" y="558" width="20" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-56" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
+        <mxCell id="uart-ov-58" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="530" y="568" as="sourcePoint"/>
             <mxPoint x="1030" y="568" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="uart-ov-57" value="it_o" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
+        <mxCell id="uart-ov-59" value="it_o" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;align=left;" vertex="1" parent="1">
           <mxGeometry x="1060" y="553" width="170" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="uart-ov-58" value="ctrl_tx.tx_enable / ctrl_rx.rx_enable are the resets of the TX / RX paths (uart_*_axis and their uart_baud_rate_gen)" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;fontSize=10;fontColor=#666666;fontStyle=2;align=center;" vertex="1" parent="1">
+        <mxCell id="uart-ov-60" value="ctrl_tx.tx_enable / ctrl_rx.rx_enable (cfg_tx_enable_i / cfg_rx_enable_i of uart_core) hold the TX / RX paths in reset (uart_*_axis and their uart_baud_rate_gen)" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;verticalAlign=middle;rounded=0;fontSize=10;fontColor=#666666;fontStyle=2;align=center;" vertex="1" parent="1">
           <mxGeometry x="160" y="625" width="840" height="30" as="geometry"/>
         </mxCell>
       </root>
