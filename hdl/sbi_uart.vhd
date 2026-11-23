@@ -39,6 +39,13 @@
 --                              parity error is stored (or echoed), then RX
 --                              is halted (RTS# deasserted) until isr bit 6
 --                              is cleared
+-- 2026-11-23  1.11    mrosiere TX and RX in uart_core : the loopbacks
+--                              (tx_use_loopback, rx_use_loopback) need
+--                              both directions, the outputs of a missing
+--                              direction come from uart_core. The
+--                              synchronizers of uart_rx_i and uart_cts_b_i
+--                              are in uart_core : the internal loopbacks
+--                              go through them (2 more clock cycles)
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -53,7 +60,6 @@ use     asylum.uart_pkg.ALL;
 use     asylum.GIC_pkg.ALL;
 use     asylum.UART_csr_pkg.ALL;
 use     asylum.sbi_pkg.all;
-use     asylum.techmap_pkg.all;
 
 entity sbi_UART is
   generic (
@@ -123,20 +129,17 @@ architecture rtl of sbi_UART is
   constant RX_PARITY_ERROR_DROP   : boolean := RX_PARITY_ERROR = "drop";
   constant RX_PARITY_ERROR_HALT   : boolean := RX_PARITY_ERROR = "halt";
 
+  -- Echo mode (tx_use_loopback) and internal loopback (rx_use_loopback)
+  -- need both directions
+  constant LOOPBACK_ENABLE        : boolean := UART_TX_ENABLE and UART_RX_ENABLE;
+
   signal   uart_tx                : std_logic;
   signal   uart_rx                : std_logic;
-  signal   uart_rx_b              : std_logic;
-  signal   uart_rx_b_sync         : std_logic;
-  signal   uart_rx_sync           : std_logic;
 
-  signal   uart_cts_b_sync        : std_logic;
   signal   uart_cts_b             : std_logic;
   signal   uart_rts_b             : std_logic;
 
-  
-  signal   tx_baud_tick_en        : std_logic;
-  signal   tx_baud_tick           : std_logic;
-           
+ 
   signal   tx_tdata               : std_logic_vector(8-1 downto 0);
   signal   tx_tvalid              : std_logic;
   signal   tx_tready              : std_logic;
@@ -149,10 +152,7 @@ architecture rtl of sbi_UART is
   signal   rx_halt                : std_logic;
   signal   rx_sink_tvalid         : std_logic;
   signal   rx_sink_tready         : std_logic;
-           
-  signal   rx_baud_tick_en        : std_logic;
-  signal   rx_baud_tick           : std_logic;
-  signal   rx_baud_tick_half      : std_logic;
+ 
   signal   rx_err_overrun         : std_logic;
   signal   rx_err_framing         : std_logic;
   signal   rx_err_parity          : std_logic;
@@ -197,32 +197,6 @@ begin  -- architecture rtl
     severity failure;
 
   -----------------------------------------------------------------------------
-  -- Input of UART
-  -----------------------------------------------------------------------------
-  ins_uart_cts_b_sync : sync2dffrn
-    port map
-    (clk_i    => clk_i     
-    ,arst_b_i => arst_b_i
-    ,d_i      => uart_cts_b_i
-    ,q_o      => uart_cts_b_sync
-    );
-
-  -- RX is asynchronous : synchronize it before the receiver FSM.
-  -- sync2dffrn is reset to '0', so the inverted line is synchronized
-  -- to have the idle level ('1') on uart_rx_sync during reset
-  uart_rx_b            <= not uart_rx_i;
-
-  ins_uart_rx_b_sync : sync2dffrn
-    port map
-    (clk_i    => clk_i
-    ,arst_b_i => arst_b_i
-    ,d_i      => uart_rx_b
-    ,q_o      => uart_rx_b_sync
-    );
-
-  uart_rx_sync         <= not uart_rx_b_sync;
-
-  -----------------------------------------------------------------------------
   -- Output of UART
   -----------------------------------------------------------------------------
   uart_tx_o            <= uart_tx;
@@ -253,99 +227,116 @@ begin  -- architecture rtl
                            sw2hw.baud_tick_cnt_max_lsb.value);
 
   -----------------------------------------------------------------------------
-  -- UART TX
+  -- UART TX and RX
   -----------------------------------------------------------------------------
-  gen_uart_tx: if UART_TX_ENABLE = true
-  generate
-    -- UART TX CSR Input
-    tx_enable            <= sw2hw.ctrl_tx.tx_enable       (0);
-    tx_parity_enable     <= sw2hw.ctrl_tx.tx_parity_enable(0);
-    tx_parity_odd        <= sw2hw.ctrl_tx.tx_parity_odd   (0);
-    tx_use_loopback      <= sw2hw.ctrl_tx.tx_use_loopback (0);
-    cts_enable           <= sw2hw.ctrl_tx.cts_enable      (0);
+  -- UART TX CSR Input
+  tx_enable            <= sw2hw.ctrl_tx.tx_enable       (0);
+  tx_parity_enable     <= sw2hw.ctrl_tx.tx_parity_enable(0);
+  tx_parity_odd        <= sw2hw.ctrl_tx.tx_parity_odd   (0);
+  tx_use_loopback      <= sw2hw.ctrl_tx.tx_use_loopback (0) when LOOPBACK_ENABLE else
+                          '0';
+  cts_enable           <= sw2hw.ctrl_tx.cts_enable      (0);
 
-    -- Instanciate UART TX Baud Rate Generator
-    ins_uart_tx_baud_rate_gen : uart_baud_rate_gen
-      generic map
-      (BAUD_TICK_CNT_WIDTH     => BAUD_TICK_CNT_WIDTH
-       )
-      port map
-      (clk_i                   => clk_i
-      ,arst_b_i                => tx_enable
-      ,baud_tick_en_i          => tx_baud_tick_en
-      ,baud_tick_o             => tx_baud_tick
-      ,baud_tick_half_o        => open
-      ,cfg_baud_tick_cnt_max_i => baud_tick_cnt_max
-      );
+  -- UART RX CSR Input
+  rx_enable            <= sw2hw.ctrl_rx.rx_enable       (0);
+  rx_parity_enable     <= sw2hw.ctrl_rx.rx_parity_enable(0);
+  rx_parity_odd        <= sw2hw.ctrl_rx.rx_parity_odd   (0);
+  rx_use_loopback      <= sw2hw.ctrl_rx.rx_use_loopback (0) when LOOPBACK_ENABLE else
+                          '0';
+  rts_enable           <= sw2hw.ctrl_rx.rts_enable      (0);
 
-    tx_baud_tick_en  <= '1';
+  -- A missing direction (UART_TX_ENABLE / UART_RX_ENABLE = false) has
+  -- constant outputs : TX : line idle, writes to data accepted and dropped
+  -- (tx_tready = 1) ; RX : no byte, no error
+  -- uart_rx and uart_cts_b (pads or internal loopbacks) are synchronized
+  -- in uart_core (sync2dffrn, 2 clock cycles)
+  ins_uart_core : uart_core
+    generic map
+    (TX_ENABLE               => UART_TX_ENABLE
+    ,RX_ENABLE               => UART_RX_ENABLE
+    ,WIDTH                   => 8
+    ,BAUD_TICK_CNT_WIDTH     => BAUD_TICK_CNT_WIDTH
+    )
+    port map
+    (clk_i                   => clk_i
+    ,arst_b_i                => arst_b_i
+    ,cfg_baud_tick_cnt_max_i => baud_tick_cnt_max
+    ,cfg_tx_enable_i         => tx_enable
+    ,cfg_tx_parity_enable_i  => tx_parity_enable
+    ,cfg_tx_parity_odd_i     => tx_parity_odd
+    ,cfg_rx_enable_i         => rx_enable
+    ,cfg_rx_parity_enable_i  => rx_parity_enable
+    ,cfg_rx_parity_odd_i     => rx_parity_odd
+    ,s_axis_tdata_i          => tx_tdata
+    ,s_axis_tvalid_i         => tx_tvalid
+    ,s_axis_tready_o         => tx_tready
+    ,uart_tx_o               => uart_tx
+    ,uart_cts_b_i            => uart_cts_b
+    ,uart_rx_i               => uart_rx
+    ,m_axis_tdata_o          => rx_tdata
+    ,m_axis_parity_error_o   => rx_data_parity_error -- Parity error of rx_tdata
+    ,m_axis_tvalid_o         => rx_tvalid
+    ,m_axis_tready_i         => rx_tready
+    ,err_overrun_o           => rx_err_overrun
+    ,err_parity_o            => rx_err_parity
+    ,err_framing_o           => rx_err_framing
+    ,err_break_o             => rx_err_break
+    ,debug_o                 => debug_o
+    );
 
-    ins_uart_tx_axis : uart_tx_axis
-      generic map
-      ( WIDTH           => 8
-        )
-      port map
-      ( clk_i           => clk_i
-       ,arst_b_i        => tx_enable
-       ,s_axis_tdata_i  => tx_tdata 
-       ,s_axis_tvalid_i => tx_tvalid
-       ,s_axis_tready_o => tx_tready
-       ,uart_tx_o       => uart_tx
-       ,uart_cts_b_i    => uart_cts_b
-       ,baud_tick_i     => tx_baud_tick
-       ,parity_enable_i => tx_parity_enable
-       ,parity_odd_i    => tx_parity_odd
-       ,debug_o         => debug_o.uart_tx 
-        );
-    
-    gen_uart_rx: if UART_RX_ENABLE = true
-    generate
-      -- Have RX, can implement loopback
-      tx_tdata         <= sw2hw.data.value when tx_use_loopback = '0' else
+  -----------------------------------------------------------------------------
+  -- UART TX : data written by software, or received bytes in echo mode
+  -----------------------------------------------------------------------------
+  tx_tdata             <= sw2hw.data.value when tx_use_loopback = '0' else
                           rx_tdata ;
-      tx_tvalid        <= sw2hw.data.valid when tx_use_loopback = '0' else
+  tx_tvalid            <= sw2hw.data.valid when tx_use_loopback = '0' else
                           rx_sink_tvalid;
-      hw2sw.data.ready <= tx_tready        when tx_use_loopback = '0' else
+  hw2sw.data.ready     <= tx_tready        when tx_use_loopback = '0' else
                           '1';-- Always accept 
-      uart_cts_b       <= '0'              when cts_enable      = '0' else -- Always Active
-                          uart_cts_b_sync  when tx_use_loopback = '0' else
+  uart_cts_b           <= '0'              when cts_enable      = '0' else -- Always Active
+                          uart_cts_b_i     when tx_use_loopback = '0' else
                           uart_rts_b;                                      -- Loop With RTS from RX
-    end generate gen_uart_rx;
-
-    gen_uart_rx_b: if UART_RX_ENABLE = false
-    generate
-      -- No RX, no loopback
-      tx_tdata         <= sw2hw.data.value;
-      tx_tvalid        <= sw2hw.data.valid;
-      hw2sw.data.ready <= tx_tready;
-      uart_cts_b       <= '0'              when cts_enable      = '0' else
-                          uart_cts_b_sync;
-    end generate gen_uart_rx_b;
-    
-  end generate gen_uart_tx;
 
   -----------------------------------------------------------------------------
-  -- No UART TX
+  -- UART RX : pad or internal loopback ; received bytes to software, or to
+  -- TX in echo mode
   -----------------------------------------------------------------------------
-  gen_uart_tx_b: if UART_TX_ENABLE = false
-  generate
-    hw2sw.data.ready     <= '1';
-    uart_tx              <= '1';
-    tx_use_loopback      <= '0';
-    debug_o.uart_tx.state<= '0';
-  end generate gen_uart_tx_b;
+  uart_rx              <= uart_tx          when rx_use_loopback = '1' else
+                          uart_rx_i;
+
+  hw2sw.data.value     <= rx_tdata         when tx_use_loopback = '0' else (others => '0');
+  hw2sw.data.valid     <= rx_sink_tvalid   when tx_use_loopback = '0' else '0';
+  rx_sink_tready       <= sw2hw.data.ready when tx_use_loopback = '0' else tx_tready;
+
+  -- Policy on a byte received with a parity error (rx_data_parity_error = 1) :
+  -- "drop" : the byte is consumed (rx_tready forced to 1) and not given
+  -- to the sinks. "halt" : the byte is given to the sink, which sets isr
+  -- bit 6 (it_rx_parity) at the clock edge of the transfer : RX is
+  -- halted until software clears this bit, no byte is given to the sinks
+  -- (the next byte waits in uart_core, the following ones are
+  -- overruns), so the byte with the parity error is the last byte of the
+  -- RX FIFO. rx_sink_tvalid is the valid of every sink : RX FIFO
+  -- (hw2sw.data, RX FIFO level), TX in echo mode, simulation dump
+  rx_drop              <= rx_data_parity_error when RX_PARITY_ERROR_DROP else
+                          '0';
+  rx_halt              <= sw2hw.isr.value(6) when RX_PARITY_ERROR_HALT else
+                          '0';
+  rx_sink_tvalid       <= rx_tvalid and not rx_drop and not rx_halt;
+  rx_tready            <= (rx_sink_tready or rx_drop) and not rx_halt;
+
+  -- Parity error event : end of the frame ("keep", "drop", a frame
+  -- dropped by an overrun included), or transfer of the byte to the
+  -- sink ("halt" : a frame dropped by an overrun only raises the overrun
+  -- event, a byte waiting for room in the RX FIFO raises it when it
+  -- enters the RX FIFO)
+  it_rx_parity         <= (rx_sink_tvalid and rx_tready and rx_data_parity_error) when RX_PARITY_ERROR_HALT else
+                          rx_err_parity;
 
   -----------------------------------------------------------------------------
-  -- UART RX
+  -- UART RX : RTS#
   -----------------------------------------------------------------------------
   gen_uart_rx: if UART_RX_ENABLE = true
   generate
-    rx_enable            <= sw2hw.ctrl_rx.rx_enable       (0);
-    rx_parity_enable     <= sw2hw.ctrl_rx.rx_parity_enable(0);
-    rx_parity_odd        <= sw2hw.ctrl_rx.rx_parity_odd   (0);
-    rx_use_loopback      <= sw2hw.ctrl_rx.rx_use_loopback (0);
-    rts_enable           <= sw2hw.ctrl_rx.rts_enable      (0);
-
     -- RTS# is registered : no glitch on the pad from the combinational
     -- comparison of the RX FIFO level. Also deasserted while RX is halted
     -- ("halt"), so that a flow-controlled sender stops
@@ -367,7 +358,7 @@ begin  -- architecture rtl
 
     -- Number of bytes in the RX FIFO, tracked with the FIFO handshakes
     -- (csr_fifo does not export its number of elements nor its pop) :
-    -- push = byte written by uart_rx_axis, pop = read of data by software.
+    -- push = byte written by uart_core, pop = read of data by software.
     -- csr_fifo pops on the cycle where the read of data is not blocked
     -- (RX FIFO not empty) : the cycle where the SBI access completes, so a
     -- blocking read lasting several cycles is one pop
@@ -404,111 +395,11 @@ begin  -- architecture rtl
       -- No FIFO : RTS# deasserted while a received byte is pending
       rx_fifo_almost_full <= it_rx_full;
     end generate gen_rx_fifo_b;
-    
-    ins_uart_rx_baud_rate_gen : uart_baud_rate_gen
-      generic map
-      (BAUD_TICK_CNT_WIDTH     => BAUD_TICK_CNT_WIDTH
-       )
-      port map
-      (clk_i                   => clk_i
-      ,arst_b_i                => rx_enable
-      ,baud_tick_en_i          => rx_baud_tick_en
-      ,baud_tick_o             => rx_baud_tick
-      ,baud_tick_half_o        => rx_baud_tick_half
-      ,cfg_baud_tick_cnt_max_i => baud_tick_cnt_max
-      );
-
-    ins_uart_rx_axis : uart_rx_axis
-      generic map
-      ( WIDTH              => 8
-        )
-      port map
-      ( clk_i           => clk_i
-       ,arst_b_i        => rx_enable
-       ,m_axis_tdata_o  => rx_tdata 
-       ,m_axis_parity_error_o => rx_data_parity_error -- Parity error of rx_tdata
-       ,m_axis_tvalid_o => rx_tvalid
-       ,m_axis_tready_i => rx_tready
-       ,uart_rx_i       => uart_rx
-       ,baud_tick_en_o  => rx_baud_tick_en
-       ,baud_tick_i     => rx_baud_tick
-       ,baud_tick_half_i=> rx_baud_tick_half
-       ,parity_enable_i => rx_parity_enable
-       ,parity_odd_i    => rx_parity_odd
-       ,last_parity_error_o => open -- available on debug_o.uart_rx.parity_error
-       ,err_overrun_o   => rx_err_overrun
-       ,err_parity_o    => rx_err_parity
-       ,err_framing_o   => rx_err_framing
-       ,err_break_o     => rx_err_break
-       ,debug_o         => debug_o.uart_rx
-
-        );
-
-    -- Policy on a byte received with a parity error (rx_data_parity_error = 1) :
-    -- "drop" : the byte is consumed (rx_tready forced to 1) and not given
-    -- to the sinks. "halt" : the byte is given to the sink, which sets isr
-    -- bit 6 (it_rx_parity) at the clock edge of the transfer : RX is
-    -- halted until software clears this bit, no byte is given to the sinks
-    -- (the next byte waits in uart_rx_axis, the following ones are
-    -- overruns), so the byte with the parity error is the last byte of the
-    -- RX FIFO. rx_sink_tvalid is the valid of every sink : RX FIFO
-    -- (hw2sw.data, RX FIFO level), TX in echo mode, simulation dump
-    rx_drop            <= rx_data_parity_error when RX_PARITY_ERROR_DROP else
-                          '0';
-    rx_halt            <= sw2hw.isr.value(6) when RX_PARITY_ERROR_HALT else
-                          '0';
-    rx_sink_tvalid     <= rx_tvalid and not rx_drop and not rx_halt;
-    rx_tready          <= (rx_sink_tready or rx_drop) and not rx_halt;
-
-    -- Parity error event : end of the frame ("keep", "drop", a frame
-    -- dropped by an overrun included), or transfer of the byte to the
-    -- sink ("halt" : a frame dropped by an overrun only raises the overrun
-    -- event, a byte waiting for room in the RX FIFO raises it when it
-    -- enters the RX FIFO)
-    it_rx_parity       <= (rx_sink_tvalid and rx_tready and rx_data_parity_error) when RX_PARITY_ERROR_HALT else
-                          rx_err_parity;
-
-    gen_uart_tx: if UART_TX_ENABLE = true
-    generate
-      uart_rx          <= uart_tx when rx_use_loopback = '1' else
-                          uart_rx_sync;
-
-      hw2sw.data.value <= rx_tdata         when tx_use_loopback = '0' else (others => '0');
-      hw2sw.data.valid <= rx_sink_tvalid   when tx_use_loopback = '0' else '0';
-      rx_sink_tready   <= sw2hw.data.ready when tx_use_loopback = '0' else tx_tready;
-    end generate gen_uart_tx;
-
-    gen_uart_tx_b: if UART_TX_ENABLE = false
-    generate
-      -- No TX, No loopback
-      uart_rx          <= uart_rx_sync;
-
-      hw2sw.data.value <= rx_tdata ;
-      hw2sw.data.valid <= rx_sink_tvalid;
-      rx_sink_tready   <= sw2hw.data.ready;
-    end generate gen_uart_tx_b;
-
   end generate gen_uart_rx;
 
-  -----------------------------------------------------------------------------
-  -- No UART RX
-  -----------------------------------------------------------------------------
   gen_uart_rx_b: if UART_RX_ENABLE = false
   generate
-
-    hw2sw.data.value               <= (others => '0');
-    hw2sw.data.valid               <= '0';
-    uart_rts_b                     <= '0';
-    rx_err_overrun                 <= '0';
-    rx_err_framing                 <= '0';
-    rx_err_parity                  <= '0';
-    rx_err_break                   <= '0';
-    it_rx_parity                   <= '0';
-    debug_o.uart_rx.state          <= (others => '0');
-    debug_o.uart_rx.bit_cnt        <= (others => '0');
-    debug_o.uart_rx.baud_tick_half <= '0';
-    debug_o.uart_rx.parity_error   <= '0';
-    
+    uart_rts_b         <= '0';
   end generate gen_uart_rx_b;
 
   -----------------------------------------------------------------------------
@@ -570,7 +461,8 @@ begin  -- architecture rtl
     if rising_edge(clk_i)
     then
 
-      if (tx_tvalid and tx_tready)
+      -- No TX : the bytes written to data are dropped, not sent
+      if (tx_tvalid and tx_tready) = '1' and UART_TX_ENABLE
       then
         write    (line_buffer, tx_tdata);
         write    (line_buffer, string'(" - 0x"));

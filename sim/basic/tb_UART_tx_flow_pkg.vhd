@@ -15,6 +15,8 @@
 -- Revisions  :
 -- Date        Version  Author   Description
 -- 2026-11-20  1.0      mrosiere Created (from tb_uart, test 10)
+-- 2026-11-23  1.1      mrosiere cts_enable = 1 : wait for CTS# through the
+--                               synchronizer (now after the CTS# mux)
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -67,7 +69,9 @@ package body tb_UART_tx_flow_pkg is
     wr(UART_DATA, x"E1", "Write UART TX 0xE1, CTS# inactive and cts_enable = 0", clk, sbi_if);
     uart_expect(x"E1", PARITY_NONE, "CTS# ignored while cts_enable = 0", tx);
     -- cts_enable = 1 : no frame while CTS# is inactive
+    -- (CTS# selected before its synchronizer in uart_core : wait for it)
     wr(UART_CTRL_TX, CTRL_EN or CTRL_FLOW_CTRL, "Enable UART TX with CTS", clk, sbi_if);
+    cycles(3, clk);
     wr(UART_DATA, x"D2", "Write UART TX 0xD2 while CTS# is inactive", clk, sbi_if);
     wr(UART_DATA, x"2D", "Write UART TX 0x2D while CTS# is inactive", clk, sbi_if);
     chk_idle(tx, 3 * 12 * C_BIT_PERIOD, "No frame while CTS# is inactive");
