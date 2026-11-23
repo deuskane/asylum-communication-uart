@@ -18,6 +18,7 @@
 --                               m_axis_parity_error_o in uart_rx_axis,
 --                               parity_error_o renamed
 --                               last_parity_error_o
+-- 2026-11-23  1.5      mrosiere Add uart_core
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -69,7 +70,11 @@ component sbi_UART is
     USER_DEFINE_BAUD_TICK : boolean := true;
     DEPTH_TX              : natural := 0;
     DEPTH_RX              : natural := 0;
-    RX_PARITY_ERROR       : string  := "keep"; -- "keep" / "drop" / "halt"
+    -- Byte received with a parity error (parity error event : isr / imr
+    -- source 6) : "keep" : stored in the RX FIFO (or echoed), "drop" :
+    -- dropped, "halt" : stored (or echoed), then RX halted until software
+    -- clears isr bit 6 (the byte is the last one of the RX FIFO)
+    RX_PARITY_ERROR       : string  := "keep";
     
     FILENAME_TX           : string  := "dump_uart_tx.txt";
     FILENAME_RX           : string  := "dump_uart_rx.txt"
@@ -114,6 +119,49 @@ component uart_baud_rate_gen is
     cfg_baud_tick_cnt_max_i : in  std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0)
   );
 end component uart_baud_rate_gen;
+
+component uart_core is
+  generic (
+    TX_ENABLE               : boolean := true  -- Transmitter instantiated
+   ;RX_ENABLE               : boolean := true  -- Receiver    instantiated
+   ;WIDTH                   : natural := 8     -- Data width
+   ;BAUD_TICK_CNT_WIDTH     : natural := 16    -- Width of cfg_baud_tick_cnt_max_i
+  );
+  port (
+    -- Clock and Reset
+    clk_i                   : in  std_logic
+   ;arst_b_i                : in  std_logic
+    -- Configuration
+   ;cfg_baud_tick_cnt_max_i : in  std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) -- Clock cycles per bit - 1 (TX and RX)
+   ;cfg_tx_enable_i         : in  std_logic  -- 0 : TX held in reset
+   ;cfg_tx_parity_enable_i  : in  std_logic  -- 1 : TX sends a parity bit
+   ;cfg_tx_parity_odd_i     : in  std_logic  -- 0 : even, 1 : odd parity
+   ;cfg_rx_enable_i         : in  std_logic  -- 0 : RX held in reset
+   ;cfg_rx_parity_enable_i  : in  std_logic  -- 1 : RX expects a parity bit
+   ;cfg_rx_parity_odd_i     : in  std_logic  -- 0 : even, 1 : odd parity
+    -- TX : AXI-Stream input
+   ;s_axis_tdata_i          : in  std_logic_vector(WIDTH-1 downto 0)
+   ;s_axis_tvalid_i         : in  std_logic
+   ;s_axis_tready_o         : out std_logic
+    -- TX : To IO
+   ;uart_tx_o               : out std_logic
+   ;uart_cts_b_i            : in  std_logic  -- Clear To Send (active low), asynchronous
+    -- RX : From IO
+   ;uart_rx_i               : in  std_logic  -- Asynchronous
+    -- RX : AXI-Stream output
+   ;m_axis_tdata_o          : out std_logic_vector(WIDTH-1 downto 0)
+   ;m_axis_parity_error_o   : out std_logic  -- Parity error of m_axis_tdata_o
+   ;m_axis_tvalid_o         : out std_logic
+   ;m_axis_tready_i         : in  std_logic
+    -- RX : errors, one clock cycle pulses at the end of a frame
+   ;err_overrun_o           : out std_logic  -- Byte still pending : new byte dropped
+   ;err_parity_o            : out std_logic  -- Parity bit mismatch
+   ;err_framing_o           : out std_logic  -- Stop bit sampled at 0
+   ;err_break_o             : out std_logic  -- All bits of the frame at 0
+    -- Debug
+   ;debug_o                 : out uart_debug_t
+  );
+end component uart_core;
 
 component uart_rx_axis is
   generic (
