@@ -9,7 +9,8 @@
 --              The scenarios drive the inputs (tb_req) and read the outputs
 --              (tb_rsp) ; frames on the pads with the UVVM UART BFM,
 --              uart_rx_i looped back to uart_tx_o on request. Each pulse of
---              err_*_o is counted (tb_rsp.nb_*, cleared by the reset).
+--              err_*_o is counted and each byte taken on m_axis is kept
+--              (tb_rsp.nb_*, tb_rsp.rx_bytes, cleared by the reset).
 --              TESTS_LIST           : scenarios run in sequence, separated
 --                                     by ',' (tb_uart_core_tests_pkg), each
 --                                     one after a reset pulse ; "" : build
@@ -21,6 +22,7 @@
 -- Revisions  :
 -- Date        Version  Author   Description
 -- 2026-11-23  1.0      mrosiere Created
+-- 2026-11-25  1.1      mrosiere Bytes taken on m_axis kept (nb_rx, rx_bytes)
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -106,7 +108,7 @@ begin
              tb_req.rx;
 
   -----------------------------------------------------------------------------
-  -- Error pulses counted since the reset
+  -- Error pulses and bytes taken on m_axis since the reset
   -----------------------------------------------------------------------------
   p_errors : process (clk_i, arst_b_i) is
   begin
@@ -116,12 +118,19 @@ begin
       tb_rsp.nb_parity  <= 0;
       tb_rsp.nb_framing <= 0;
       tb_rsp.nb_break   <= 0;
+      tb_rsp.nb_rx      <= 0;
+      tb_rsp.rx_bytes   <= (others => (others => '0'));
     elsif rising_edge(clk_i)
     then
       if tb_rsp.err_overrun = '1' then tb_rsp.nb_overrun <= tb_rsp.nb_overrun + 1; end if;
       if tb_rsp.err_parity  = '1' then tb_rsp.nb_parity  <= tb_rsp.nb_parity  + 1; end if;
       if tb_rsp.err_framing = '1' then tb_rsp.nb_framing <= tb_rsp.nb_framing + 1; end if;
       if tb_rsp.err_break   = '1' then tb_rsp.nb_break   <= tb_rsp.nb_break   + 1; end if;
+      if tb_rsp.m_tvalid = '1' and tb_req.m_tready = '1'
+      then
+        tb_rsp.rx_bytes(tb_rsp.nb_rx mod tb_rsp.rx_bytes'length) <= tb_rsp.m_tdata;
+        tb_rsp.nb_rx      <= tb_rsp.nb_rx + 1;
+      end if;
     end if;
   end process p_errors;
 

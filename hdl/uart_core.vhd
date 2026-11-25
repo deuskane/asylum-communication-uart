@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2026-11-23
--- Last update: 2026-11-23
+-- Last update: 2026-11-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -24,12 +24,17 @@
 --              uart_rx_i and uart_cts_b_i are asynchronous : each one is
 --              synchronized (sync2dffrn, 2 clock cycles) when its direction
 --              exists (RX : uart_rx_i, TX : uart_cts_b_i).
+--              The receiver samples each bit in its middle and needs at
+--              least 2*UART_RX_LATENCY = 8 clock cycles per bit
+--              (uart_baud_rate_gen) : simulation error below.
 -------------------------------------------------------------------------------
 -- Copyright (c) 2026
 -------------------------------------------------------------------------------
 -- Revisions  :
 -- Date        Version  Author   Description
 -- 2026-11-23  1.0      mrosiere Created
+-- 2026-11-25  1.1      mrosiere Error (simulation) below 8 clock cycles per
+--                               bit with the receiver
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -219,6 +224,21 @@ begin  -- architecture rtl
       ,err_break_o             => err_break_o
       ,debug_o                 => debug_o.uart_rx
       );
+
+-- synthesis translate_off
+    -- Checked on each start bit : with less than 2*UART_RX_LATENCY clock
+    -- cycles per bit, the middle of the bit comes before the receiver can
+    -- sample it (uart_baud_rate_gen) : it waits in START, no byte
+    process (rx_baud_tick_en)
+    begin
+      if rising_edge(rx_baud_tick_en)
+      then
+        assert unsigned(cfg_baud_tick_cnt_max_i) >= 2*UART_RX_LATENCY-1
+          report "uart_core : " & integer'image(to_integer(unsigned(cfg_baud_tick_cnt_max_i))+1) & " clock cycles per bit, the receiver needs at least " & integer'image(2*UART_RX_LATENCY)
+          severity error;
+      end if;
+    end process;
+-- synthesis translate_on
   end generate gen_rx;
 
   gen_rx_b: if RX_ENABLE = false

@@ -67,7 +67,7 @@ The transmitter and the receiver have AXI-Stream-like valid/ready interfaces, th
 ## Features
 
 - Frame: 1 start bit, 8 data bits LSB first, optional parity bit (even or odd), 1 stop bit
-- Baud rate `f_clk / (baud_tick_cnt_max + 1)`: reset value from the generics `CLOCK_FREQ` / `BAUD_RATE`, software-writable 16-bit divider (`USER_DEFINE_BAUD_TICK`)
+- Baud rate `f_clk / (baud_tick_cnt_max + 1)`: reset value from the generics `CLOCK_FREQ` / `BAUD_RATE`, software-writable 16-bit divider (`USER_DEFINE_BAUD_TICK`); the receiver samples each bit in its middle and needs at least 8 clock cycles per bit
 - Separate TX and RX enables, each one the reset of its path; bytes written while TX is disabled stay in the TX FIFO
 - Configurable FIFO depths (`DEPTH_TX`, `DEPTH_RX`, 0 = no FIFO), blocking read / write of `data`
 - Hardware flow control: CTS# gates the transmitter, RTS# deasserted at `DEPTH_RX - 2` bytes in the RX FIFO
@@ -180,7 +180,7 @@ The asynchronous inputs are synchronized inside the IP: connect them directly to
 |------|-----------|------|-------------|
 | `clk_i` | in | std_logic | Clock |
 | `arst_b_i` | in | std_logic | Asynchronous reset, active low |
-| `cfg_baud_tick_cnt_max_i` | in | std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) | Clock cycles per bit - 1, for TX and RX; change it while both directions are disabled |
+| `cfg_baud_tick_cnt_max_i` | in | std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) | Clock cycles per bit - 1, for TX and RX; at least 7 with the receiver (8 clock cycles per bit, see [Sampling point](#sampling-point)); change it while both directions are disabled |
 | `cfg_tx_enable_i` / `cfg_rx_enable_i` | in | std_logic | `'0'`: the direction is held in reset (its reset is `arst_b_i and cfg_<dir>_enable_i`) |
 | `cfg_tx_parity_enable_i` / `cfg_tx_parity_odd_i` | in | std_logic | TX parity bit; 0: even, 1: odd |
 | `cfg_rx_parity_enable_i` / `cfg_rx_parity_odd_i` | in | std_logic | RX parity bit, sampled at the start of each frame; 0: even, 1: odd |
@@ -271,7 +271,7 @@ Components in `asylum.uart_pkg`, generic `WIDTH` (8) for the transmitter and the
 | `uart_rx_i` | in | std_logic | Serial input (already synchronized) |
 | `m_axis_tdata_o` / `m_axis_tvalid_o` / `m_axis_tready_i` | out / out / in | std_logic_vector(WIDTH-1 downto 0) / std_logic / std_logic | Received byte, every byte is delivered (except a byte dropped by an overrun) |
 | `m_axis_parity_error_o` | out | std_logic | Parity error of the byte on `m_axis_tdata_o`; the policy is applied by the sink |
-| `baud_tick_i` / `baud_tick_half_i` | in | std_logic | Baud ticks (sampling on `baud_tick_half_i`, mid-bit) |
+| `baud_tick_i` / `baud_tick_half_i` | in | std_logic | Baud ticks (the line is sampled on the clock edge after `baud_tick_half_i`, mid-bit) |
 | `baud_tick_en_o` | out | std_logic | Enable of the baud rate generator (START and ACTIVE states) |
 | `parity_enable_i` / `parity_odd_i` | in | std_logic | Parity configuration, sampled at the start of each frame |
 | `last_parity_error_o` | out | std_logic | Parity status of the last received frame (debug) |
@@ -285,7 +285,7 @@ Components in `asylum.uart_pkg`, generic `WIDTH` (8) for the transmitter and the
 |------|-----------|------|-------------|
 | `baud_tick_en_i` | in | std_logic | Enable; the counter is loaded with `cfg_baud_tick_cnt_max_i` on its rising edge |
 | `baud_tick_o` | out | std_logic | One-cycle pulse every `cfg_baud_tick_cnt_max_i + 1` cycles |
-| `baud_tick_half_o` | out | std_logic | One-cycle pulse when the counter is at `cfg_baud_tick_cnt_max_i / 2` (mid-bit) |
+| `baud_tick_half_o` | out | std_logic | One-cycle pulse when the counter is at `cfg_baud_tick_cnt_max_i / 2 + UART_RX_LATENCY` (4, `uart_pkg`): sampling point of the receiver, in the middle of the bit (see [Sampling point](#sampling-point)); never with less than 8 clock cycles per bit |
 | `cfg_baud_tick_cnt_max_i` | in | std_logic_vector(BAUD_TICK_CNT_WIDTH-1 downto 0) | Reload value of the down counter |
 
 </details>
@@ -297,7 +297,7 @@ Generics of `sbi_UART`:
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `NAME` | string | `""` | Instance name, visible in `sbi_tgt_o.info` |
-| `BAUD_RATE` | integer | `115200` | Baud rate (bit/s) of the reset value of `baud_tick_cnt_max` |
+| `BAUD_RATE` | integer | `115200` | Baud rate (bit/s) of the reset value of `baud_tick_cnt_max`; the receiver needs `CLOCK_FREQ / BAUD_RATE >= 8` |
 | `CLOCK_FREQ` | integer | `50000000` | Frequency of `clk_i` in Hz |
 | `BAUD_TICK_CNT_WIDTH` | integer | `16` | Width of the baud rate counters; keep 16, the width of `baud_tick_cnt_max_msb & baud_tick_cnt_max_lsb` |
 | `UART_TX_ENABLE` | boolean | `true` | `false`: no transmitter (`uart_tx_o = '1'`, writes to `data` accepted and dropped) |
@@ -316,21 +316,23 @@ Figures of the `syn_*` targets (`make nonreg_syn`, see [Targets](#targets)): [sy
 
 | Configuration | LUT¹ | LUTRAM¹ | FF¹ | CARRY4¹ | MUXF7/F8¹ | BRAM¹ | DSP¹ | Area² (µm²) | kGE³ |
 |---|---|---|---|---|---|---|---|---|---|
-| `syn_default` (default generics, no FIFO) | 223 | 0 | 146 | 8 | 32 | 0 | 0 | 6711.44 | 1.788 |
-| `syn_fifo16` (FIFOs 16 / 16, as `tb_UART`) | 249 | 16 | 171 | 18 | 42 | 0 | 0 | 17653.18 | 4.703 |
+| `syn_default` (default generics, no FIFO) | 225 | 0 | 146 | 12 | 42 | 0 | 0 | 6870.34 | 1.830 |
+| `syn_fifo16` (FIFOs 16 / 16, as `tb_UART`) | 250 | 16 | 171 | 22 | 53 | 0 | 0 | 17799.57 | 4.742 |
 | `syn_tx_only` (no receiver, TX FIFO 4) | 134 | 8 | 91 | 6 | 16 | 0 | 0 | 5142.43 | 1.370 |
-| `syn_rx_only` (no transmitter, RX FIFO 4) | 139 | 8 | 113 | 7 | 14 | 0 | 0 | 6383.62 | 1.701 |
-| `syn_fixed_baud` (no FIFO, fixed divider) | 196 | 0 | 130 | 8 | 9 | 0 | 0 | 5621.64 | 1.498 |
-| `syn_parity_drop` (no FIFO, `RX_PARITY_ERROR = "drop"`) | 226 | 0 | 147 | 8 | 34 | 0 | 0 | 6762.74 | 1.802 |
-| `syn_parity_halt` (no FIFO, `RX_PARITY_ERROR = "halt"`) | 226 | 0 | 146 | 8 | 39 | 0 | 0 | 6746.47 | 1.797 |
-| `syn_core` (`uart_core`, TX and RX) | 159 | 0 | 103 | 8 | 29 | 0 | 0 | 4699.51 | 1.252 |
+| `syn_rx_only` (no transmitter, RX FIFO 4) | 141 | 8 | 113 | 11 | 24 | 0 | 0 | 6532.52 | 1.740 |
+| `syn_fixed_baud` (no FIFO, fixed divider) | 196 | 0 | 130 | 8 | 9 | 0 | 0 | 5620.39 | 1.497 |
+| `syn_parity_drop` (no FIFO, `RX_PARITY_ERROR = "drop"`) | 228 | 0 | 147 | 12 | 44 | 0 | 0 | 6924.14 | 1.845 |
+| `syn_parity_halt` (no FIFO, `RX_PARITY_ERROR = "halt"`) | 228 | 0 | 146 | 12 | 49 | 0 | 0 | 6899.12 | 1.838 |
+| `syn_core` (`uart_core`, TX and RX) | 161 | 0 | 103 | 12 | 39 | 0 | 0 | 4849.65 | 1.292 |
 | `syn_core_tx_only` (`uart_core`, TX only) | 79 | 0 | 42 | 4 | 16 | 0 | 0 | 1845.52 | 0.492 |
 
-¹ Xilinx Artix-7 (LUT6), Yosys 0.33 `synth_xilinx -flatten -noiopad -noclkbuf`, before place and route: every cell of the netlist is counted, Vivado may differ. Identical cells are merged as a vendor tool does (`opt_merge -share_all`): the inverters of an active-low reset net become one (the resets of the TX and RX paths, `arst_b_i and cfg_<dir>_enable_i` in `uart_core`, are reset nets too); every remaining cell is counted, an `INV` as a `LUT1` (31 of the 223 LUTs of `syn_default`, 32 of the 159 of `syn_core`). The FIFO storage is in LUTRAM (`RAM32M`), not in BRAM.
+¹ Xilinx Artix-7 (LUT6), Yosys 0.33 `synth_xilinx -flatten -noiopad -noclkbuf`, before place and route: every cell of the netlist is counted, Vivado may differ. Identical cells are merged as a vendor tool does (`opt_merge -share_all`): the inverters of an active-low reset net become one (the resets of the TX and RX paths, `arst_b_i and cfg_<dir>_enable_i` in `uart_core`, are reset nets too); every remaining cell is counted, an `INV` as a `LUT1` (32 of the 225 LUTs of `syn_default`, 33 of the 161 of `syn_core`). The FIFO storage is in LUTRAM (`RAM32M`), not in BRAM.
 
 ² SkyWater sky130 `sky130_fd_sc_hd`, typical corner (tt, 25 °C, 1.80 V), Yosys 0.33 `synth` + `dfflibmap` + `abc -liberty`: standard-cell area only, no timing constraint, no buffering, clock tree or placement; the FIFO storage becomes flip-flops (no SRAM macro).
 
 ³ Area in thousands of NAND2 gate equivalents (`sky130_fd_sc_hd__nand2_1` = 3.7536 µm²).
+
+Since 3.2.0 the RX half tick compares the counter with `baud_tick_cnt_max / 2 + 4` (see [Sampling point](#sampling-point)): the adder costs 2 LUT and 4 `CARRY4` (ABC also maps 10 more `MUXF7` / `MUXF8`) and about 22 sky130 cells (+150 µm²) per receiver, and folds into a constant with a fixed divider (`syn_fixed_baud`); the flip-flops are unchanged.
 
 ## Theory of Operation
 
@@ -354,9 +356,25 @@ Figures of the `syn_*` targets (`make nonreg_syn`, see [Targets](#targets)): [sy
 
 ![UART frame](doc/uart-frame.svg)
 
-Each direction has its own `uart_baud_rate_gen`, a down counter reloaded with `baud_tick_cnt_max`: one bit lasts `baud_tick_cnt_max + 1` clock cycles. The reset value of `baud_tick_cnt_max` is `CLOCK_FREQ / BAUD_RATE - 1` (integer division): 433 for 115200 baud at 50 MHz (115207 baud). The TX generator runs free and the transmitter shifts one bit per `baud_tick`. The RX generator starts on the falling edge of the start bit, and the receiver samples each bit at mid-bit (`baud_tick_half`), which tolerates a few percent of baud rate mismatch (± 3 % in simulation).
+Each direction has its own `uart_baud_rate_gen`, a down counter reloaded with `baud_tick_cnt_max`: one bit lasts `baud_tick_cnt_max + 1` clock cycles. The reset value of `baud_tick_cnt_max` is `CLOCK_FREQ / BAUD_RATE - 1` (integer division): 433 for 115200 baud at 50 MHz (115207 baud). The TX generator runs free and the transmitter shifts one bit per `baud_tick`. The RX generator starts on the falling edge of the start bit, and the receiver samples each bit at mid-bit (`baud_tick_half`), which tolerates a few percent of baud rate mismatch: ± 2 % with back-to-back frames from 8 to 434 clock cycles per bit, ± 3 % at 434 in simulation (the margin grows with the clock cycles per bit: with back-to-back frames, a sender 2 % faster to 5 % slower at 8 cycles per bit, 4 % faster to 5 % slower at 100 and 434).
 
 `ctrl_tx.tx_enable` and `ctrl_rx.rx_enable` (`cfg_tx_enable_i` / `cfg_rx_enable_i` of `uart_core`) hold their path (transmitter or receiver and its generator) in reset: write `baud_tick_cnt_max` while both are 0.
+
+### Sampling point
+
+The receiver samples the line on the clock edge after `baud_tick_half`. With `N = baud_tick_cnt_max + 1` clock cycles per bit and the clock edges counted from the one where `uart_rx_axis` sees the start bit (edge 0):
+
+| Edge | Event |
+|------|-------|
+| 0 | `uart_rx_axis` sees the start bit: IDLE to START |
+| 1 | `baud_tick_en_o` = 1 |
+| 2 | RX counter loaded with `baud_tick_cnt_max` |
+| 3 + `baud_tick_cnt_max` - H | counter at `H`: `baud_tick_half` = 1 |
+| 4 + `baud_tick_cnt_max` - H | start bit sampled (false start if `'1'`), then one bit every N cycles |
+
+The middle of the start bit is at edge `N / 2` (integer division), so the half tick comes at `H = baud_tick_cnt_max / 2 + UART_RX_LATENCY`: `UART_RX_LATENCY` (4, in `uart_pkg`) compensates the 4 registers between the start bit seen and its sample. The line falls up to one clock cycle before edge 0: each bit is sampled between `N/2 - 1/2` and `N/2 + 1` clock cycles after its start (measured with the bits starting on a falling clock edge: 4.5 cycles at N = 8 and 9, 5.5 at 10, 6.5 at 13, 8.5 at 16, 50.5 at 100). The synchronizer of `uart_core` delays the start bit and the samples alike: it does not move the sampling point. Before 3.2.0 the half tick came at `baud_tick_cnt_max / 2`, 4 cycles after the middle of the bit (past the bit below 9 cycles per bit).
+
+The receiver needs **at least 8 clock cycles per bit** (`baud_tick_cnt_max >= 7`, `2 * UART_RX_LATENCY`): the middle of the start bit must not come before its earliest sample, 4 cycles after the start bit is seen (`H <= baud_tick_cnt_max`). Below, the half tick never comes: the receiver waits in START and receives nothing; `uart_core` reports a simulation error on each start bit. The transmitter has no such limit. At 50 MHz the receiver goes up to 6.25 Mbaud, at 12.5 MHz up to 1.5625 Mbaud.
 
 ### Transmitter
 
@@ -504,7 +522,7 @@ The receive errors are the bits `UART_RX_ERRORS` of `isr`: read them, then write
 | File | DUT | Description |
 |------|-----|-------------|
 | [sim/basic/tb_UART.vhd](sim/basic/tb_UART.vhd) | `sbi_UART` | Self-checking UVVM testbench with the SBI VIP, 50 MHz, 115200 baud, `DEPTH_TX = DEPTH_RX = 16`, generics `TESTS_LIST` (scenarios, see below) and `RX_PARITY_ERROR` (of the DUT). A UART BFM drives `uart_rx_i` (bit period, parity, corrupted parity bit, stop bit level) and a monitor checks every bit of the frames on `uart_tx_o`. Scenarios in `tb_UART_<name>_pkg` (one package per scenario), names and dispatch in [tb_UART_tests_pkg](sim/basic/tb_UART_tests_pkg.vhd), helpers (register accesses, UART BFM and monitor, reset pulse) in [tb_UART_bfm_pkg](sim/basic/tb_UART_bfm_pkg.vhd) |
-| [sim/core/tb_uart_core.vhd](sim/core/tb_uart_core.vhd) | `uart_core` | Self-checking UVVM testbench with the UVVM UART BFM (frames sent on `uart_rx_i`, parity and stop bit errors injected; frames checked on `uart_tx_o`), 50 MHz, 16 or 434 clock cycles per bit, generics `TESTS_LIST`, `TX_ENABLE` and `RX_ENABLE` (of the DUT). The scenarios drive the inputs and read the outputs of the DUT as two records (`tb_req`, `tb_rsp`, inputs changed on the falling edge, except the asynchronous frames of `rx`), `uart_rx_i` looped back to `uart_tx_o` on request; the testbench counts the pulses of each `err_*_o`. Scenarios in `tb_uart_core_<name>_pkg`, names, dispatch and the directions each one needs (else `TB_ERROR`) in [tb_uart_core_tests_pkg](sim/core/tb_uart_core_tests_pkg.vhd), helpers in [tb_uart_core_bfm_pkg](sim/core/tb_uart_core_bfm_pkg.vhd) |
+| [sim/core/tb_uart_core.vhd](sim/core/tb_uart_core.vhd) | `uart_core` | Self-checking UVVM testbench with the UVVM UART BFM (frames sent on `uart_rx_i`, parity and stop bit errors injected; frames checked on `uart_tx_o`), 50 MHz, 8 to 434 clock cycles per bit, frames with one bit cut to find the sampling point, generics `TESTS_LIST`, `TX_ENABLE` and `RX_ENABLE` (of the DUT). The scenarios drive the inputs and read the outputs of the DUT as two records (`tb_req`, `tb_rsp`, inputs changed on the falling edge, except the asynchronous frames of `rx`), `uart_rx_i` looped back to `uart_tx_o` on request; the testbench counts the pulses of each `err_*_o`. Scenarios in `tb_uart_core_<name>_pkg`, names, dispatch and the directions each one needs (else `TB_ERROR`) in [tb_uart_core_tests_pkg](sim/core/tb_uart_core_tests_pkg.vhd), helpers in [tb_uart_core_bfm_pkg](sim/core/tb_uart_core_bfm_pkg.vhd) |
 
 ### Scenarios (`TESTS_LIST`)
 
@@ -543,9 +561,11 @@ Scenarios of `tb_uart_core`, checks for the configurations TX and RX (`sim_core_
 | `rx_errors` | 30 / - / 30 / - | Framing error (byte delivered), break with and without parity, overrun (pending byte kept, new byte dropped): one pulse each |
 | `tx_disabled` | - / - / 12 / 12 | `TX_ENABLE = false`: `uart_tx_o`, `s_axis_tready_o` (bytes taken) and `debug_o.uart_tx` constant, whatever the configuration and CTS# |
 | `rx_disabled` | - / 18 / - / 18 | `RX_ENABLE = false`: `m_axis_*`, `err_*` and `debug_o.uart_rx` constant while good frames, parity errors, framing errors and a break come on `uart_rx_i` |
-| **Total** | **391 / 70 / 158 / 30** | |
+| `rx_sampling` | 609 / - / 609 / - | At 8, 9, 10, 13, 16, 100 and 434 clock cycles per bit, each bit of the frame (start, 8 data bits, odd parity, stop) cut in turn: at 0 during `(N-1)/2` clock cycles then at 1, read at 1 (cut start bit: false start, no byte); at 0 during `(N+2)/2` cycles, read at 0 (data bit, parity error, framing error): each bit sampled within one clock cycle of its middle |
+| `rx_baud_mismatch` | 140 / - / 140 / - | At the same clock cycles per bit, 6 patterns back to back with even parity, the BFM bit period 2 % shorter then 2 % longer than the DUT: every byte received, no parity, framing or overrun error |
+| **Total** | **1140 / 70 / 907 / 30** | |
 
-`tb_uart_core` was validated with 24 RTL mutants of `uart_core` (removed direction driving its outputs, baud rate generators swapped, RX parity from the TX configuration and back, enables ignored, error outputs swapped, CTS# ignored, RX generator free running, synchronizers), each scenario run alone in every configuration where it applies: 21 are killed; the 3 others are equivalent in simulation (RX synchronizer bypassed, CTS# synchronizer bypassed: 2 clock cycles less of latency; RX synchronized without the inversion: line seen at `'0'` during the reset and 2 cycles after, while the testbench holds the receiver in reset with `cfg_rx_enable_i = 0`).
+`tb_uart_core` was validated with 24 RTL mutants of `uart_core` (removed direction driving its outputs, baud rate generators swapped, RX parity from the TX configuration and back, enables ignored, error outputs swapped, CTS# ignored, RX generator free running, synchronizers), each scenario run alone in every configuration where it applies: 21 are killed; the 3 others are equivalent in simulation (RX synchronizer bypassed, CTS# synchronizer bypassed: 2 clock cycles less of latency; RX synchronized without the inversion: line seen at `'0'` during the reset and 2 cycles after, while the testbench holds the receiver in reset with `cfg_rx_enable_i = 0`). 7 mutants of the sampling point (no compensation as before 3.2.0: 4 cycles late; 2 and 1 cycles late; 1 and 2 cycles early; each bit sampled 4 cycles after its start; sampled at its end, on `baud_tick`) are each killed by `rx_sampling` and by `rx_baud_mismatch`; only the last two are also killed by the scenarios written before 3.2.0.
 
 The testbench of `sbi_UART` was validated with 42 RTL mutants (transmitter, receiver, baud rate generator, `sbi_UART`, register map), each run scenario by scenario in the three configurations: 40 are killed; the 2 others do not change the function (receiver synchronizer bypassed, now in `uart_core`; first RX sample one clock cycle earlier); rerun on `sbi_UART` built on `uart_core` with its synchronizers, every mutant is killed by the same scenarios. Not simulated: `DEPTH_TX` / `DEPTH_RX` = 0, `UART_TX_ENABLE` / `UART_RX_ENABLE` = false and `USER_DEFINE_BAUD_TICK` = false (checked by the `lint_ghdl_synth_*` and `syn_*` targets only; the constant outputs of a removed direction are simulated in `tb_uart_core`).
 
@@ -559,9 +579,9 @@ The testbench of `sbi_UART` was validated with 42 RTL mutants (transmitter, rece
 | `sim_rx_parity_drop` | `tb_UART` | `RX_PARITY_ERROR = "drop"`, every scenario (762 checks) |
 | `sim_rx_parity_halt` | `tb_UART` | `RX_PARITY_ERROR = "halt"`, every scenario (779 checks) |
 | `sim_core` | `tb_uart_core` | Reference configuration of `uart_core` (TX and RX): build and elaboration only |
-| `sim_core_<name>` | `tb_uart_core` | One target per scenario of the reference configuration: `sim_core_tx`, `_rx`, `_loopback`, `_cts`, `_rx_errors` (391 checks in all) |
+| `sim_core_<name>` | `tb_uart_core` | One target per scenario of the reference configuration: `sim_core_tx`, `_rx`, `_loopback`, `_cts`, `_rx_errors`, `_rx_sampling`, `_rx_baud_mismatch` (1140 checks in all) |
 | `sim_core_tx_only` | `tb_uart_core` | `RX_ENABLE = false`: `tx`, `cts`, `rx_disabled` (70 checks) |
-| `sim_core_rx_only` | `tb_uart_core` | `TX_ENABLE = false`: `rx`, `rx_errors`, `tx_disabled` (158 checks) |
+| `sim_core_rx_only` | `tb_uart_core` | `TX_ENABLE = false`: `rx`, `rx_errors`, `rx_sampling`, `rx_baud_mismatch`, `tx_disabled` (907 checks) |
 | `sim_core_disabled` | `tb_uart_core` | `TX_ENABLE = RX_ENABLE = false`: `tx_disabled`, `rx_disabled` (30 checks) |
 | `lint_ghdl` | `asylum.sbi_UART_wrapper` | GHDL `-Wall` analysis and elaboration of [syn/sbi_UART_wrapper.vhd](syn/sbi_UART_wrapper.vhd) |
 | `lint_ghdl_synth_<config>` | `asylum.sbi_UART_wrapper` | `ghdl --synth` check (no latch, synthesizable) for 7 generic configurations: `default`, `fifo16`, `tx_only`, `rx_only`, `fixed_baud`, `parity_drop`, `parity_halt` |
@@ -590,7 +610,7 @@ To run a list of scenarios, build the testbench once, then run the list without 
 
 ```bash
 make sim_basic                   # build and elaboration (TESTS_LIST empty)
-fusesoc --cores-root . run --build-root build --no-export --run --target sim_basic asylum:communication:uart:3.1.0 --TESTS_LIST=rx,echo,rx --RX_PARITY_ERROR=halt
+fusesoc --cores-root . run --build-root build --no-export --run --target sim_basic asylum:communication:uart:3.2.0 --TESTS_LIST=rx,echo,rx --RX_PARITY_ERROR=halt
 ```
 
 or in the build directory of the target, `make run EXTRA_OPTIONS="-gTESTS_LIST=rx,echo -gRX_PARITY_ERROR=keep"`: `EXTRA_OPTIONS` replaces every generic set by the target, repeat the generics of the configuration.
