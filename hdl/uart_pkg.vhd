@@ -19,6 +19,7 @@
 --                               parity_error_o renamed
 --                               last_parity_error_o
 -- 2026-11-23  1.5      mrosiere Add uart_core
+-- 2026-11-25  1.6      mrosiere Add UART_RX_LATENCY
 -------------------------------------------------------------------------------
 
 library IEEE;
@@ -56,6 +57,16 @@ package uart_pkg is
     uart_rx : uart_rx_debug_t;
     
   end record uart_debug_t;
+
+  -----------------------------------------------------------------------------
+  -- UART_RX_LATENCY
+  -----------------------------------------------------------------------------
+  -- Clock cycles from the edge where uart_rx_axis sees a start bit to its
+  -- earliest sample (baud_tick_en_o, counter load, baud_tick_half_o, sample) :
+  -- uart_baud_rate_gen gives the half tick that many cycles before the middle
+  -- of the bit. The receiver needs at least 2*UART_RX_LATENCY clock cycles
+  -- per bit (cfg_baud_tick_cnt_max_i >= 2*UART_RX_LATENCY-1).
+  constant UART_RX_LATENCY : natural := 4;
 
   
 -- [COMPONENT_INSERT][BEGIN]

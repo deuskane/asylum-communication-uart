@@ -6,7 +6,7 @@
 -- Author     : Mathieu Rosiere
 -- Company    : 
 -- Created    : 2025-01-21
--- Last update: 2025-11-10
+-- Last update: 2026-11-25
 -- Platform   : 
 -- Standard   : VHDL'93/02
 -------------------------------------------------------------------------------
@@ -18,11 +18,16 @@
 -- Date        Version  Author   Description
 -- 2025-01-21  1.0      mrosiere Created
 -- 2025-05-03  1.1      mrosiere External Baud Tick Counter Generation
+-- 2026-11-25  1.2      mrosiere Half tick UART_RX_LATENCY cycles early : the
+--                               receiver samples in the middle of the bit
 -------------------------------------------------------------------------------
 
 library IEEE;
 use     IEEE.STD_LOGIC_1164.ALL;
 use     IEEE.NUMERIC_STD.ALL;
+
+library asylum;
+use     asylum.uart_pkg.ALL;
 
 entity uart_baud_rate_gen is
   generic
@@ -44,14 +49,31 @@ end uart_baud_rate_gen;
 architecture rtl of uart_baud_rate_gen is
   -- Déclaration des registres
   signal   cfg_baud_tick_cnt_max      : unsigned(BAUD_TICK_CNT_WIDTH-1 downto 0);
-  signal   cfg_baud_tick_cnt_max_div2 : unsigned(BAUD_TICK_CNT_WIDTH-1 downto 1);
+  signal   cfg_baud_tick_cnt_half     : unsigned(BAUD_TICK_CNT_WIDTH-1 downto 0);
   signal   baud_tick_cnt_r            : unsigned(BAUD_TICK_CNT_WIDTH-1 downto 0);
   signal   baud_tick_r                : std_logic;
   signal   baud_tick_half_r           : std_logic;
   signal   baud_tick_en_r             : std_logic;
 begin
   cfg_baud_tick_cnt_max      <= unsigned(cfg_baud_tick_cnt_max_i);
-  cfg_baud_tick_cnt_max_div2 <= cfg_baud_tick_cnt_max(BAUD_TICK_CNT_WIDTH-1 downto 1);
+
+  -- Half tick : sampling point of the receiver (uart_rx_axis), which samples
+  -- the line on the clock edge after baud_tick_half_o. With MAX =
+  -- cfg_baud_tick_cnt_max_i (N = MAX+1 clock cycles per bit) and the clock
+  -- edges counted from the one where the receiver sees the start bit
+  -- (edge 0) :
+  --   edge 1         : baud_tick_en_i = 1
+  --   edge 2         : counter loaded with MAX
+  --   edge 3+MAX-H   : counter at H, baud_tick_half_o = 1
+  --   edge 4+MAX-H   : start bit sampled, then each bit N cycles later
+  -- The middle of the start bit is at edge N/2 = MAX-MAX/2 (integer
+  -- division), so H = MAX/2 + UART_RX_LATENCY (4 cycles). As the line
+  -- falls up to one cycle before edge 0, each bit is sampled between N/2-1/2
+  -- and N/2+1 cycles after its start. H <= MAX needs N >= 2*UART_RX_LATENCY
+  -- (8 cycles per bit) : below, the half tick never comes. A synchronizer
+  -- before the receiver delays the start bit and the samples alike : it
+  -- does not move the sampling point.
+  cfg_baud_tick_cnt_half     <= ('0' & cfg_baud_tick_cnt_max(BAUD_TICK_CNT_WIDTH-1 downto 1)) + UART_RX_LATENCY;
 
   -- Processus principal pour générer le tick de baud
   process(clk_i, arst_b_i)
@@ -80,7 +102,7 @@ begin
           baud_tick_cnt_r <= cfg_baud_tick_cnt_max;
         else
           
-          if baud_tick_cnt_r = cfg_baud_tick_cnt_max_div2
+          if baud_tick_cnt_r = cfg_baud_tick_cnt_half
           then
             baud_tick_half_r <= '1';
           end if;       
