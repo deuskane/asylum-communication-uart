@@ -610,7 +610,7 @@ To run a list of scenarios, build the testbench once, then run the list without 
 
 ```bash
 make sim_basic                   # build and elaboration (TESTS_LIST empty)
-fusesoc --cores-root . run --build-root build --no-export --run --target sim_basic asylum:communication:uart:3.1.0 --TESTS_LIST=rx,echo,rx --RX_PARITY_ERROR=halt
+fusesoc --cores-root . run --build-root build --no-export --run --target sim_basic asylum:communication:uart:3.2.0 --TESTS_LIST=rx,echo,rx --RX_PARITY_ERROR=halt
 ```
 
 or in the build directory of the target, `make run EXTRA_OPTIONS="-gTESTS_LIST=rx,echo -gRX_PARITY_ERROR=keep"`: `EXTRA_OPTIONS` replaces every generic set by the target, repeat the generics of the configuration.

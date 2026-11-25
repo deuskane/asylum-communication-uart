@@ -57,9 +57,15 @@ CAPI=2:
 #                               synchronizers of uart_rx_i / uart_cts_b_i
 #                               moved into uart_core (internal loopbacks
 #                               of sbi_UART : 2 more clock cycles)
+# 2026-11-25  3.2.0    mrosiere RX sampling point in the middle of the bit
+#                               (half tick UART_RX_LATENCY cycles early, was
+#                               4 cycles late), receiver minimum 8 clock
+#                               cycles per bit, targets
+#                               sim_core_rx_sampling and
+#                               sim_core_rx_baud_mismatch
 #-----------------------------------------------------------------------------
 
-name        : asylum:communication:uart:3.1.0
+name        : asylum:communication:uart:3.2.0
 description : UART TX and RX
 
 #=========================================
