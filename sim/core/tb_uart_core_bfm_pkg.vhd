@@ -9,6 +9,7 @@
 --              (tb_req), outputs of the DUT and error pulse counters
 --              (tb_rsp), configuration, AXI-Stream transfers, UART frames
 --              sent on uart_rx_i and checked on uart_tx_o (UVVM UART BFM),
+--              frames with one bit cut (sampling point of the receiver),
 --              checks, reset pulse.
 -------------------------------------------------------------------------------
 -- Copyright (c) 2026
@@ -16,6 +17,9 @@
 -- Revisions  :
 -- Date        Version  Author   Description
 -- 2026-11-23  1.0      mrosiere Created
+-- 2026-11-25  1.1      mrosiere CYCLES_PER_BIT, bytes taken on m_axis
+--                               (nb_rx, rx_bytes), uart_send bit_ratio,
+--                               set_cycles, uart_send_cut
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -53,6 +57,12 @@ package tb_uart_core_bfm_pkg is
   type     parity_array_t is array (natural range <>) of t_parity;
   constant PARITIES        : parity_array_t := (PARITY_NONE, PARITY_EVEN, PARITY_ODD);
 
+  -- Clock cycles per bit of the rx_sampling and rx_baud_mismatch scenarios :
+  -- the minimum of the receiver (8), odd and even values, the fast and the
+  -- slow baud rates
+  type     natural_array_t is array (natural range <>) of natural;
+  constant CYCLES_PER_BIT  : natural_array_t := (8, 9, 10, 13, 16, 100, 434);
+
   -- Inputs of the DUT, driven by the scenario
   type tb_req_t is record
     cnt_max          : natural;     -- cfg_baud_tick_cnt_max_i
@@ -86,8 +96,8 @@ package tb_uart_core_bfm_pkg is
                                           loopback         => false,
                                           m_tready         => '0');
 
-  -- Outputs of the DUT and number of pulses of each error output since the
-  -- reset
+  -- Outputs of the DUT, number of pulses of each error output and bytes
+  -- taken on m_axis since the reset
   type tb_rsp_t is record
     s_tready         : std_logic;   -- s_axis_tready_o
     tx               : std_logic;   -- uart_tx_o
@@ -102,6 +112,8 @@ package tb_uart_core_bfm_pkg is
     nb_parity        : natural;     -- Pulses of err_parity_o
     nb_framing       : natural;     -- Pulses of err_framing_o
     nb_break         : natural;     -- Pulses of err_break_o
+    nb_rx            : natural;     -- Bytes taken on m_axis
+    rx_bytes         : byte_array_t(0 to 15); -- Byte i taken on m_axis in rx_bytes(i mod 16)
     debug            : uart_debug_t;-- debug_o
   end record tb_rsp_t;
 
@@ -171,15 +183,39 @@ package tb_uart_core_bfm_pkg is
     ;signal   clk      : in    std_logic
     );
 
+  -- cfg_baud_tick_cnt_max_i = cycles - 1, changed while RX is held in reset
+  -- (RX left enabled, without parity)
+  procedure set_cycles
+    (constant cycles   : in    natural  -- Clock cycles per bit
+    ;signal   clk      : in    std_logic
+    ;signal   tb_req   : inout tb_req_t
+    );
+
   -- Send one frame on uart_rx_i (UVVM UART BFM, baud rate tb_req.cnt_max)
   -- parity_error : inverted parity bit
   -- stop_error   : stop bit at 0
+  -- bit_ratio    : bit period of the BFM / bit period of the DUT
   procedure uart_send
     (constant data         : in    byte_t
     ;constant parity       : in    t_parity
     ;signal   tb_req       : inout tb_req_t
     ;constant parity_error : in    boolean := false
     ;constant stop_error   : in    boolean := false
+    ;constant bit_ratio    : in    real    := 1.0
+    );
+
+  -- Send one frame of 11 bits on uart_rx_i with one bit cut, to find where
+  -- the receiver samples it : start bit, 8 data bits 0xFF, odd parity bit,
+  -- stop bit ; bit b (0 : start, 1 to 8 : data, 9 : parity, 10 : stop) is
+  -- '0' during its first cut clock cycles, then the line is '1' until the
+  -- end of the frame. Each bit lasts tb_req.cnt_max+1 clock cycles from a
+  -- falling edge : the receiver reads '0' when it samples bit b before the
+  -- end of the cut.
+  procedure uart_send_cut
+    (constant b        : in    natural
+    ;constant cut      : in    natural
+    ;signal   clk      : in    std_logic
+    ;signal   tb_req   : inout tb_req_t
     );
 
   -- Receive one frame on uart_tx_o and check it (UVVM UART BFM, baud rate
@@ -328,15 +364,28 @@ package body tb_uart_core_bfm_pkg is
     check_value(tb_rsp.m_tvalid      , '0'    , error, msg & " : byte taken (m_axis_tvalid_o)", C_TB_SCOPE);
   end procedure;
 
+  procedure set_cycles
+    (constant cycles   : in    natural
+    ;signal   clk      : in    std_logic
+    ;signal   tb_req   : inout tb_req_t
+    ) is
+  begin
+    set_rx('0', PARITY_NONE, clk, tb_req);
+    tb_req.cnt_max <= cycles-1;
+    set_rx('1', PARITY_NONE, clk, tb_req);
+  end procedure;
+
   procedure uart_send
     (constant data         : in    byte_t
     ;constant parity       : in    t_parity
     ;signal   tb_req       : inout tb_req_t
     ;constant parity_error : in    boolean := false
     ;constant stop_error   : in    boolean := false
+    ;constant bit_ratio    : in    real    := 1.0
     ) is
     variable v_config      : t_uart_bfm_config := uart_config(tb_req.cnt_max, parity);
   begin
+    v_config.bit_time := v_config.bit_time * bit_ratio;
     v_config.error_injection.parity_bit_error := parity_error;
     v_config.error_injection.stop_bit_error   := stop_error;
     uart_transmit(data_value => data
@@ -345,6 +394,32 @@ package body tb_uart_core_bfm_pkg is
                  ,config     => v_config
                  ,scope      => C_TB_SCOPE
                  );
+  end procedure;
+
+  procedure uart_send_cut
+    (constant b        : in    natural
+    ;constant cut      : in    natural
+    ;signal   clk      : in    std_logic
+    ;signal   tb_req   : inout tb_req_t
+    ) is
+    constant C_BIT     : time := (tb_req.cnt_max+1) * C_CLK_PERIOD;
+  begin
+    wait until falling_edge(clk);
+    -- Bits before bit b : start bit at 0, then 1
+    for i in 0 to b-1 loop
+      if i = 0
+      then
+        tb_req.rx <= '0';
+      else
+        tb_req.rx <= '1';
+      end if;
+      wait for C_BIT;
+    end loop;
+    -- Bit b cut : 0 during cut clock cycles, then 1 until the end of the frame
+    tb_req.rx <= '0';
+    wait for cut * C_CLK_PERIOD;
+    tb_req.rx <= '1';
+    wait for (11-b) * C_BIT - cut * C_CLK_PERIOD;
   end procedure;
 
   procedure uart_check

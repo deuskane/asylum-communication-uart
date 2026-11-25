@@ -140,6 +140,8 @@ filesets:
       - sim/core/tb_uart_core_rx_errors_pkg.vhd
       - sim/core/tb_uart_core_tx_disabled_pkg.vhd
       - sim/core/tb_uart_core_rx_disabled_pkg.vhd
+      - sim/core/tb_uart_core_rx_sampling_pkg.vhd
+      - sim/core/tb_uart_core_rx_baud_mismatch_pkg.vhd
       - sim/core/tb_uart_core_tests_pkg.vhd
       - sim/core/tb_uart_core.vhd
     file_type    : vhdlSource-2008
@@ -648,6 +650,26 @@ targets:
       - RX_ENABLE=true
 
   #---------------------------------------
+  sim_core_rx_sampling:
+  #---------------------------------------
+    << : *sim_core
+    description     : Simulation of uart_core (UVVM) - each bit sampled in its middle (bit cut shorter and longer than half a bit), 8 to 434 clock cycles per bit
+    parameters      :
+      - TESTS_LIST=rx_sampling
+      - TX_ENABLE=true
+      - RX_ENABLE=true
+
+  #---------------------------------------
+  sim_core_rx_baud_mismatch:
+  #---------------------------------------
+    << : *sim_core
+    description     : Simulation of uart_core (UVVM) - back-to-back frames with a bit period 2 % shorter and 2 % longer, 8 to 434 clock cycles per bit
+    parameters      :
+      - TESTS_LIST=rx_baud_mismatch
+      - TX_ENABLE=true
+      - RX_ENABLE=true
+
+  #---------------------------------------
   sim_core_tx_only:
   #---------------------------------------
     << : *sim_core
@@ -663,7 +685,7 @@ targets:
     << : *sim_core
     description     : Simulation of uart_core (UVVM) - RX only (TX_ENABLE false), predefined outputs of TX
     parameters      :
-      - TESTS_LIST=rx,rx_errors,tx_disabled
+      - TESTS_LIST=rx,rx_errors,rx_sampling,rx_baud_mismatch,tx_disabled
       - TX_ENABLE=false
       - RX_ENABLE=true
 

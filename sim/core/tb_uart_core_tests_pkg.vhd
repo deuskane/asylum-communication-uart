@@ -15,6 +15,7 @@
 -- Revisions  :
 -- Date        Version  Author   Description
 -- 2026-11-23  1.0      mrosiere Created
+-- 2026-11-25  1.1      mrosiere Scenarios rx_sampling and rx_baud_mismatch
 -------------------------------------------------------------------------------
 
 library ieee;
@@ -32,7 +33,7 @@ use     work.tb_uart_core_bfm_pkg.all;
 package tb_uart_core_tests_pkg is
 
   -- Names of the scenarios (valid items of TESTS_LIST)
-  constant C_TESTS : string := "tx,rx,loopback,cts,rx_errors,tx_disabled,rx_disabled";
+  constant C_TESTS : string := "tx,rx,loopback,cts,rx_errors,tx_disabled,rx_disabled,rx_sampling,rx_baud_mismatch";
 
   -- Run the scenario name ; a scenario that does not apply to TX_ENABLE /
   -- RX_ENABLE is a testbench error
@@ -99,6 +100,14 @@ package body tb_uart_core_tests_pkg is
     then
       check_generics(name, not rx_enable, "RX_ENABLE = false");
       work.tb_uart_core_rx_disabled_pkg.run(clk, tb_req, tb_rsp);
+    elsif string_eq(name, "rx_sampling")
+    then
+      check_generics(name, rx_enable, "RX_ENABLE = true");
+      work.tb_uart_core_rx_sampling_pkg.run(clk, tb_req, tb_rsp);
+    elsif string_eq(name, "rx_baud_mismatch")
+    then
+      check_generics(name, rx_enable, "RX_ENABLE = true");
+      work.tb_uart_core_rx_baud_mismatch_pkg.run(clk, tb_req, tb_rsp);
     else
       alert(TB_ERROR, "Unknown test " & name, C_TB_SCOPE);
     end if;

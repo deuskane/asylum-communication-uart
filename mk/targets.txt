@@ -31,8 +31,10 @@ sim_core_cts                 : Simulation of uart_core (UVVM) - CTS# back-pressu
 sim_core_disabled            : Simulation of uart_core (UVVM) - TX and RX disabled, predefined outputs
 sim_core_loopback            : Simulation of uart_core (UVVM) - TX looped back to RX at two baud rates, every parity, TX and RX parities set separately
 sim_core_rx                  : Simulation of uart_core (UVVM) - reception without, with even and with odd parity, parity error, cfg_rx_enable_i
+sim_core_rx_baud_mismatch    : Simulation of uart_core (UVVM) - back-to-back frames with a bit period 2 % shorter and 2 % longer, 8 to 434 clock cycles per bit
 sim_core_rx_errors           : Simulation of uart_core (UVVM) - framing error, break and overrun pulses
 sim_core_rx_only             : Simulation of uart_core (UVVM) - RX only (TX_ENABLE false), predefined outputs of TX
+sim_core_rx_sampling         : Simulation of uart_core (UVVM) - each bit sampled in its middle (bit cut shorter and longer than half a bit), 8 to 434 clock cycles per bit
 sim_core_tx                  : Simulation of uart_core (UVVM) - transmission without, with even and with odd parity, cfg_tx_enable_i
 sim_core_tx_only             : Simulation of uart_core (UVVM) - TX only (RX_ENABLE false), predefined outputs of RX
 sim_rx_parity_drop           : Simulation of sbi_UART (UVVM) - bytes with a parity error dropped (RX_PARITY_ERROR drop), every scenario
